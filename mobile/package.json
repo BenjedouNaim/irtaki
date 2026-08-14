@@ -28,8 +28,26 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.4",
+    "@babel/preset-react": "^7.27.4",
+    "@babel/preset-typescript": "^7.27.4",
+    "@eslint/js": "^9.39.5",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.2",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.67.0"
   },
   "scripts": {
     "start": "expo start",
@@ -37,7 +55,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "eslint \"{src,app}/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"{src,app}/**/*.{ts,tsx}\" --fix",
+    "type-check": "tsc --noEmit",
+    "test:unit": "jest --passWithNoTests"
   },
   "private": true
 }
