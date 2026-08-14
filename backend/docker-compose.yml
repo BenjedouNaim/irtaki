@@ -1,0 +1,30 @@
+# backend/docker-compose.yml
+# Local development Postgres only — not used in CI or production.
+# Production runs on self-hosted Tunisian VPS managed by Coolify (ADR-014).
+#
+# Usage:
+#   docker compose up -d          # start Postgres
+#   docker compose down -v        # stop and wipe volumes
+#
+# After starting: run `typeorm migration:run` before starting the dev server (TD-03).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: irtaki
+      POSTGRES_USER: irtaki
+      POSTGRES_PASSWORD: irtaki
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U irtaki -d irtaki"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
