@@ -1,0 +1,9 @@
+{
+  "name": "irtaki-backend",
+  "private": true,
+  "scripts": {
+    "lint": "echo 'placeholder — real lint config lands in F-FND-01' && exit 0",
+    "type-check": "echo 'placeholder — real tsconfig lands in F-FND-01' && exit 0",
+    "test:unit": "echo 'placeholder — real tests land in F-FND-01' && exit 0"
+  }
+}
