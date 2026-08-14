@@ -1,0 +1,30 @@
+name: mobile-ci
+on:
+  pull_request:
+    paths: ['mobile/**']
+  push:
+    branches: [main]
+    paths: ['mobile/**']
+    tags: ['mobile-v*']
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run test:unit
+      # EAS Build and Submit placeholders - configure when Expo token exists
+      # - name: Setup Expo
+      #   uses: expo/expo-github-action@v8
+      #   with:
+      #     eas-version: latest
+      #     token: ${{ secrets.EXPO_TOKEN }}
+      # - name: EAS Build
+      #   run: eas build --platform all --non-interactive
