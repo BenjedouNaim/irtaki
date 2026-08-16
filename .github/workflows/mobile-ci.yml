@@ -17,6 +17,8 @@ jobs:
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for paths-filter git-diff mode (no API call)
 
       # Detect whether any mobile/** files changed. On push triggers this is
       # not needed (paths filter above already gates the job), but on PRs it
@@ -25,6 +27,7 @@ jobs:
         id: changes
         uses: dorny/paths-filter@v3
         with:
+          token: ''  # use git diff instead of GitHub API (avoids permission errors)
           filters: |
             mobile:
               - 'mobile/**'
@@ -36,7 +39,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.changes.outputs.mobile == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
