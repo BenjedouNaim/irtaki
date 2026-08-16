@@ -22,7 +22,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       username: process.env.DB_USER ?? 'irtaki',
       password: process.env.DB_PASS ?? 'irtaki',
       entities: [],
-      migrations: [],
+      migrations: [__dirname + '/../../migrations/*.{ts,js}'],
       synchronize: false,
       autoLoadEntities: false,
       logging: false,
