@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { SURAHS_DATA } from './quran/surahs.data';
+import { HIZB_BOUNDARIES_DATA } from './quran/hizb_boundaries.data';
 
 // Load environmental variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -123,12 +125,43 @@ async function seed() {
       `, [u.id, u.email, u.password_hash, u.role, u.full_name, u.gender, u.timezone, u.must_change_password]);
     }
 
-    // 3. Seed Reference Data Version (DBT-13)
-    console.log('Seeding reference data version...');
+    // 3. Seed Surahs (DBT-11)
+    console.log('Seeding surahs reference data (Qālūn ʿan Nāfiʿ)...');
+    for (const s of SURAHS_DATA) {
+      await dataSource.query(`
+        INSERT INTO "surahs" ("number", "name_ar", "ayah_count", "ordinal_offset")
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT ("number") DO UPDATE
+        SET "name_ar" = EXCLUDED.name_ar,
+            "ayah_count" = EXCLUDED.ayah_count,
+            "ordinal_offset" = EXCLUDED.ordinal_offset;
+      `, [s.number, s.name_ar, s.ayah_count, s.ordinal_offset]);
+    }
+
+    // 4. Seed Hizb Boundaries (DBT-12)
+    console.log('Seeding hizb boundaries reference data (60 Hizbs)...');
+    for (const h of HIZB_BOUNDARIES_DATA) {
+      await dataSource.query(`
+        INSERT INTO "hizb_boundaries" ("hizb_number", "start_ordinal", "end_ordinal", "start_surah", "start_ayah", "end_surah", "end_ayah")
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT ("hizb_number") DO UPDATE
+        SET "start_ordinal" = EXCLUDED.start_ordinal,
+            "end_ordinal" = EXCLUDED.end_ordinal,
+            "start_surah" = EXCLUDED.start_surah,
+            "start_ayah" = EXCLUDED.start_ayah,
+            "end_surah" = EXCLUDED.end_surah,
+            "end_ayah" = EXCLUDED.end_ayah;
+      `, [h.hizb_number, h.start_ordinal, h.end_ordinal, h.start_surah, h.start_ayah, h.end_surah, h.end_ayah]);
+    }
+
+    // 5. Seed Reference Data Version (DBT-13)
+    console.log('Seeding reference data version (qarun-nafi-v1.0)...');
     await dataSource.query(`
-      INSERT INTO "reference_data_version" ("id", "dataset_version")
-      VALUES (true, '1.0.0-placeholder')
-      ON CONFLICT ("id") DO NOTHING;
+      INSERT INTO "reference_data_version" ("id", "dataset_version", "loaded_at")
+      VALUES (true, 'qarun-nafi-v1.0', now())
+      ON CONFLICT ("id") DO UPDATE
+      SET "dataset_version" = EXCLUDED.dataset_version,
+          "loaded_at" = now();
     `);
 
     console.log('Seeding completed successfully!');
@@ -140,3 +173,4 @@ async function seed() {
 }
 
 void seed();
+
