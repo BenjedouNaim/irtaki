@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 
 export interface FormFieldProps {
   label: string;
@@ -41,7 +35,11 @@ export function FormField({
 
       {hasError ? (
         <View style={styles.errorRow} testID="form-field-error">
-          <Text style={styles.errorIcon} accessibilityElementsHidden aria-hidden>
+          <Text
+            testID="form-field-error-icon"
+            style={styles.errorIcon}
+            accessibilityLabel="تنبيه"
+          >
             ⚠️
           </Text>
           <Text style={styles.errorText}>{error}</Text>

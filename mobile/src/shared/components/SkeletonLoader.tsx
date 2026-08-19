@@ -31,7 +31,7 @@ export function SkeletonLoader({
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     pulseAnimation.start();
@@ -44,12 +44,20 @@ export function SkeletonLoader({
   if (variant === 'dashboard') {
     return (
       <View testID={testID} style={[styles.dashboardContainer, style]}>
-        <Animated.View style={[styles.dashboardHeader, { opacity: animatedValue }]} />
+        <Animated.View
+          style={[styles.dashboardHeader, { opacity: animatedValue }]}
+        />
         <View style={styles.dashboardGrid}>
-          <Animated.View style={[styles.dashboardCard, { opacity: animatedValue }]} />
-          <Animated.View style={[styles.dashboardCard, { opacity: animatedValue }]} />
+          <Animated.View
+            style={[styles.dashboardCard, { opacity: animatedValue }]}
+          />
+          <Animated.View
+            style={[styles.dashboardCard, { opacity: animatedValue }]}
+          />
         </View>
-        <Animated.View style={[styles.dashboardChart, { opacity: animatedValue }]} />
+        <Animated.View
+          style={[styles.dashboardChart, { opacity: animatedValue }]}
+        />
       </View>
     );
   }
@@ -59,11 +67,21 @@ export function SkeletonLoader({
   return (
     <View testID={testID} style={[styles.container, style]}>
       {items.map((key) => (
-        <View key={key} style={styles.rowWrapper} testID={`skeleton-row-${key}`}>
-          <Animated.View style={[styles.rowAvatar, { opacity: animatedValue }]} />
+        <View
+          key={key}
+          style={styles.rowWrapper}
+          testID={`skeleton-row-${key}`}
+        >
+          <Animated.View
+            style={[styles.rowAvatar, { opacity: animatedValue }]}
+          />
           <View style={styles.rowContent}>
-            <Animated.View style={[styles.rowTitle, { opacity: animatedValue }]} />
-            <Animated.View style={[styles.rowSubtitle, { opacity: animatedValue }]} />
+            <Animated.View
+              style={[styles.rowTitle, { opacity: animatedValue }]}
+            />
+            <Animated.View
+              style={[styles.rowSubtitle, { opacity: animatedValue }]}
+            />
           </View>
         </View>
       ))}

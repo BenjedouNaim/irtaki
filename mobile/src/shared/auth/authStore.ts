@@ -22,7 +22,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSession: (accessToken: string, role: Role) =>
     set({ accessToken, role, isAuthenticated: true, isLoading: false }),
   clearSession: () =>
-    set({ accessToken: null, role: null, isAuthenticated: false, isLoading: false }),
+    set({
+      accessToken: null,
+      role: null,
+      isAuthenticated: false,
+      isLoading: false,
+    }),
   setLoading: (isLoading: boolean) => set({ isLoading }),
 }));
 

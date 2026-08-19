@@ -1,7 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 
-export type StatusBadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+export type StatusBadgeVariant =
+  'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 export interface StatusBadgeProps {
   status: string;
@@ -63,7 +71,10 @@ export function StatusBadge({
     <View
       style={[
         styles.badge,
-        { backgroundColor: currentVariant.bg, borderColor: currentVariant.border },
+        {
+          backgroundColor: currentVariant.bg,
+          borderColor: currentVariant.border,
+        },
         style,
       ]}
       testID={testID}

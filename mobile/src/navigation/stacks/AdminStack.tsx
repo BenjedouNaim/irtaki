@@ -4,7 +4,9 @@ import { View, Text, StyleSheet } from 'react-native';
 export function AdminStack() {
   return (
     <View style={styles.container} testID="admin-stack">
-      <Text style={styles.title}>شاشة الإدارة (المجموعات · الكادر · سجل التدقيق)</Text>
+      <Text style={styles.title}>
+        شاشة الإدارة (المجموعات · الكادر · سجل التدقيق)
+      </Text>
       <Text style={styles.subtitle}>Admin Stack Stub</Text>
     </View>
   );

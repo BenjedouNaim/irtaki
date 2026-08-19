@@ -5,7 +5,12 @@ import {
   storeRefreshToken,
   deleteStoredRefreshToken,
 } from '../auth/authStore';
-import { ApiError, ApiErrorEnvelope, NetworkError, RequestOptions } from './types';
+import {
+  ApiError,
+  ApiErrorEnvelope,
+  NetworkError,
+  RequestOptions,
+} from './types';
 
 export function getBaseUrl(): string {
   const envUrl =
@@ -67,7 +72,10 @@ export async function refreshAccessToken(): Promise<string | null> {
       if (newAccessToken && currentRole) {
         useAuthStore.getState().setSession(newAccessToken, currentRole);
       } else if (newAccessToken) {
-        useAuthStore.setState({ accessToken: newAccessToken, isAuthenticated: true });
+        useAuthStore.setState({
+          accessToken: newAccessToken,
+          isAuthenticated: true,
+        });
       }
 
       return newAccessToken ?? null;
@@ -84,9 +92,14 @@ export async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+export async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const baseUrl = getBaseUrl();
-  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const normalizedEndpoint = endpoint.startsWith('/')
+    ? endpoint
+    : `/${endpoint}`;
 
   let urlString = `${baseUrl}${normalizedEndpoint}`;
   if (options.params) {
@@ -126,11 +139,17 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
     if (err instanceof Error && err.name === 'AbortError') {
       throw err;
     }
-    throw new NetworkError(err instanceof Error ? err.message : 'Network request failed');
+    throw new NetworkError(
+      err instanceof Error ? err.message : 'Network request failed',
+    );
   }
 
   // Handle 401 unauthorized & silent refresh
-  if (response.status === 401 && !skipAuth && !endpoint.includes('/auth/refresh')) {
+  if (
+    response.status === 401 &&
+    !skipAuth &&
+    !endpoint.includes('/auth/refresh')
+  ) {
     const newAccessToken = await refreshAccessToken();
     if (newAccessToken) {
       headers.Authorization = `Bearer ${newAccessToken}`;
@@ -141,7 +160,9 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
           body: body !== undefined ? JSON.stringify(body) : undefined,
         });
       } catch (err: unknown) {
-        throw new NetworkError(err instanceof Error ? err.message : 'Network request failed');
+        throw new NetworkError(
+          err instanceof Error ? err.message : 'Network request failed',
+        );
       }
     }
   }

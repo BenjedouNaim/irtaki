@@ -4,7 +4,9 @@ import { View, Text, StyleSheet } from 'react-native';
 export function StudentTabs() {
   return (
     <View style={styles.container} testID="student-tabs">
-      <Text style={styles.title}>شاشة الطالب (الرئيسية · التقدم · الاشتراكات)</Text>
+      <Text style={styles.title}>
+        شاشة الطالب (الرئيسية · التقدم · الاشتراكات)
+      </Text>
       <Text style={styles.subtitle}>Student Tabs Stub</Text>
     </View>
   );

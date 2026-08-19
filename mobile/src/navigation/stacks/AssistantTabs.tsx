@@ -4,7 +4,9 @@ import { View, Text, StyleSheet } from 'react-native';
 export function AssistantTabs() {
   return (
     <View style={styles.container} testID="assistant-tabs">
-      <Text style={styles.title}>شاشة المساعد (الرئيسية · طلبات الانضمام · المدفوعات)</Text>
+      <Text style={styles.title}>
+        شاشة المساعد (الرئيسية · طلبات الانضمام · المدفوعات)
+      </Text>
       <Text style={styles.subtitle}>Assistant Tabs Stub</Text>
     </View>
   );
