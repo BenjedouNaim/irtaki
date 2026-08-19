@@ -1,7 +1,8 @@
 name: backend-ci
 on:
+  # Always trigger on pull_request (no path filter here) so the required check
+  # is always reported. The actual work is gated inside the job via the filter step.
   pull_request:
-    paths: ['backend/**']
   push:
     branches: [main]
     paths: ['backend/**']
@@ -22,15 +23,44 @@ jobs:
       DB_PASS: irtaki
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for paths-filter git-diff mode (no API call)
+
+      # Detect whether any backend/** files changed. On push triggers this is
+      # not needed (paths filter above already gates the job), but on PRs it
+      # lets us skip the heavy steps fast and still report a green status.
+      - name: Check for backend changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          token: '' # use git diff instead of GitHub API (avoids permission errors)
+          filters: |
+            backend:
+              - 'backend/**'
+
+      - name: Skip (no backend changes)
+        if: steps.changes.outputs.backend == 'false'
+        run: echo "No backend files changed — skipping CI steps."
+
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.backend == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm ci
+
+      - name: Install dependencies
+        if: steps.changes.outputs.backend == 'true'
+        run: npm ci
+
       - name: Lint
+        if: steps.changes.outputs.backend == 'true'
         run: npm run lint
+
       - name: Type-check
+        if: steps.changes.outputs.backend == 'true'
         run: npm run type-check
+
       - name: Unit tests
+        if: steps.changes.outputs.backend == 'true'
         run: npm run test:unit
