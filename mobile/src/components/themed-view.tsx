@@ -11,8 +11,8 @@ export type ThemedViewProps = ViewProps & {
 
 export function ThemedView({
   style,
-  lightColor,
-  darkColor,
+  lightColor: _lightColor,
+  darkColor: _darkColor,
   type,
   ...otherProps
 }: ThemedViewProps) {

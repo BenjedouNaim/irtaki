@@ -1,14 +1,8 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: undefined,
-  testEnvironment: 'node',
+  preset: 'jest-expo',
   testRegex: '.*\\.spec\\.(ts|tsx)$',
-  transform: {
-    '^.+\\.(ts|tsx|js|jsx)$': 'babel-jest',
-  },
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
-    // Path aliases matching tsconfig.json paths
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@/assets/(.*)$': '<rootDir>/assets/$1',
   },
