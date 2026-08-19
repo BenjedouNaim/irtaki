@@ -1,12 +1,17 @@
 # backend/docker-compose.yml
-# Local development Postgres only — not used in CI or production.
+# Local development stack — Postgres + NestJS backend.
+# NOT used in CI (unit tests run without a container) or production.
 # Production runs on self-hosted Tunisian VPS managed by Coolify (ADR-014).
 #
-# Usage:
-#   docker compose up -d          # start Postgres
-#   docker compose down -v        # stop and wipe volumes
+# Prerequisites:
+#   cp .env.example .env   # then fill in your secrets
 #
-# After starting: run `typeorm migration:run` before starting the dev server (TD-03).
+# Usage:
+#   docker compose up --build -d   # build image, start postgres + backend
+#   docker compose logs -f backend # tail backend logs
+#   docker compose down -v         # stop and wipe volumes
+#
+# The backend service runs migrations automatically on startup (see CMD in Dockerfile).
 
 services:
   postgres:
@@ -25,6 +30,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Override DB_HOST so the backend reaches the compose postgres service
+      # rather than localhost (which would be the container's own loopback).
+      DB_HOST: postgres
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
