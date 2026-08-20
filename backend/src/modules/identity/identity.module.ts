@@ -11,6 +11,7 @@ import { UserRepository } from './infrastructure/user.repository';
 import { Argon2PasswordHasher } from './infrastructure/argon2-password-hasher';
 import { TokenService } from './application/token/token.service';
 import { RegisterUseCase } from './application/register/register.use-case';
+import { LoginUseCase } from './application/login/login.use-case';
 import { AuthController } from './presentation/auth.controller';
 
 @Module({
@@ -37,7 +38,14 @@ import { AuthController } from './presentation/auth.controller';
     Argon2PasswordHasher,
     TokenService,
     RegisterUseCase,
+    LoginUseCase,
   ],
-  exports: [USER_REPOSITORY, PASSWORD_HASHER, TokenService, RegisterUseCase],
+  exports: [
+    USER_REPOSITORY,
+    PASSWORD_HASHER,
+    TokenService,
+    RegisterUseCase,
+    LoginUseCase,
+  ],
 })
 export class IdentityModule {}
