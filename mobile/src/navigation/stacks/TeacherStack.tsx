@@ -1,31 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 export function TeacherStack() {
   return (
-    <View style={styles.container} testID="teacher-stack">
-      <Text style={styles.title}>شاشة المعلم (حلقات التحفيظ والمتابعة)</Text>
-      <Text style={styles.subtitle}>Teacher Stack Stub</Text>
+    <View
+      className="flex-1 items-center justify-center p-4 bg-white dark:bg-gray-950"
+      testID="teacher-stack"
+    >
+      <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
+        شاشة المعلم (المجموعات · الحلقات · الطلاب)
+      </Text>
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        Teacher Stack Stub
+      </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-});

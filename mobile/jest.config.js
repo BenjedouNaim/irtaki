@@ -7,6 +7,6 @@ module.exports = {
     '^@/assets/(.*)$': '<rootDir>/assets/$1',
   },
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts'],
-  coverageDirectory: 'coverage',
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   passWithNoTests: true,
 };

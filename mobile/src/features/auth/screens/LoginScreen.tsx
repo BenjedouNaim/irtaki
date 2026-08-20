@@ -3,10 +3,8 @@ import {
   View,
   Text,
   TextInput,
-  StyleSheet,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
 } from 'react-native';
 import { z } from 'zod';
@@ -107,29 +105,44 @@ export function LoginScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardContainer}
+      behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-white dark:bg-gray-950"
       testID="login-screen"
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+          paddingVertical: 32,
+        }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.header}>
-          <Text style={styles.appName}>إرتقِ</Text>
-          <Text style={styles.title}>تسجيل الدخول</Text>
-          <Text style={styles.subtitle}>
+        <View className="items-center mb-8">
+          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
+            إرتقِ
+          </Text>
+          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
+            تسجيل الدخول
+          </Text>
+          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
             أدخل بريدك الإلكتروني وكلمة المرور للمتابعة
           </Text>
         </View>
 
         {generalError ? (
-          <View style={styles.generalErrorBanner} testID="login-general-error">
-            <Text style={styles.generalErrorText}>{generalError}</Text>
+          <View
+            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
+            style={{ borderCurve: 'continuous' }}
+            testID="login-general-error"
+          >
+            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
+              {generalError}
+            </Text>
           </View>
         ) : null}
 
-        <View style={styles.form}>
+        <View className="w-full">
           <FormField
             label="البريد الإلكتروني"
             required
@@ -138,7 +151,12 @@ export function LoginScreen({
           >
             <TextInput
               testID="login-email-input"
-              style={[styles.input, Boolean(errors.email) && styles.inputError]}
+              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
+                errors.email
+                  ? 'border-destructive bg-white dark:bg-gray-950'
+                  : 'border-gray-300 dark:border-gray-700'
+              }`}
+              style={{ borderCurve: 'continuous' }}
               placeholder="example@domain.com"
               placeholderTextColor="#9ca3af"
               keyboardType="email-address"
@@ -165,10 +183,12 @@ export function LoginScreen({
             <TextInput
               ref={passwordInputRef}
               testID="login-password-input"
-              style={[
-                styles.input,
-                Boolean(errors.password) && styles.inputError,
-              ]}
+              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
+                errors.password
+                  ? 'border-destructive bg-white dark:bg-gray-950'
+                  : 'border-gray-300 dark:border-gray-700'
+              }`}
+              style={{ borderCurve: 'continuous' }}
               placeholder="••••••••"
               placeholderTextColor="#9ca3af"
               secureTextEntry
@@ -187,14 +207,16 @@ export function LoginScreen({
           </FormField>
 
           {onNavigateToForgotPassword ? (
-            <TouchableOpacity
+            <Pressable
               onPress={onNavigateToForgotPassword}
               disabled={isSubmitting}
-              style={styles.forgotPasswordButton}
+              className="self-start mb-4"
               testID="login-forgot-password-link"
             >
-              <Text style={styles.forgotPasswordText}>نسيت كلمة المرور؟</Text>
-            </TouchableOpacity>
+              <Text className="text-xs font-semibold text-primary dark:text-primary-400">
+                نسيت كلمة المرور؟
+              </Text>
+            </Pressable>
           ) : null}
 
           <Button
@@ -203,121 +225,27 @@ export function LoginScreen({
             loading={isSubmitting}
             disabled={isSubmitting}
             testID="login-submit-button"
-            style={styles.submitButton}
+            className="mt-2"
           />
         </View>
 
         {onNavigateToRegister ? (
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>ليس لديك حساب؟ </Text>
-            <TouchableOpacity
+          <View className="flex-row-reverse justify-center items-center mt-6">
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
+              ليس لديك حساب؟{' '}
+            </Text>
+            <Pressable
               onPress={onNavigateToRegister}
               disabled={isSubmitting}
               testID="login-register-link"
             >
-              <Text style={styles.registerLinkText}>إنشاء حساب جديد</Text>
-            </TouchableOpacity>
+              <Text className="text-sm font-bold text-primary dark:text-primary-400">
+                إنشاء حساب جديد
+              </Text>
+            </Pressable>
           </View>
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboardContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#0f766e',
-    marginBottom: 8,
-    fontFamily: Platform.select({
-      ios: 'NotoNaskhArabic-Bold',
-      default: 'sans-serif',
-    }),
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  generalErrorBanner: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fca5a5',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  generalErrorText: {
-    color: '#dc2626',
-    fontSize: 13,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  form: {
-    width: '100%',
-  },
-  input: {
-    width: '100%',
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#f9fafb',
-  },
-  inputError: {
-    borderColor: '#dc2626',
-    backgroundColor: '#fff',
-  },
-  forgotPasswordButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-  },
-  forgotPasswordText: {
-    fontSize: 13,
-    color: '#0f766e',
-    fontWeight: '600',
-  },
-  submitButton: {
-    marginTop: 8,
-  },
-  footer: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  registerLinkText: {
-    fontSize: 14,
-    color: '#0f766e',
-    fontWeight: '700',
-  },
-});

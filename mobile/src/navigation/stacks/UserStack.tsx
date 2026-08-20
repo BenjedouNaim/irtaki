@@ -1,31 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 export function UserStack() {
   return (
-    <View style={styles.container} testID="user-stack">
-      <Text style={styles.title}>شاشة المستخدم (مقدم طلب)</Text>
-      <Text style={styles.subtitle}>User Stack Stub</Text>
+    <View
+      className="flex-1 items-center justify-center p-4 bg-white dark:bg-gray-950"
+      testID="user-stack"
+    >
+      <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
+        شاشة المستخدم (طلب الانضمام · المجموعات)
+      </Text>
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        User Stack Stub
+      </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-});

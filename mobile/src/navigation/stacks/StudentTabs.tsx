@@ -1,33 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 export function StudentTabs() {
   return (
-    <View style={styles.container} testID="student-tabs">
-      <Text style={styles.title}>
+    <View
+      className="flex-1 items-center justify-center p-4 bg-white dark:bg-gray-950"
+      testID="student-tabs"
+    >
+      <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
         شاشة الطالب (الرئيسية · التقدم · الاشتراكات)
       </Text>
-      <Text style={styles.subtitle}>Student Tabs Stub</Text>
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        Student Tabs Stub
+      </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-});
