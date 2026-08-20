@@ -11,6 +11,7 @@ async function bootstrap() {
   app.useLogger(logger);
 
   app.setGlobalPrefix('api/v1');
+  app.enableCors();
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   await app.listen(port);

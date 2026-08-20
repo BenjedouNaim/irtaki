@@ -70,10 +70,18 @@ const DEFAULT_ERROR_MESSAGES: Record<
  */
 function normalizeErrorCode(error: string, status: number): string {
   if (DEFAULT_ERROR_MESSAGES[status] && DEFAULT_ERROR_MESSAGES[status].error) {
-    // If it's a default NestJS title error like "Not Found", "Forbidden", map to canonical
-    const trimmed = error.trim();
-    if (trimmed.toLowerCase() === 'forbidden') {
-      return 'SCOPE_DENIED';
+    const trimmed = error.trim().toLowerCase();
+    if (
+      trimmed === 'forbidden' ||
+      trimmed === 'unprocessable entity' ||
+      trimmed === 'bad request' ||
+      trimmed === 'not found' ||
+      trimmed === 'unauthorized' ||
+      trimmed === 'conflict' ||
+      trimmed === 'too many requests' ||
+      trimmed === 'internal server error'
+    ) {
+      return DEFAULT_ERROR_MESSAGES[status].error;
     }
   }
   return error

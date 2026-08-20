@@ -75,6 +75,10 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   FCM_SERVICE_ACCOUNT_JSON?: string;
+
+  @IsString()
+  @IsOptional()
+  CENTER_TIMEZONE: string = 'Africa/Tunis';
 }
 
 /**
