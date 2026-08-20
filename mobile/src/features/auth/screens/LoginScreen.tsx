@@ -38,7 +38,9 @@ export function LoginScreen({
 }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
+    {},
+  );
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -73,10 +75,7 @@ export function LoginScreen({
       useAuthStore.getState().setSession(response.access_token, response.role);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (
-          err.statusCode === 401 ||
-          err.errorCode === 'INVALID_CREDENTIALS'
-        ) {
+        if (err.statusCode === 401 || err.errorCode === 'INVALID_CREDENTIALS') {
           // UF.md §9: 401 INVALID_CREDENTIALS — banner above form, password cleared & refocused
           setGeneralError(
             err.message || 'البريد الإلكتروني أو كلمة المرور غير صحيحة',

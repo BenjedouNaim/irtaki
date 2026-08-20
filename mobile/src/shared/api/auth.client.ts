@@ -49,4 +49,3 @@ export async function loginUser(data: LoginRequest): Promise<LoginResponse> {
     body: data,
   });
 }
-

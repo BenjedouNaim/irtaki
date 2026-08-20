@@ -21,7 +21,9 @@ describe('LoginScreen (SCR-01)', () => {
   });
 
   it('renders email and password inputs, submit button, and app title', async () => {
-    const { getByText, getAllByText, getByTestId } = await render(<LoginScreen />);
+    const { getByText, getAllByText, getByTestId } = await render(
+      <LoginScreen />,
+    );
 
     expect(getByText('إرتقِ')).toBeTruthy();
     expect(getAllByText('تسجيل الدخول').length).toBeGreaterThanOrEqual(1);
@@ -29,7 +31,6 @@ describe('LoginScreen (SCR-01)', () => {
     expect(getByTestId('login-password-input')).toBeTruthy();
     expect(getByTestId('login-submit-button')).toBeTruthy();
   });
-
 
   it('shows error when submitting empty fields', async () => {
     const { getByTestId, findByText } = await render(<LoginScreen />);
@@ -110,10 +111,7 @@ describe('LoginScreen (SCR-01)', () => {
         getByTestId('login-email-input'),
         'user@example.com',
       );
-      fireEvent.changeText(
-        getByTestId('login-password-input'),
-        'Password123!',
-      );
+      fireEvent.changeText(getByTestId('login-password-input'), 'Password123!');
     });
 
     await act(async () => {
