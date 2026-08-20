@@ -1,6 +1,7 @@
+import '@/global.css';
 import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
@@ -10,7 +11,6 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { enforceRTL } from '@/shared/config/rtl';
-import { RootNavigator } from '@/navigation';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,7 +51,7 @@ export default function RootLayout() {
         <ThemeProvider
           value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
         >
-          <RootNavigator />
+          <Stack screenOptions={{ headerShown: false }} />
         </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
