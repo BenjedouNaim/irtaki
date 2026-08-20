@@ -3,6 +3,7 @@ import {
   MiddlewareConsumer,
   Module,
   NestModule,
+  UnprocessableEntityException,
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -12,6 +13,7 @@ import { AppService } from './app.service';
 import { validate } from './config/app.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { IdentityModule } from './modules/identity/identity.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 @Module({
@@ -23,6 +25,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
     SharedModule,
     DatabaseModule,
     HealthModule,
+    IdentityModule,
   ],
   controllers: [AppController],
   providers: [
@@ -34,6 +37,22 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
         forbidNonWhitelisted: true,
         transform: true,
         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        exceptionFactory: (errors) => {
+          const details = errors.flatMap((error) => {
+            if (!error.constraints) return [];
+            return Object.entries(error.constraints).map(([rule, message]) => ({
+              field: error.property,
+              rule,
+              message,
+            }));
+          });
+          return new UnprocessableEntityException({
+            statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+            error: 'VALIDATION_ERROR',
+            message: 'فشل التحقق من صحة البيانات المدخلة',
+            details,
+          });
+        },
       }),
     },
   ],
