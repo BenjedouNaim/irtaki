@@ -213,7 +213,7 @@ export function LoginScreen({
               className="self-start mb-4"
               testID="login-forgot-password-link"
             >
-              <Text className="text-xs font-semibold text-primary dark:text-primary-400">
+              <Text className="text-xs font-semibold text-accent dark:text-accent-300">
                 نسيت كلمة المرور؟
               </Text>
             </Pressable>

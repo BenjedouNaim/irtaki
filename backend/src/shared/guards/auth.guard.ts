@@ -4,23 +4,42 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { Observable } from 'rxjs';
+import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
-/**
- * Base AuthGuard stub (EPIC-00 / F-FND-03).
- *
- * Full JWT extraction, signature verification, and session lifecycle
- * enforcement will be implemented in EPIC-01 (F-AUTH-06).
- */
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: string;
+}
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
+
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(protected readonly reflector?: Reflector) {}
+  private readonly accessSecret: string;
 
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  constructor(
+    protected readonly reflector?: Reflector,
+    private readonly jwtService?: JwtService,
+    private readonly configService?: ConfigService,
+  ) {
+    this.accessSecret =
+      this.configService?.get<string>('JWT_ACCESS_SECRET') ||
+      process.env.JWT_ACCESS_SECRET ||
+      'dev-secret-key-must-be-changed-in-prod-min-32-chars';
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     if (this.reflector) {
       const isPublic = this.reflector.getAllAndOverride<boolean>(
         IS_PUBLIC_KEY,
@@ -31,11 +50,44 @@ export class AuthGuard implements CanActivate {
       }
     }
 
-    // TODO (EPIC-01): validate JWT, set request.user
-    throw new UnauthorizedException({
-      statusCode: 401,
-      error: 'TOKEN_EXPIRED',
-      message: 'انتهت صلاحية الجلسة أو الرمز غير صالح',
-    });
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const authHeader = request.headers.authorization;
+
+    if (!authHeader) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: 'TOKEN_EXPIRED',
+        message: 'انتهت صلاحية الجلسة أو الرمز غير صالح',
+      });
+    }
+
+    const [type, token] = authHeader.split(' ');
+    if (type !== 'Bearer' || !token) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: 'TOKEN_EXPIRED',
+        message: 'انتهت صلاحية الجلسة أو الرمز غير صالح',
+      });
+    }
+
+    try {
+      if (this.jwtService) {
+        const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+          secret: this.accessSecret,
+        });
+        request.user = {
+          id: payload.sub,
+          email: payload.email,
+          role: payload.role,
+        };
+      }
+      return true;
+    } catch {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: 'TOKEN_EXPIRED',
+        message: 'انتهت صلاحية الجلسة أو الرمز غير صالح',
+      });
+    }
   }
 }

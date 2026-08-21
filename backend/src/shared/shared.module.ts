@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { PinoLoggerService } from './logging/logger.service';
 import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
@@ -9,6 +11,7 @@ import { ScopeGuard } from './guards/scope.guard';
 
 @Global()
 @Module({
+  imports: [ConfigModule, JwtModule.register({})],
   providers: [
     PinoLoggerService,
     CorrelationIdMiddleware,
@@ -18,6 +21,10 @@ import { ScopeGuard } from './guards/scope.guard';
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
     },
   ],
   exports: [

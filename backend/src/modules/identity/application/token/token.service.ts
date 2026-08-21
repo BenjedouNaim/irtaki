@@ -11,6 +11,7 @@ import { AuthTokenTypeOrmEntity } from '../../infrastructure/auth-token.typeorm-
 export interface GeneratedTokens {
   accessToken: string;
   refreshToken: string;
+  tokenId: string;
 }
 
 @Injectable()
@@ -69,10 +70,11 @@ export class TokenService {
     return {
       accessToken,
       refreshToken: rawRefreshToken,
+      tokenId: tokenEntity.id,
     };
   }
 
-  private hashRefreshToken(refreshToken: string): string {
+  public hashRefreshToken(refreshToken: string): string {
     return crypto
       .createHmac('sha256', this.refreshPepper)
       .update(refreshToken)
