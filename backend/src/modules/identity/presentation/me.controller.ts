@@ -6,10 +6,10 @@ import {
   HttpStatus,
   Patch,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { RolesGuard } from '../../../shared';
+import { Roles } from '../../../shared';
+import { UserRole } from '../domain/user-role.enum';
 import { GetMeUseCase } from '../application/me/get-me.use-case';
 import { UpdateProfileUseCase } from '../application/me/update-profile.use-case';
 import { UpdateProfileDto } from '../application/me/update-profile.dto';
@@ -24,18 +24,31 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Controller('me')
-@UseGuards(RolesGuard)
 export class MeController {
   constructor(
     private readonly getMeUseCase: GetMeUseCase,
     private readonly updateProfileUseCase: UpdateProfileUseCase,
   ) {}
 
+  @Roles(
+    UserRole.Admin,
+    UserRole.Teacher,
+    UserRole.Assistant,
+    UserRole.Student,
+    UserRole.User,
+  )
   @Get()
   async getMe(@Req() req: AuthenticatedRequest): Promise<MeResponseDto> {
     return this.getMeUseCase.execute(req.user.id);
   }
 
+  @Roles(
+    UserRole.Admin,
+    UserRole.Teacher,
+    UserRole.Assistant,
+    UserRole.Student,
+    UserRole.User,
+  )
   @Patch()
   @HttpCode(HttpStatus.OK)
   async updateProfile(
