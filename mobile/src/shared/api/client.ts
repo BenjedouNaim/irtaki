@@ -50,7 +50,6 @@ export async function refreshAccessToken(): Promise<string | null> {
         },
         body: JSON.stringify({
           refresh_token: storedRefreshToken,
-          refreshToken: storedRefreshToken,
         }),
       });
 
@@ -61,8 +60,9 @@ export async function refreshAccessToken(): Promise<string | null> {
       }
 
       const data = await response.json();
-      const newAccessToken = data.access_token || data.accessToken;
-      const newRefreshToken = data.refresh_token || data.refreshToken;
+      const payload = data.data || data;
+      const newAccessToken = payload.access_token || payload.accessToken;
+      const newRefreshToken = payload.refresh_token || payload.refreshToken;
 
       if (newRefreshToken) {
         await storeRefreshToken(newRefreshToken);

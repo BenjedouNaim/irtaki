@@ -50,13 +50,13 @@ const variantStyles: Record<
     container:
       'bg-gray-100 active:bg-gray-200 dark:bg-gray-800 dark:active:bg-gray-700',
     text: 'text-gray-900 dark:text-gray-100',
-    loadingColor: '#111827',
+    loadingColor: '#1B2420',
   },
   outline: {
     container:
       'bg-transparent border border-primary dark:border-primary-400 active:bg-primary-50 dark:active:bg-primary-950',
     text: 'text-primary dark:text-primary-400',
-    loadingColor: '#0f766e',
+    loadingColor: '#0E6B4A',
   },
 };
 

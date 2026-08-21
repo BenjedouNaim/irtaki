@@ -49,3 +49,29 @@ export async function loginUser(data: LoginRequest): Promise<LoginResponse> {
     body: data,
   });
 }
+
+export interface RefreshResponse {
+  access_token: string;
+  refresh_token: string;
+}
+
+export async function refreshSession(
+  refreshToken: string,
+): Promise<RefreshResponse> {
+  return request<RefreshResponse>('/auth/refresh', {
+    method: 'POST',
+    skipAuth: true,
+    body: {
+      refresh_token: refreshToken,
+    },
+  });
+}
+
+export async function logoutUser(refreshToken: string): Promise<void> {
+  return request<void>('/auth/logout', {
+    method: 'POST',
+    body: {
+      refresh_token: refreshToken,
+    },
+  });
+}

@@ -111,3 +111,8 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# claude code skills 
+
+.claude/*
+
