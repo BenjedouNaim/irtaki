@@ -337,7 +337,7 @@ Response `201`: `{ id, role: "User", email, timezone, access_token, refresh_toke
 
 **`GET /me`** → `{ id, role, email, full_name, gender, timezone }` (`full_name`/`gender` are `null` until first enrollment acceptance). No `password_hash`, ever.
 
-**`PATCH /me`** — Request: `{ timezone?, notification_timezone_refresh?: boolean }`. Only `timezone` and the caller's own row are writable here; `role`, `full_name`, `gender` are never client-settable (they change only through enrollment/administration flows). Errors: `422 INVALID_TIMEZONE`.
+**`PATCH /me`** — Request: `{ timezone? }`. Only `timezone` and the caller's own row are writable here; `role`, `full_name`, `gender` are never client-settable (they change only through enrollment/administration flows). Errors: `422 INVALID_TIMEZONE`.
 
 ### 10.3 Dashboard (API-009) — resolves APIQ-01
 
