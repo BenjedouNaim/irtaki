@@ -28,11 +28,13 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 export interface LoginScreenProps {
   onNavigateToRegister?: () => void;
   onNavigateToForgotPassword?: () => void;
+  successMessage?: string;
 }
 
 export function LoginScreen({
   onNavigateToRegister,
   onNavigateToForgotPassword,
+  successMessage,
 }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -129,6 +131,18 @@ export function LoginScreen({
             أدخل بريدك الإلكتروني وكلمة المرور للمتابعة
           </Text>
         </View>
+
+        {successMessage && !generalError ? (
+          <View
+            className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 mb-4"
+            style={{ borderCurve: 'continuous' }}
+            testID="login-success-banner"
+          >
+            <Text className="text-emerald-800 dark:text-emerald-200 text-sm text-center font-medium">
+              {successMessage}
+            </Text>
+          </View>
+        ) : null}
 
         {generalError ? (
           <View

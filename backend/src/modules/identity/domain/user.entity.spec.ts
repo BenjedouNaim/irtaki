@@ -30,4 +30,20 @@ describe('User Domain Entity', () => {
     user.updateTimezone('UTC');
     expect(user.timezone).toBe('UTC');
   });
+
+  it('updates password hash and updatedAt timestamp', () => {
+    const user = new User({
+      email: 'user@example.com',
+      passwordHash: 'oldHash',
+      timezone: 'Africa/Tunis',
+    });
+
+    const previousUpdatedAt = user.updatedAt;
+    user.updatePassword('newHash456');
+
+    expect(user.passwordHash).toBe('newHash456');
+    expect(user.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      previousUpdatedAt.getTime(),
+    );
+  });
 });

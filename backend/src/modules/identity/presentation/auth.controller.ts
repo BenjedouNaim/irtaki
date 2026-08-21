@@ -11,6 +11,16 @@ import { RefreshResponseDto } from '../application/refresh/refresh-response.dto'
 import { RefreshUseCase } from '../application/refresh/refresh.use-case';
 import { LogoutDto } from '../application/logout/logout.dto';
 import { LogoutUseCase } from '../application/logout/logout.use-case';
+import { RequestPasswordResetDto } from '../application/password-reset/request-password-reset.dto';
+import {
+  RequestPasswordResetResponse,
+  RequestPasswordResetUseCase,
+} from '../application/password-reset/request-password-reset.use-case';
+import { ConfirmPasswordResetDto } from '../application/password-reset/confirm-password-reset.dto';
+import {
+  ConfirmPasswordResetResponse,
+  ConfirmPasswordResetUseCase,
+} from '../application/password-reset/confirm-password-reset.use-case';
 
 @Controller('auth')
 export class AuthController {
@@ -19,6 +29,8 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly refreshUseCase: RefreshUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly requestPasswordResetUseCase: RequestPasswordResetUseCase,
+    private readonly confirmPasswordResetUseCase: ConfirmPasswordResetUseCase,
   ) {}
 
   @Public()
@@ -46,5 +58,23 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Body() dto: LogoutDto): Promise<void> {
     return this.logoutUseCase.execute(dto);
+  }
+
+  @Public()
+  @Post('password-reset/request')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async requestPasswordReset(
+    @Body() dto: RequestPasswordResetDto,
+  ): Promise<RequestPasswordResetResponse> {
+    return this.requestPasswordResetUseCase.execute(dto);
+  }
+
+  @Public()
+  @Post('password-reset/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmPasswordReset(
+    @Body() dto: ConfirmPasswordResetDto,
+  ): Promise<ConfirmPasswordResetResponse> {
+    return this.confirmPasswordResetUseCase.execute(dto);
   }
 }

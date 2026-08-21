@@ -75,3 +75,36 @@ export async function logoutUser(refreshToken: string): Promise<void> {
     },
   });
 }
+
+export interface RequestPasswordResetRequest {
+  email: string;
+}
+
+export interface GenericMessageResponse {
+  message: string;
+}
+
+export async function requestPasswordReset(
+  data: RequestPasswordResetRequest,
+): Promise<GenericMessageResponse> {
+  return request<GenericMessageResponse>('/auth/password-reset/request', {
+    method: 'POST',
+    skipAuth: true,
+    body: data,
+  });
+}
+
+export interface ConfirmPasswordResetRequest {
+  token: string;
+  new_password: string;
+}
+
+export async function confirmPasswordReset(
+  data: ConfirmPasswordResetRequest,
+): Promise<GenericMessageResponse> {
+  return request<GenericMessageResponse>('/auth/password-reset/confirm', {
+    method: 'POST',
+    skipAuth: true,
+    body: data,
+  });
+}

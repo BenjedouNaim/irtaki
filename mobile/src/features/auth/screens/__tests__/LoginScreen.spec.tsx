@@ -175,4 +175,28 @@ describe('LoginScreen (SCR-01)', () => {
 
     expect(onNavigateToRegister).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onNavigateToForgotPassword when forgot password link is pressed', async () => {
+    const onNavigateToForgotPassword = jest.fn();
+    const { getByTestId } = await render(
+      <LoginScreen onNavigateToForgotPassword={onNavigateToForgotPassword} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('login-forgot-password-link'));
+    });
+
+    expect(onNavigateToForgotPassword).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays success banner when successMessage prop is provided', async () => {
+    const { getByTestId, findByText } = await render(
+      <LoginScreen successMessage="تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول." />,
+    );
+
+    expect(
+      await findByText('تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.'),
+    ).toBeTruthy();
+    expect(getByTestId('login-success-banner')).toBeTruthy();
+  });
 });

@@ -80,4 +80,37 @@ export class TokenService {
       .update(refreshToken)
       .digest('hex');
   }
+
+  async generatePasswordResetToken(
+    userId: string,
+  ): Promise<{ rawToken: string; tokenId: string; expiresAt: Date }> {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashResetToken(rawToken);
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes
+
+    const tokenEntity = new AuthTokenTypeOrmEntity();
+    tokenEntity.id = uuidv7();
+    tokenEntity.userId = userId;
+    tokenEntity.tokenHash = tokenHash;
+    tokenEntity.purpose = 'password_reset';
+    tokenEntity.deviceToken = null;
+    tokenEntity.issuedAt = now;
+    tokenEntity.expiresAt = expiresAt;
+    tokenEntity.revokedAt = null;
+    tokenEntity.replacedBy = null;
+
+    await this.tokenRepo.save(tokenEntity);
+
+    return {
+      rawToken,
+      tokenId: tokenEntity.id,
+      expiresAt,
+    };
+  }
+
+  public hashResetToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
 }
