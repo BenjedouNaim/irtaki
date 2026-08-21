@@ -83,4 +83,9 @@ export class User {
     this._timezone = timezone;
     this._updatedAt = new Date();
   }
+
+  updatePassword(passwordHash: string): void {
+    this._passwordHash = passwordHash;
+    this._updatedAt = new Date();
+  }
 }
