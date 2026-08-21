@@ -8,7 +8,10 @@ import {
   deleteStoredRefreshToken,
 } from '@/shared/auth/authStore';
 
+import { useRouter } from 'expo-router';
+
 export function UserStack() {
+  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -38,6 +41,13 @@ export function UserStack() {
       <Text className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         User Stack Stub
       </Text>
+      <Button
+        label="الملف الشخصي"
+        variant="outline"
+        onPress={() => router.push('/(app)/profile')}
+        testID="profile-button"
+        className="mb-3"
+      />
       <Button
         label="تسجيل الخروج"
         variant="destructive"
