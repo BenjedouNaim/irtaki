@@ -18,7 +18,10 @@ import { RefreshUseCase } from './application/refresh/refresh.use-case';
 import { LogoutUseCase } from './application/logout/logout.use-case';
 import { RequestPasswordResetUseCase } from './application/password-reset/request-password-reset.use-case';
 import { ConfirmPasswordResetUseCase } from './application/password-reset/confirm-password-reset.use-case';
+import { GetMeUseCase } from './application/me/get-me.use-case';
+import { UpdateProfileUseCase } from './application/me/update-profile.use-case';
 import { AuthController } from './presentation/auth.controller';
+import { MeController } from './presentation/me.controller';
 
 @Module({
   imports: [
@@ -30,7 +33,7 @@ import { AuthController } from './presentation/auth.controller';
       AuditEntryTypeOrmEntity,
     ]),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, MeController],
   providers: [
     {
       provide: USER_REPOSITORY,
@@ -54,6 +57,8 @@ import { AuthController } from './presentation/auth.controller';
     LogoutUseCase,
     RequestPasswordResetUseCase,
     ConfirmPasswordResetUseCase,
+    GetMeUseCase,
+    UpdateProfileUseCase,
   ],
   exports: [
     USER_REPOSITORY,
@@ -66,6 +71,8 @@ import { AuthController } from './presentation/auth.controller';
     LogoutUseCase,
     RequestPasswordResetUseCase,
     ConfirmPasswordResetUseCase,
+    GetMeUseCase,
+    UpdateProfileUseCase,
   ],
 })
 export class IdentityModule {}
