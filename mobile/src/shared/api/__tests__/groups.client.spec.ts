@@ -1,4 +1,8 @@
-import { listGroups, ListGroupsResponse } from '../groups.client';
+import {
+  listGroups,
+  listAvailableGroups,
+  ListGroupsResponse,
+} from '../groups.client';
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({
@@ -33,6 +37,28 @@ describe('groups.client', () => {
     const result = await listGroups();
 
     expect(apiClient.get).toHaveBeenCalledWith('/groups');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.get with /groups/available and gender query param', async () => {
+    const mockResponse: ListGroupsResponse = {
+      data: [
+        {
+          id: 'group-2',
+          name: 'حلقة قالون 2',
+          recitation_day: 4,
+          enrollment_status: 'Open',
+        },
+      ],
+    };
+
+    (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await listAvailableGroups('Male');
+
+    expect(apiClient.get).toHaveBeenCalledWith('/groups/available', {
+      params: { gender: 'Male' },
+    });
     expect(result).toEqual(mockResponse);
   });
 });

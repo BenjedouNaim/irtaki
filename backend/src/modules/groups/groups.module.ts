@@ -6,6 +6,7 @@ import { MembershipTypeOrmEntity } from './infrastructure/membership.typeorm-ent
 import { UserTypeOrmEntity } from '../identity/infrastructure/user.typeorm-entity';
 import { GroupRepository } from './infrastructure/group.repository';
 import { ListGroupsUseCase } from './application/list-groups/list-groups.use-case';
+import { BrowseAvailableGroupsUseCase } from './application/browse-available-groups/browse-available-groups.use-case';
 import { GroupsController } from './presentation/groups.controller';
 
 @Module({
@@ -24,7 +25,8 @@ import { GroupsController } from './presentation/groups.controller';
     },
     GroupRepository,
     ListGroupsUseCase,
+    BrowseAvailableGroupsUseCase,
   ],
-  exports: [GROUP_REPOSITORY, ListGroupsUseCase],
+  exports: [GROUP_REPOSITORY, ListGroupsUseCase, BrowseAvailableGroupsUseCase],
 })
 export class GroupsModule {}

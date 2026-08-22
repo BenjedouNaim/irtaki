@@ -42,11 +42,18 @@ export function UserStack() {
         User Stack Stub
       </Text>
       <Button
+        label="تصفح الحلقات المتاحة"
+        variant="primary"
+        onPress={() => router.push('/(app)/user/join-stepper')}
+        testID="browse-groups-button"
+        className="mb-3 w-full max-w-xs"
+      />
+      <Button
         label="الملف الشخصي"
         variant="outline"
         onPress={() => router.push('/(app)/profile')}
         testID="profile-button"
-        className="mb-3"
+        className="mb-3 w-full max-w-xs"
       />
       <Button
         label="تسجيل الخروج"
@@ -54,6 +61,7 @@ export function UserStack() {
         loading={isLoggingOut}
         onPress={handleLogout}
         testID="logout-button"
+        className="w-full max-w-xs"
       />
     </View>
   );
