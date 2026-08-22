@@ -20,6 +20,7 @@ describe('ConfirmPasswordResetUseCase', () => {
     mockUserRepo = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
+      findAllByRole: jest.fn(),
       save: jest.fn(),
     };
 

@@ -62,3 +62,14 @@ export async function createGroup(
 ): Promise<GroupDetailResponse> {
   return apiClient.post<GroupDetailResponse>('/groups', payload);
 }
+
+export interface UpdateGroupNamePayload {
+  name: string;
+}
+
+export async function updateGroupName(
+  id: string,
+  payload: UpdateGroupNamePayload,
+): Promise<GroupDetailResponse> {
+  return apiClient.patch<GroupDetailResponse>(`/groups/${id}`, payload);
+}

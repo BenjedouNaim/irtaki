@@ -99,4 +99,188 @@ describe('GroupDetailScreen (SCR-29)', () => {
     expect(await findByText('حلقة الإمام قالون النموذجية')).toBeTruthy();
     expect(groupsApi.getGroupDetail).toHaveBeenCalledTimes(2);
   });
+
+  describe('Inline Rename (F-GRP-05)', () => {
+    it('enters edit mode when pressing edit button, prefilling current name', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId, getByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      expect(input.props.value).toBe('حلقة الإمام قالون النموذجية');
+      expect(getByTestId('group-detail-name-save')).toBeTruthy();
+      expect(getByTestId('group-detail-name-cancel')).toBeTruthy();
+    });
+
+    it('cancels editing and restores original name without calling updateGroupName', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+      const updateSpy = jest.spyOn(groupsApi, 'updateGroupName');
+
+      const { findByTestId, getByTestId, queryByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      fireEvent.changeText(input, 'اسم تم تغييره');
+
+      const cancelBtn = getByTestId('group-detail-name-cancel');
+      fireEvent.press(cancelBtn);
+
+      expect(queryByTestId('group-detail-name-input')).toBeNull();
+      expect(getByTestId('group-detail-name')).toHaveTextContent(
+        'حلقة الإمام قالون النموذجية',
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('validates empty name on client side and prevents API call', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+      const updateSpy = jest.spyOn(groupsApi, 'updateGroupName');
+
+      const { findByTestId, getByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      fireEvent.changeText(input, '   ');
+
+      const saveBtn = getByTestId('group-detail-name-save');
+      await act(async () => {
+        fireEvent.press(saveBtn);
+      });
+
+      expect(getByTestId('group-detail-name-error')).toHaveTextContent(
+        'اسم الحلقة مطلوب',
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it('successfully renames group, updates displayed name, exits edit mode, and shows success banner', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+      const updatedGroup: groupsApi.GroupListItemFull = {
+        ...mockGroupDetail,
+        name: 'حلقة الإمام نافع المدني',
+      };
+      const updateSpy = jest
+        .spyOn(groupsApi, 'updateGroupName')
+        .mockResolvedValueOnce({
+          data: updatedGroup,
+        });
+
+      const { findByTestId, getByTestId, queryByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      fireEvent.changeText(input, '  حلقة الإمام نافع المدني  ');
+
+      const saveBtn = getByTestId('group-detail-name-save');
+      await act(async () => {
+        fireEvent.press(saveBtn);
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith(mockGroupId, {
+        name: 'حلقة الإمام نافع المدني',
+      });
+      expect(queryByTestId('group-detail-name-input')).toBeNull();
+      expect(getByTestId('group-detail-name')).toHaveTextContent(
+        'حلقة الإمام نافع المدني',
+      );
+      expect(getByTestId('group-detail-success-banner')).toBeTruthy();
+    });
+
+    it('shows inline error and stays in edit mode when duplicate name 409 is returned', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+      jest.spyOn(groupsApi, 'updateGroupName').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 409,
+          error: 'GROUP_NAME_TAKEN',
+          message: 'اسم الحلقة مستخدم بالفعل',
+        }),
+      );
+
+      const { findByTestId, getByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      fireEvent.changeText(input, 'حلقة مكررة');
+
+      const saveBtn = getByTestId('group-detail-name-save');
+      await act(async () => {
+        fireEvent.press(saveBtn);
+      });
+
+      expect(getByTestId('group-detail-name-error')).toHaveTextContent(
+        'اسم الحلقة مستخدم بالفعل',
+      );
+      expect(getByTestId('group-detail-name-input')).toBeTruthy();
+    });
+
+    it('shows inline validation error when 422 with details is returned', async () => {
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+      jest.spyOn(groupsApi, 'updateGroupName').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 422,
+          error: 'VALIDATION_ERROR',
+          message: 'بيانات غير صالحة',
+          details: [
+            {
+              field: 'name',
+              rule: 'VR-22',
+              message: 'اسم الحلقة يحتوي على أحرف غير مسموح بها',
+            },
+          ],
+        }),
+      );
+
+      const { findByTestId, getByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const editBtn = await findByTestId('group-detail-name-edit-button');
+      fireEvent.press(editBtn);
+
+      const input = getByTestId('group-detail-name-input');
+      fireEvent.changeText(input, 'اسم غير صالح');
+
+      const saveBtn = getByTestId('group-detail-name-save');
+      await act(async () => {
+        fireEvent.press(saveBtn);
+      });
+
+      expect(getByTestId('group-detail-name-error')).toHaveTextContent(
+        'اسم الحلقة يحتوي على أحرف غير مسموح بها',
+      );
+    });
+  });
 });

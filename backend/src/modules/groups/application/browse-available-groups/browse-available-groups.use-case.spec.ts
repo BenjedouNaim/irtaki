@@ -32,6 +32,9 @@ describe('BrowseAvailableGroupsUseCase', () => {
       findGenderByUserId: jest.fn(),
       findByIdForDetail: jest.fn(),
       findByActiveMemberAndGroupId: jest.fn(),
+      findByName: jest.fn(),
+      create: jest.fn(),
+      updateName: jest.fn(),
     };
     useCase = new BrowseAvailableGroupsUseCase(mockGroupRepo);
   });
