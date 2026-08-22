@@ -74,9 +74,10 @@ export async function refreshAccessToken(): Promise<string | null> {
           const parts = newAccessToken.split('.');
           if (parts[1]) {
             const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const binaryStr = typeof atob !== 'undefined'
-              ? atob(base64)
-              : Buffer.from(base64, 'base64').toString('binary');
+            const binaryStr =
+              typeof atob !== 'undefined'
+                ? atob(base64)
+                : Buffer.from(base64, 'base64').toString('binary');
             const decoded = JSON.parse(binaryStr);
             if (decoded && decoded.role) {
               role = decoded.role;
