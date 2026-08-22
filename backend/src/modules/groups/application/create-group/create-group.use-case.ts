@@ -10,12 +10,11 @@ import { uuidv7 } from 'uuidv7';
 import {
   GROUP_REPOSITORY,
   GroupListRow,
-  IGroupRepository,
 } from '../../domain/group.repository.interface';
-import {
-  IUserRepository,
-  USER_REPOSITORY,
-} from '../../../identity/domain/user.repository.interface';
+import type { IGroupRepository } from '../../domain/group.repository.interface';
+import { USER_REPOSITORY } from '../../../identity/domain/user.repository.interface';
+import type { IUserRepository } from '../../../identity/domain/user.repository.interface';
+
 import { UserRole } from '../../../identity/domain/user-role.enum';
 import { AuditEntryTypeOrmEntity } from '../../../identity/infrastructure/audit-entry.typeorm-entity';
 import { CreateGroupDto } from './create-group.dto';
