@@ -40,4 +40,5 @@ export interface IGroupRepository {
     assistantId: string;
     createdBy: string;
   }): Promise<GroupListRow>;
+  updateName(id: string, name: string): Promise<GroupListRow | null>;
 }

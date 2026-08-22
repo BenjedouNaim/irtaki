@@ -278,6 +278,19 @@ export class GroupRepository implements IGroupRepository {
     return created!;
   }
 
+  async updateName(id: string, name: string): Promise<GroupListRow | null> {
+    const updateResult = await this.groupRepo.update(
+      { id },
+      { name: name.trim() },
+    );
+
+    if (!updateResult.affected || updateResult.affected === 0) {
+      return null;
+    }
+
+    return this.findByIdForDetail(id);
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,
