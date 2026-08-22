@@ -14,6 +14,7 @@ import { validate } from './config/app.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
+import { GroupsModule } from './modules/groups/groups.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 @Module({
@@ -26,6 +27,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
     DatabaseModule,
     HealthModule,
     IdentityModule,
+    GroupsModule,
   ],
   controllers: [AppController],
   providers: [
