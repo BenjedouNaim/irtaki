@@ -1,0 +1,24 @@
+export const GROUP_REPOSITORY = Symbol('GROUP_REPOSITORY');
+
+export interface GroupStaffSummary {
+  id: string;
+  full_name: string | null;
+}
+
+export interface GroupListRow {
+  id: string;
+  name: string;
+  gender: string;
+  recitation_day: number;
+  enrollment_status: string;
+  lifecycle_state: string;
+  created_at: Date;
+  teacher: GroupStaffSummary;
+  assistant: GroupStaffSummary;
+}
+
+export interface IGroupRepository {
+  findAllForList(): Promise<GroupListRow[]>;
+  findByStaffIdForList(staffId: string): Promise<GroupListRow[]>;
+  findByActiveMemberForList(userId: string): Promise<GroupListRow | null>;
+}
