@@ -234,8 +234,9 @@ describe('GET /groups/available (API-011 Integration)', () => {
         'Male',
       );
 
+      const openMaleGroupName = `حلقة رجال مفتوحة-${Date.now()}`;
       const openMaleGroupId = await seedGroup({
-        name: `حلقة رجال مفتوحة-${Date.now()}`,
+        name: openMaleGroupName,
         gender: 'Male',
         recitationDay: 1,
         enrollmentStatus: 'Open',
@@ -300,10 +301,11 @@ describe('GET /groups/available (API-011 Integration)', () => {
       const foundGroup = body.data.find((g) => g.id === openMaleGroupId);
       expect(foundGroup).toEqual({
         id: openMaleGroupId,
-        name: 'حلقة قالون رجال مفتوحة',
+        name: openMaleGroupName,
         recitation_day: 1,
         enrollment_status: 'Open',
       });
+
       expect(foundGroup).not.toHaveProperty('teacher');
       expect(foundGroup).not.toHaveProperty('assistant');
       expect(foundGroup).not.toHaveProperty('gender');
