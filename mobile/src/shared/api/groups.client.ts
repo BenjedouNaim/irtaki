@@ -40,3 +40,11 @@ export async function listAvailableGroups(
     params: { gender },
   });
 }
+
+export interface GroupDetailResponse {
+  data: GroupListItem;
+}
+
+export async function getGroupDetail(id: string): Promise<GroupDetailResponse> {
+  return apiClient.get<GroupDetailResponse>(`/groups/${id}`);
+}
