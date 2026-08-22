@@ -195,7 +195,11 @@ describe('POST /groups (API-013 Integration)', () => {
       });
 
       // Verify audit_entries row was written
-      const auditRows = await dataSource.query(
+      const auditRows: Array<{
+        actor_id: string;
+        target_type: string;
+        new_value: Record<string, unknown>;
+      }> = await dataSource.query(
         "SELECT * FROM audit_entries WHERE action = 'GROUP_CREATED' AND target_id = $1",
         [body.data.id],
       );
@@ -474,14 +478,18 @@ describe('POST /groups (API-013 Integration)', () => {
       const statuses = [res1.status, res2.status].sort();
       expect(statuses).toEqual([HttpStatus.CREATED, HttpStatus.CONFLICT]);
 
-      const conflictRes = res1.status === HttpStatus.CONFLICT ? res1 : res2;
-      expect((conflictRes.body as { error: string }).error).toBe('GROUP_NAME_TAKEN');
+      const conflictRes =
+        res1.status === Number(HttpStatus.CONFLICT) ? res1 : res2;
+
+      expect((conflictRes.body as { error: string }).error).toBe(
+        'GROUP_NAME_TAKEN',
+      );
 
       // Verify only 1 row exists in DB
-      const dbRows = await dataSource.query(
-        'SELECT id, name FROM groups WHERE name = $1',
-        [concurrentName],
-      );
+      const dbRows: Array<{ id: string; name: string }> =
+        await dataSource.query('SELECT id, name FROM groups WHERE name = $1', [
+          concurrentName,
+        ]);
       expect(dbRows.length).toBe(1);
     });
   });

@@ -48,7 +48,6 @@ describe('CreateGroupScreen (SCR-28)', () => {
     },
   ];
 
-
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
@@ -63,7 +62,9 @@ describe('CreateGroupScreen (SCR-28)', () => {
   });
 
   it('renders form fields, title, and loads staff options', async () => {
-    const { getByText, getByTestId, findByText } = render(<CreateGroupScreen />);
+    const { getByText, getByTestId, findByText } = render(
+      <CreateGroupScreen />,
+    );
 
     expect(getByText('إنشاء حلقة جديدة')).toBeTruthy();
     expect(getByTestId('group-name-input')).toBeTruthy();
@@ -236,8 +237,6 @@ describe('CreateGroupScreen (SCR-28)', () => {
       });
       expect(onSuccess).toHaveBeenCalledWith(createdGroupId);
     });
-
-
   });
 
   it('handles staff load error and retries upon pressing retry button', async () => {

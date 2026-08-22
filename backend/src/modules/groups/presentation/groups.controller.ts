@@ -49,7 +49,6 @@ export class GroupsController {
     return this.createGroupUseCase.execute(req.user.id, dto);
   }
 
-
   @Roles(
     UserRole.Admin,
     UserRole.Teacher,

@@ -279,7 +279,6 @@ export class GroupRepository implements IGroupRepository {
   }
 
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
-
     return {
       id: raw.id,
       name: raw.name,

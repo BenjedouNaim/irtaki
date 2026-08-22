@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateGroupUseCase } from './create-group.use-case';
@@ -86,7 +89,7 @@ describe('CreateGroupUseCase', () => {
     };
 
     const mockAuditRepo = {
-      save: jest.fn().mockResolvedValue({} as AuditEntryTypeOrmEntity),
+      save: jest.fn().mockResolvedValue({}),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -127,7 +130,9 @@ describe('CreateGroupUseCase', () => {
 
       expect(userRepository.findById).toHaveBeenCalledWith(mockTeacher.id);
       expect(userRepository.findById).toHaveBeenCalledWith(mockAssistant.id);
-      expect(groupRepository.findByName).toHaveBeenCalledWith('حلقة قالون النموذجية');
+      expect(groupRepository.findByName).toHaveBeenCalledWith(
+        'حلقة قالون النموذجية',
+      );
       expect(groupRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'حلقة قالون النموذجية',
@@ -140,22 +145,20 @@ describe('CreateGroupUseCase', () => {
           createdBy: 'admin-id',
         }),
       );
-      expect(auditRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'GROUP_CREATED',
-          targetType: 'Group',
-          targetId: mockCreatedRow.id,
-          actorId: 'admin-id',
-          previousValue: null,
-          newValue: expect.objectContaining({
-            name: 'حلقة قالون النموذجية',
-            gender: 'Male',
-            recitation_day: 5,
-            enrollment_status: 'Closed',
-            lifecycle_state: 'Active',
-          }),
-        }),
-      );
+      expect(auditRepository.save).toHaveBeenCalledTimes(1);
+      const savedAudit = auditRepository.save.mock.calls[0][0];
+      expect(savedAudit.action).toBe('GROUP_CREATED');
+      expect(savedAudit.targetType).toBe('Group');
+      expect(savedAudit.targetId).toBe(mockCreatedRow.id);
+      expect(savedAudit.actorId).toBe('admin-id');
+      expect(savedAudit.previousValue).toBeNull();
+      expect(savedAudit.newValue).toMatchObject({
+        name: 'حلقة قالون النموذجية',
+        gender: 'Male',
+        recitation_day: 5,
+        enrollment_status: 'Closed',
+        lifecycle_state: 'Active',
+      });
 
       expect(result).toEqual({
         data: {
@@ -179,7 +182,9 @@ describe('CreateGroupUseCase', () => {
       });
       groupRepository.findByName.mockResolvedValue(null);
       groupRepository.create.mockResolvedValue(mockCreatedRow);
-      auditRepository.save.mockRejectedValue(new Error('DB audit connection failure'));
+      auditRepository.save.mockRejectedValue(
+        new Error('DB audit connection failure'),
+      );
 
       const result = await useCase.execute('admin-id', validDto);
 
@@ -202,7 +207,9 @@ describe('CreateGroupUseCase', () => {
       try {
         await useCase.execute('admin-id', validDto);
       } catch (err) {
-        const response = (err as UnprocessableEntityException).getResponse() as {
+        const response = (
+          err as UnprocessableEntityException
+        ).getResponse() as {
           statusCode: number;
           details: Array<{ field: string; rule: string }>;
         };
@@ -234,7 +241,9 @@ describe('CreateGroupUseCase', () => {
         await useCase.execute('admin-id', validDto);
         fail('Expected UnprocessableEntityException');
       } catch (err) {
-        const response = (err as UnprocessableEntityException).getResponse() as {
+        const response = (
+          err as UnprocessableEntityException
+        ).getResponse() as {
           statusCode: number;
           details: Array<{ field: string; rule: string }>;
         };

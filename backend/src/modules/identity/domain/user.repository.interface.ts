@@ -9,4 +9,3 @@ export interface IUserRepository {
   findAllByRole(role?: UserRole): Promise<User[]>;
   save(user: User): Promise<User>;
 }
-

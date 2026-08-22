@@ -97,11 +97,16 @@ export class CreateGroupUseCase {
         createdBy: actorId,
       });
     } catch (err: unknown) {
-      const errorObj = err as { code?: string; driverError?: { code?: string }; detail?: string };
+      const errorObj = err as {
+        code?: string;
+        driverError?: { code?: string };
+        detail?: string;
+      };
       if (
         errorObj?.code === '23505' ||
         errorObj?.driverError?.code === '23505' ||
-        (typeof errorObj?.detail === 'string' && errorObj.detail.includes('already exists'))
+        (typeof errorObj?.detail === 'string' &&
+          errorObj.detail.includes('already exists'))
       ) {
         throw new ConflictException({
           statusCode: 409,

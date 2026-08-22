@@ -41,4 +41,3 @@ export interface IGroupRepository {
     createdBy: string;
   }): Promise<GroupListRow>;
 }
-

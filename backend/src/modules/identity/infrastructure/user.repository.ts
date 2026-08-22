@@ -34,7 +34,6 @@ export class UserRepository implements IUserRepository {
     return entities.map((e) => this.toDomain(e));
   }
 
-
   async save(user: User): Promise<User> {
     const entity = this.toEntity(user);
     const saved = await this.repo.save(entity);

@@ -62,4 +62,3 @@ export async function createGroup(
 ): Promise<GroupDetailResponse> {
   return apiClient.post<GroupDetailResponse>('/groups', payload);
 }
-

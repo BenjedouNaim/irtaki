@@ -73,7 +73,9 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
       setAssistants(assistantsRes.data);
     } catch (err) {
       if (err instanceof ApiError) {
-        setStaffError(err.message || 'تعذر تحميل قائمة الكادر الإداري والتعليمي');
+        setStaffError(
+          err.message || 'تعذر تحميل قائمة الكادر الإداري والتعليمي',
+        );
       } else {
         setStaffError('تعذر الاتصال بالخادم لتحميل قائمة المعلمين والمساعدين.');
       }
@@ -138,7 +140,6 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
       teacher_id: teacherId || '',
       assistant_id: assistantId || '',
     });
-
 
     if (!validationResult.success) {
       const fieldErrors = validationResult.error.flatten().fieldErrors;

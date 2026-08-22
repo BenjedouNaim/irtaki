@@ -44,4 +44,3 @@ import { GroupsController } from './presentation/groups.controller';
   ],
 })
 export class GroupsModule {}
-

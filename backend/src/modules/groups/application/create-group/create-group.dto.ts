@@ -1,4 +1,12 @@
-import { IsIn, IsInt, IsNotEmpty, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateGroupDto {
   @IsString({ message: 'اسم الحلقة يجب أن يكون نصاً' })
