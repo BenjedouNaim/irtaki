@@ -32,3 +32,11 @@ export interface ListGroupsResponse {
 export async function listGroups(): Promise<ListGroupsResponse> {
   return apiClient.get<ListGroupsResponse>('/groups');
 }
+
+export async function listAvailableGroups(
+  gender: 'Male' | 'Female',
+): Promise<ListGroupsResponse> {
+  return apiClient.get<ListGroupsResponse>('/groups/available', {
+    params: { gender },
+  });
+}

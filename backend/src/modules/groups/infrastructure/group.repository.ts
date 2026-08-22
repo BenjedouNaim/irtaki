@@ -117,6 +117,46 @@ export class GroupRepository implements IGroupRepository {
     return this.mapRawToGroupListRow(row);
   }
 
+  async findAvailableForGender(
+    gender: 'Male' | 'Female',
+  ): Promise<GroupListRow[]> {
+    const rows = await this.groupRepo
+      .createQueryBuilder('g')
+      .leftJoin(UserTypeOrmEntity, 't', 't.id = g.teacher_id')
+      .leftJoin(UserTypeOrmEntity, 'a', 'a.id = g.assistant_id')
+      .where('g.enrollment_status = :status', { status: 'Open' })
+      .andWhere('g.lifecycle_state = :state', { state: 'Active' })
+      .andWhere('g.gender = :gender', { gender })
+      .select([
+        'g.id AS id',
+        'g.name AS name',
+        'g.gender AS gender',
+        'g.recitation_day AS recitation_day',
+        'g.enrollment_status AS enrollment_status',
+        'g.lifecycle_state AS lifecycle_state',
+        'g.created_at AS created_at',
+        't.id AS teacher_id',
+        't.full_name AS teacher_full_name',
+        'a.id AS assistant_id',
+        'a.full_name AS assistant_full_name',
+      ])
+      .orderBy('g.created_at', 'DESC')
+      .getRawMany<RawGroupListRow>();
+
+    return rows.map((r) => this.mapRawToGroupListRow(r));
+  }
+
+  async findGenderByUserId(userId: string): Promise<'Male' | 'Female' | null> {
+    const user = await this.groupRepo.manager
+      .getRepository(UserTypeOrmEntity)
+      .findOne({
+        where: { id: userId },
+        select: ['gender'],
+      });
+
+    return (user?.gender as 'Male' | 'Female') ?? null;
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,
