@@ -19,16 +19,19 @@ import { RECITATION_DAYS_MAP } from './JoinStepperScreen';
 
 export const createGroupSchema = z.object({
   name: z.string().trim().min(1, 'اسم الحلقة مطلوب'),
-  gender: z.enum(['Male', 'Female'], {
-    required_error: 'يرجى تحديد الفئة المستهدفة',
-  }),
+  gender: z
+    .string()
+    .min(1, 'يرجى تحديد الفئة المستهدفة')
+    .refine((v): v is 'Male' | 'Female' => v === 'Male' || v === 'Female', {
+      message: 'يرجى تحديد الفئة المستهدفة',
+    }),
   recitation_day: z
-    .number({ required_error: 'يرجى تحديد يوم التسميع' })
-    .int()
+    .number({ message: 'يرجى تحديد يوم التسميع' })
+    .int('يوم التسميع غير صالح')
     .min(1, 'يوم التسميع غير صالح')
     .max(7, 'يوم التسميع غير صالح'),
-  teacher_id: z.string().uuid('يرجى اختيار المعلم المشرف'),
-  assistant_id: z.string().uuid('يرجى اختيار المساعد الإداري'),
+  teacher_id: z.string().min(1, 'يرجى اختيار المعلم المشرف'),
+  assistant_id: z.string().min(1, 'يرجى اختيار المساعد الإداري'),
 });
 
 export type CreateGroupFormData = z.infer<typeof createGroupSchema>;
@@ -130,11 +133,12 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
 
     const validationResult = createGroupSchema.safeParse({
       name,
-      gender: gender ?? undefined,
+      gender: gender || '',
       recitation_day: recitationDay ?? undefined,
-      teacher_id: teacherId ?? undefined,
-      assistant_id: assistantId ?? undefined,
+      teacher_id: teacherId || '',
+      assistant_id: assistantId || '',
     });
+
 
     if (!validationResult.success) {
       const fieldErrors = validationResult.error.flatten().fieldErrors;
