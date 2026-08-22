@@ -61,12 +61,7 @@ export class GroupsController {
     );
   }
 
-  @Roles(
-    UserRole.Admin,
-    UserRole.Teacher,
-    UserRole.Assistant,
-    UserRole.Student,
-  )
+  @Roles(UserRole.Admin, UserRole.Teacher, UserRole.Assistant, UserRole.Student)
   @Get(':id')
   async getGroupDetail(
     @Req() req: AuthenticatedRequest,

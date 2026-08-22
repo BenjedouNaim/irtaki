@@ -272,7 +272,8 @@ describe('GET /groups/:id (API-012 Integration)', () => {
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .expect(HttpStatus.FORBIDDEN);
 
-      expect(res.body.statusCode).toBe(HttpStatus.FORBIDDEN);
+      const body = res.body as { statusCode: number; error: string };
+      expect(body.statusCode).toBe(HttpStatus.FORBIDDEN);
     });
   });
 
@@ -482,7 +483,7 @@ describe('GET /groups/:id (API-012 Integration)', () => {
         .set('Authorization', `Bearer ${student.accessToken}`)
         .expect(HttpStatus.OK);
 
-      const body = res.body;
+      const body = res.body as { data: Record<string, unknown> };
       expect(body.data).toBeDefined();
       expect(body.data.id).toBe(groupId);
       expect(body.data.name).toBe('حلقة قالون - الطالب أحمد');

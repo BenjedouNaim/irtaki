@@ -186,9 +186,10 @@ describe('GroupDetailUseCase', () => {
         mockGroupRow.id,
       );
 
-      expect(
-        groupRepository.findByActiveMemberAndGroupId,
-      ).toHaveBeenCalledWith('student-id', mockGroupRow.id);
+      expect(groupRepository.findByActiveMemberAndGroupId).toHaveBeenCalledWith(
+        'student-id',
+        mockGroupRow.id,
+      );
 
       expect(result).toEqual({
         data: {
@@ -213,9 +214,10 @@ describe('GroupDetailUseCase', () => {
         useCase.execute('student-id', UserRole.Student, 'other-group-id'),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(
-        groupRepository.findByActiveMemberAndGroupId,
-      ).toHaveBeenCalledWith('student-id', 'other-group-id');
+      expect(groupRepository.findByActiveMemberAndGroupId).toHaveBeenCalledWith(
+        'student-id',
+        'other-group-id',
+      );
     });
   });
 
