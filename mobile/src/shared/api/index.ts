@@ -3,3 +3,5 @@ export * from './client';
 export * from './auth.client';
 export * from './me.client';
 export * from './groups.client';
+export * from './users.client';
+

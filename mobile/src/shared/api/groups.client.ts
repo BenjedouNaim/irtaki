@@ -48,3 +48,18 @@ export interface GroupDetailResponse {
 export async function getGroupDetail(id: string): Promise<GroupDetailResponse> {
   return apiClient.get<GroupDetailResponse>(`/groups/${id}`);
 }
+
+export interface CreateGroupPayload {
+  name: string;
+  gender: 'Male' | 'Female';
+  recitation_day: number;
+  teacher_id: string;
+  assistant_id: string;
+}
+
+export async function createGroup(
+  payload: CreateGroupPayload,
+): Promise<GroupDetailResponse> {
+  return apiClient.post<GroupDetailResponse>('/groups', payload);
+}
+
