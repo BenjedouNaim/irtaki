@@ -73,4 +73,3 @@ export async function updateGroupName(
 ): Promise<GroupDetailResponse> {
   return apiClient.patch<GroupDetailResponse>(`/groups/${id}`, payload);
 }
-

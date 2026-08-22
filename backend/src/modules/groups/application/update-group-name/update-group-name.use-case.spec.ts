@@ -96,9 +96,9 @@ describe('UpdateGroupNameUseCase', () => {
   it('throws NotFoundException when group does not exist', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(null);
 
-    await expect(
-      useCase.execute(actorId, groupId, validDto),
-    ).rejects.toThrow(NotFoundException);
+    await expect(useCase.execute(actorId, groupId, validDto)).rejects.toThrow(
+      NotFoundException,
+    );
 
     expect(groupRepository.updateName).not.toHaveBeenCalled();
   });
@@ -111,9 +111,9 @@ describe('UpdateGroupNameUseCase', () => {
       name: 'حلقة قالون الجديدة',
     });
 
-    await expect(
-      useCase.execute(actorId, groupId, validDto),
-    ).rejects.toThrow(ConflictException);
+    await expect(useCase.execute(actorId, groupId, validDto)).rejects.toThrow(
+      ConflictException,
+    );
 
     expect(groupRepository.updateName).not.toHaveBeenCalled();
   });
@@ -139,9 +139,9 @@ describe('UpdateGroupNameUseCase', () => {
       driverError: { code: '23505' },
     });
 
-    await expect(
-      useCase.execute(actorId, groupId, validDto),
-    ).rejects.toThrow(ConflictException);
+    await expect(useCase.execute(actorId, groupId, validDto)).rejects.toThrow(
+      ConflictException,
+    );
   });
 
   it('throws NotFoundException if updateName returns null', async () => {
@@ -149,9 +149,9 @@ describe('UpdateGroupNameUseCase', () => {
     groupRepository.findByName.mockResolvedValueOnce(null);
     groupRepository.updateName.mockResolvedValueOnce(null);
 
-    await expect(
-      useCase.execute(actorId, groupId, validDto),
-    ).rejects.toThrow(NotFoundException);
+    await expect(useCase.execute(actorId, groupId, validDto)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   it('re-throws unexpected DB errors from updateName', async () => {
@@ -161,8 +161,8 @@ describe('UpdateGroupNameUseCase', () => {
       new Error('Connection lost'),
     );
 
-    await expect(
-      useCase.execute(actorId, groupId, validDto),
-    ).rejects.toThrow('Connection lost');
+    await expect(useCase.execute(actorId, groupId, validDto)).rejects.toThrow(
+      'Connection lost',
+    );
   });
 });
