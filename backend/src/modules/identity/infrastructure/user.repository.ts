@@ -26,6 +26,15 @@ export class UserRepository implements IUserRepository {
     return this.toDomain(entity);
   }
 
+  async findAllByRole(role?: UserRole): Promise<User[]> {
+    const entities = await this.repo.find({
+      where: role ? { role } : {},
+      order: { createdAt: 'ASC' },
+    });
+    return entities.map((e) => this.toDomain(e));
+  }
+
+
   async save(user: User): Promise<User> {
     const entity = this.toEntity(user);
     const saved = await this.repo.save(entity);
