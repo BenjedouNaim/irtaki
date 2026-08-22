@@ -1,12 +1,25 @@
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
 import { ListGroupsUseCase } from '../application/list-groups/list-groups.use-case';
 import { BrowseAvailableGroupsUseCase } from '../application/browse-available-groups/browse-available-groups.use-case';
 import { GroupDetailUseCase } from '../application/group-detail/group-detail.use-case';
+import { CreateGroupUseCase } from '../application/create-group/create-group.use-case';
 import { ListGroupsResponseDto } from '../application/list-groups/group-list-item.dto';
 import { GroupDetailResponseDto } from '../application/group-detail/group-detail.dto';
+import { CreateGroupDto } from '../application/create-group/create-group.dto';
+import { CreateGroupResponseDto } from '../application/create-group/create-group-response.dto';
 import { BrowseAvailableGroupsQueryDto } from './dto/browse-available-groups-query.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -23,7 +36,18 @@ export class GroupsController {
     private readonly listGroupsUseCase: ListGroupsUseCase,
     private readonly browseAvailableGroupsUseCase: BrowseAvailableGroupsUseCase,
     private readonly groupDetailUseCase: GroupDetailUseCase,
+    private readonly createGroupUseCase: CreateGroupUseCase,
   ) {}
+
+  @Roles(UserRole.Admin)
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateGroupDto,
+  ): Promise<CreateGroupResponseDto> {
+    return this.createGroupUseCase.execute(req.user.id, dto);
+  }
 
   @Roles(
     UserRole.Admin,
