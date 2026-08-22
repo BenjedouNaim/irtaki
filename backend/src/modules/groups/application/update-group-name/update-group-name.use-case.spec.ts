@@ -1,21 +1,17 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { UpdateGroupNameUseCase } from './update-group-name.use-case';
 import {
   GROUP_REPOSITORY,
   IGroupRepository,
   GroupListRow,
 } from '../../domain/group.repository.interface';
-import { AuditEntryTypeOrmEntity } from '../../../identity/infrastructure/audit-entry.typeorm-entity';
 import { UpdateGroupNameDto } from './update-group-name.dto';
 
 describe('UpdateGroupNameUseCase', () => {
   let useCase: UpdateGroupNameUseCase;
   let groupRepository: jest.Mocked<IGroupRepository>;
-  let auditRepository: jest.Mocked<Repository<AuditEntryTypeOrmEntity>>;
 
   const mockExistingRow: GroupListRow = {
     id: '44444444-4444-4444-4444-444444444444',
@@ -47,10 +43,6 @@ describe('UpdateGroupNameUseCase', () => {
       updateName: jest.fn(),
     };
 
-    const mockAuditRepo = {
-      save: jest.fn().mockResolvedValue({}),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UpdateGroupNameUseCase,
@@ -58,16 +50,11 @@ describe('UpdateGroupNameUseCase', () => {
           provide: GROUP_REPOSITORY,
           useValue: mockGroupRepo,
         },
-        {
-          provide: getRepositoryToken(AuditEntryTypeOrmEntity),
-          useValue: mockAuditRepo,
-        },
       ],
     }).compile();
 
     useCase = module.get<UpdateGroupNameUseCase>(UpdateGroupNameUseCase);
     groupRepository = module.get(GROUP_REPOSITORY);
-    auditRepository = module.get(getRepositoryToken(AuditEntryTypeOrmEntity));
   });
 
   const actorId = 'admin-user-id';
@@ -76,7 +63,7 @@ describe('UpdateGroupNameUseCase', () => {
     name: '  حلقة قالون الجديدة  ',
   };
 
-  it('successfully updates group name, trims whitespace, writes audit entry, and returns updated group', async () => {
+  it('successfully updates group name, trims whitespace, and returns updated group', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockExistingRow);
     groupRepository.findByName.mockResolvedValueOnce(null);
     groupRepository.updateName.mockResolvedValueOnce(mockUpdatedRow);
@@ -104,18 +91,6 @@ describe('UpdateGroupNameUseCase', () => {
         assistant: mockUpdatedRow.assistant,
       },
     });
-
-    expect(auditRepository.save).toHaveBeenCalledTimes(1);
-    expect(auditRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actorId,
-        action: 'GROUP_NAME_UPDATED',
-        targetType: 'Group',
-        targetId: groupId,
-        previousValue: { name: 'حلقة قالون القديمة' },
-        newValue: { name: 'حلقة قالون الجديدة' },
-      }),
-    );
   });
 
   it('throws NotFoundException when group does not exist', async () => {
@@ -126,7 +101,6 @@ describe('UpdateGroupNameUseCase', () => {
     ).rejects.toThrow(NotFoundException);
 
     expect(groupRepository.updateName).not.toHaveBeenCalled();
-    expect(auditRepository.save).not.toHaveBeenCalled();
   });
 
   it('throws ConflictException on fast-path duplicate name check when another group has that name', async () => {
@@ -142,7 +116,6 @@ describe('UpdateGroupNameUseCase', () => {
     ).rejects.toThrow(ConflictException);
 
     expect(groupRepository.updateName).not.toHaveBeenCalled();
-    expect(auditRepository.save).not.toHaveBeenCalled();
   });
 
   it('does not trigger fast-path conflict if the existing group already has that name (same id)', async () => {
@@ -169,8 +142,6 @@ describe('UpdateGroupNameUseCase', () => {
     await expect(
       useCase.execute(actorId, groupId, validDto),
     ).rejects.toThrow(ConflictException);
-
-    expect(auditRepository.save).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException if updateName returns null', async () => {
@@ -193,16 +164,5 @@ describe('UpdateGroupNameUseCase', () => {
     await expect(
       useCase.execute(actorId, groupId, validDto),
     ).rejects.toThrow('Connection lost');
-  });
-
-  it('continues and returns updated group if audit logging fails', async () => {
-    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockExistingRow);
-    groupRepository.findByName.mockResolvedValueOnce(null);
-    groupRepository.updateName.mockResolvedValueOnce(mockUpdatedRow);
-    auditRepository.save.mockRejectedValueOnce(new Error('Audit DB down'));
-
-    const result = await useCase.execute(actorId, groupId, validDto);
-
-    expect(result.data.name).toBe('حلقة قالون الجديدة');
   });
 });

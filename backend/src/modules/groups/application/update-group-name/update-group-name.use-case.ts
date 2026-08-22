@@ -4,15 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { uuidv7 } from 'uuidv7';
 import {
   GROUP_REPOSITORY,
   GroupListRow,
 } from '../../domain/group.repository.interface';
 import type { IGroupRepository } from '../../domain/group.repository.interface';
-import { AuditEntryTypeOrmEntity } from '../../../identity/infrastructure/audit-entry.typeorm-entity';
 import { UpdateGroupNameDto } from './update-group-name.dto';
 import { UpdateGroupNameResponseDto } from './update-group-name-response.dto';
 
@@ -21,12 +17,10 @@ export class UpdateGroupNameUseCase {
   constructor(
     @Inject(GROUP_REPOSITORY)
     private readonly groupRepository: IGroupRepository,
-    @InjectRepository(AuditEntryTypeOrmEntity)
-    private readonly auditRepository: Repository<AuditEntryTypeOrmEntity>,
   ) {}
 
   async execute(
-    actorId: string,
+    _actorId: string,
     groupId: string,
     dto: UpdateGroupNameDto,
   ): Promise<UpdateGroupNameResponseDto> {
@@ -92,23 +86,7 @@ export class UpdateGroupNameUseCase {
       throw err;
     }
 
-    // 4. Best-effort audit write
-    try {
-      const audit = new AuditEntryTypeOrmEntity();
-      audit.id = uuidv7();
-      audit.actorId = actorId;
-      audit.action = 'GROUP_NAME_UPDATED';
-      audit.targetType = 'Group';
-      audit.targetId = updatedGroup.id;
-      audit.previousValue = { name: existing.name };
-      audit.newValue = { name: updatedGroup.name };
-      audit.occurredAt = new Date();
-      await this.auditRepository.save(audit);
-    } catch {
-      // Audit failure must not block group rename
-    }
-
-    // 5. Return updated group in envelope
+    // 4. Return updated group in envelope
     return {
       data: {
         id: updatedGroup.id,
