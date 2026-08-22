@@ -1,7 +1,9 @@
 import {
   listGroups,
   listAvailableGroups,
+  getGroupDetail,
   ListGroupsResponse,
+  GroupDetailResponse,
 } from '../groups.client';
 import { apiClient } from '../client';
 
@@ -59,6 +61,28 @@ describe('groups.client', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/groups/available', {
       params: { gender: 'Male' },
     });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.get with /groups/:id', async () => {
+    const mockResponse: GroupDetailResponse = {
+      data: {
+        id: 'group-1',
+        name: 'حلقة قالون',
+        gender: 'Male',
+        recitation_day: 3,
+        enrollment_status: 'Open',
+        lifecycle_state: 'Active',
+        teacher: { id: 'teacher-1', full_name: 'أستاذ أحمد' },
+        assistant: { id: 'assistant-1', full_name: 'مساعد علي' },
+      },
+    };
+
+    (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await getGroupDetail('group-1');
+
+    expect(apiClient.get).toHaveBeenCalledWith('/groups/group-1');
     expect(result).toEqual(mockResponse);
   });
 });
