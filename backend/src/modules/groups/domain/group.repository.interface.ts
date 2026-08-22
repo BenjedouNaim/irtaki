@@ -28,4 +28,17 @@ export interface IGroupRepository {
     userId: string,
     groupId: string,
   ): Promise<GroupListRow | null>;
+  findByName(name: string): Promise<GroupListRow | null>;
+  create(group: {
+    id: string;
+    name: string;
+    gender: 'Male' | 'Female';
+    recitationDay: number;
+    enrollmentStatus?: string;
+    lifecycleState?: string;
+    teacherId: string;
+    assistantId: string;
+    createdBy: string;
+  }): Promise<GroupListRow>;
 }
+
