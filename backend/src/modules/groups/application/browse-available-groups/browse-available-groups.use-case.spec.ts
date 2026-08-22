@@ -35,7 +35,7 @@ describe('BrowseAvailableGroupsUseCase', () => {
       findByName: jest.fn(),
       create: jest.fn(),
       updateName: jest.fn(),
-    } as unknown as jest.Mocked<IGroupRepository>;
+    };
     useCase = new BrowseAvailableGroupsUseCase(mockGroupRepo);
   });
 
