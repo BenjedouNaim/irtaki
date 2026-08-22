@@ -68,9 +68,27 @@ export async function refreshAccessToken(): Promise<string | null> {
         await storeRefreshToken(newRefreshToken);
       }
 
-      const currentRole = useAuthStore.getState().role;
-      if (newAccessToken && currentRole) {
-        useAuthStore.getState().setSession(newAccessToken, currentRole);
+      let role = useAuthStore.getState().role;
+      if (!role && newAccessToken) {
+        try {
+          const parts = newAccessToken.split('.');
+          if (parts[1]) {
+            const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const binaryStr = typeof atob !== 'undefined'
+              ? atob(base64)
+              : Buffer.from(base64, 'base64').toString('binary');
+            const decoded = JSON.parse(binaryStr);
+            if (decoded && decoded.role) {
+              role = decoded.role;
+            }
+          }
+        } catch {
+          // ignore decode error
+        }
+      }
+
+      if (newAccessToken && role) {
+        useAuthStore.getState().setSession(newAccessToken, role);
       } else if (newAccessToken) {
         useAuthStore.setState({
           accessToken: newAccessToken,

@@ -30,9 +30,13 @@ export type RegisterFormData = z.infer<typeof registerSchema>;
 
 export interface RegisterScreenProps {
   onNavigateToLogin?: () => void;
+  onRegisterSuccess?: (role: string) => void;
 }
 
-export function RegisterScreen({ onNavigateToLogin }: RegisterScreenProps) {
+export function RegisterScreen({
+  onNavigateToLogin,
+  onRegisterSuccess,
+}: RegisterScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
@@ -79,6 +83,7 @@ export function RegisterScreen({ onNavigateToLogin }: RegisterScreenProps) {
       }
 
       useAuthStore.getState().setSession(response.access_token, response.role);
+      onRegisterSuccess?.(response.role);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.statusCode === 409 || err.errorCode === 'EMAIL_TAKEN') {

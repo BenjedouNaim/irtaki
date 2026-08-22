@@ -28,12 +28,14 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 export interface LoginScreenProps {
   onNavigateToRegister?: () => void;
   onNavigateToForgotPassword?: () => void;
+  onLoginSuccess?: (role: string) => void;
   successMessage?: string;
 }
 
 export function LoginScreen({
   onNavigateToRegister,
   onNavigateToForgotPassword,
+  onLoginSuccess,
   successMessage,
 }: LoginScreenProps) {
   const [email, setEmail] = useState('');
@@ -73,6 +75,7 @@ export function LoginScreen({
       }
 
       useAuthStore.getState().setSession(response.access_token, response.role);
+      onLoginSuccess?.(response.role);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.statusCode === 401 || err.errorCode === 'INVALID_CREDENTIALS') {
