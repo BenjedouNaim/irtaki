@@ -23,4 +23,9 @@ export interface IGroupRepository {
   findByActiveMemberForList(userId: string): Promise<GroupListRow | null>;
   findAvailableForGender(gender: 'Male' | 'Female'): Promise<GroupListRow[]>;
   findGenderByUserId(userId: string): Promise<'Male' | 'Female' | null>;
+  findByIdForDetail(groupId: string): Promise<GroupListRow | null>;
+  findByActiveMemberAndGroupId(
+    userId: string,
+    groupId: string,
+  ): Promise<GroupListRow | null>;
 }
