@@ -6,6 +6,9 @@ export default function RegisterPage() {
   const router = useRouter();
 
   return (
-    <RegisterScreen onNavigateToLogin={() => router.push('/(auth)/login')} />
+    <RegisterScreen
+      onNavigateToLogin={() => router.push('/(auth)/login')}
+      onRegisterSuccess={() => router.replace('/(app)/user')}
+    />
   );
 }
