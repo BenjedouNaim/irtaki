@@ -30,22 +30,28 @@ describe('CreateGroupUseCase', () => {
   const mockTeacher = new User({
     id: '11111111-1111-1111-1111-111111111111',
     email: 'teacher@test.com',
+    passwordHash: 'hash',
     role: UserRole.Teacher,
     fullName: 'الشيخ محمد',
+    timezone: 'Africa/Tunis',
   });
 
   const mockAssistant = new User({
     id: '22222222-2222-2222-2222-222222222222',
     email: 'assistant@test.com',
+    passwordHash: 'hash',
     role: UserRole.Assistant,
     fullName: 'الأستاذ أحمد',
+    timezone: 'Africa/Tunis',
   });
 
   const mockStudent = new User({
     id: '33333333-3333-3333-3333-333333333333',
     email: 'student@test.com',
+    passwordHash: 'hash',
     role: UserRole.Student,
     fullName: 'الطالب علي',
+    timezone: 'Africa/Tunis',
   });
 
   const validDto: CreateGroupDto = {

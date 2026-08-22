@@ -22,6 +22,7 @@ describe('RegisterUseCase', () => {
     mockUserRepo = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
+      findAllByRole: jest.fn(),
       save: jest.fn().mockImplementation((user: User) => Promise.resolve(user)),
     };
 
