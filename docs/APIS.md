@@ -203,7 +203,7 @@ Collection:
 { "data": [{ "...": "..." }], "pagination": { "next_cursor": "eyJ...", "has_more": true } }
 ```
 
-Empty success with no body (e.g. `DELETE /devices/{id}`): `204 No Content`, no envelope. No `total` count is returned on any collection — DEC-C11's scale-agnostic posture and the absence of a sizing target mean a `COUNT(*)` on every list read would be a cost paid for no confirmed benefit; a client needing "how many" already gets `has_more` for infinite-scroll UX, which is the only use case that exists today.
+Empty success with no body (e.g. `DELETE /devices/{id}`): `204 No Content`, no envelope. Bounded, non-paginated collection endpoints (e.g. `GET /groups`, `GET /groups/available`, `GET /groups/{id}/memberships`) return `{ "data": [...] }` without `pagination` keys. No `total` count is returned on any collection — DEC-C11's scale-agnostic posture and the absence of a sizing target mean a `COUNT(*)` on every list read would be a cost paid for no confirmed benefit; a client needing "how many" already gets `has_more` for infinite-scroll UX, which is the only use case that exists today.
 
 ### 9.2 Pagination (Phase 20)
 
@@ -362,7 +362,7 @@ This single endpoint answers UC-02 in one round trip per SA §20's mandate. Dril
 | `recitation_day`             | integer 1–7      | Yes (create)       | Write-once (VR-25) — absent on `PATCH /groups/{id}`   |
 | `teacher_id`, `assistant_id` | UUID             | Yes (create/staff) | Must hold the matching role (VR-24)                   |
 
-`GET /groups` — no query filters; scope-filtered server-side per caller (Admin: all; Teacher/Assistant: assigned; Student: own group only, limited fields; User: none — use `/groups/available`).
+`GET /groups` — no query filters; scope-filtered server-side per caller. Envelope `{ "data": [...] }`, fixed sort `created_at DESC` (§9.4). Admin/Teacher/Assistant receive full item shape: `{ "id", "name", "gender", "recitation_day", "enrollment_status", "lifecycle_state", "teacher": { "id", "full_name" }, "assistant": { "id", "full_name" } }` (APIQ-NEW-03). Student receives limited item shape: `{ "id", "name", "recitation_day", "enrollment_status" }` wrapped in a 0-or-1 item array. User receives `200` with `{ "data": [] }` (client routes to `/groups/available`).
 `GET /groups/available?gender=` — `gender` required for User callers; server still re-derives it from the caller's session if a Student/other role somehow calls it, ignoring a mismatched query value rather than trusting it.
 `GET /groups/{id}` → full detail for Admin/staff; Student sees `{ id, name, recitation_day, enrollment_status }` only (§14.2 — no staff identities beyond what's needed).
 
@@ -651,6 +651,8 @@ All Critical/High-severity items were already resolved upstream (SAS §29.1: zer
 | DB-UQ-11        | `groups.name` uniqueness                                                                                                                                                                                                                                                                                                                                     | DBD            | Resolved: Confirmed, enforced (APIQ-05)                                                                |
 | **APIQ-NEW-01** | `/groups/{id}/memberships` roster sort (`full_name ASC`) uses a Latin collation; Arabic-name sort order may not match user expectation. Low severity — a genuine gap surfaced only at this phase, not present upstream.                                                                                                                                      | New            | Open — recommend confirming Arabic collation (`ar_TN` or ICU) at implementation, not a contract change |
 | **APIQ-NEW-02** | `dashboard_route` on `POST /auth/login`'s response is a new, API-only convenience field with no SAS precedent — it duplicates information the client can derive from `role` alone. Worth confirming it's wanted before implementation, since it's the one field in this document invented purely for client convenience rather than traced to a requirement. | New            | Open — low stakes, drop it if you'd rather the client own all routing logic                            |
+| **APIQ-NEW-03** | Admin/staff `GET /groups` full item shape resolved: embeds `teacher: { id, full_name }` and `assistant: { id, full_name }` reference objects, matching existing embedding pattern (`GET /audit`, `GET /groups/{id}/memberships`). Student receives limited shape (`{ id, name, recitation_day, enrollment_status }`).                                    | New            | **Resolved**                                                                                           |
+| **APIQ-NEW-04** | Non-paginated collection envelope resolved: bounded collections (`/groups`, `/groups/available`, `/groups/{id}/memberships`) use `{ "data": [...] }` with no `pagination` key.                                                                                                                                                                               | New            | **Resolved**                                                                                           |
 
 ## 17. API Quality Review
 
