@@ -73,3 +73,17 @@ export async function updateGroupName(
 ): Promise<GroupDetailResponse> {
   return apiClient.patch<GroupDetailResponse>(`/groups/${id}`, payload);
 }
+
+export interface ToggleEnrollmentPayload {
+  enrollment_status: 'Open' | 'Closed';
+}
+
+export async function toggleEnrollment(
+  id: string,
+  payload: ToggleEnrollmentPayload,
+): Promise<GroupDetailResponse> {
+  return apiClient.patch<GroupDetailResponse>(
+    `/groups/${id}/enrollment`,
+    payload,
+  );
+}
