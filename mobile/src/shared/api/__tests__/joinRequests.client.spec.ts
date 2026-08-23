@@ -2,6 +2,7 @@ import {
   submitJoinRequest,
   getMyJoinRequest,
   listPendingJoinRequests,
+  getJoinRequestDetail,
   SubmitJoinRequestPayload,
   SubmitJoinRequestResponse,
   ListPendingJoinRequestsResponse,
@@ -99,6 +100,36 @@ describe('joinRequests.client', () => {
         limit: 10,
       },
     });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.get with /join-requests/:id for getJoinRequestDetail', async () => {
+    const mockResponse = {
+      data: {
+        id: 'jr-123',
+        full_name: 'أحمد التونسي',
+        gender: 'Male',
+        age: 25,
+        phone_number: '+21698123456',
+        occupation: 'مهندس',
+        city: 'تونس',
+        memorized_ahzab: [1, 2, 3, 4, 5],
+        tajweed_level: 'Intermediate',
+        studied_tajweed_theory: true,
+        studied_qalun: true,
+        fee_agreement: true,
+        program_goal: 'Memorization',
+        score: 85.5,
+        status: 'Pending',
+        created_at: '2026-08-23T10:00:00.000Z',
+      },
+    };
+
+    (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await getJoinRequestDetail('jr-123');
+
+    expect(apiClient.get).toHaveBeenCalledWith('/join-requests/jr-123');
     expect(result).toEqual(mockResponse);
   });
 });

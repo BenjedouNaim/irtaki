@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   IJoinRequestRepository,
+  JoinRequestDetailRow,
   JoinRequestQueueRow,
   JoinRequestRecord,
 } from '../domain/join-request.repository.interface';
@@ -16,6 +17,103 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     @InjectRepository(JoinRequestTypeOrmEntity)
     private readonly joinRequestRepo: Repository<JoinRequestTypeOrmEntity>,
   ) {}
+
+  async findByIdForDetail(id: string): Promise<JoinRequestDetailRow | null> {
+    const rawRow = await this.joinRequestRepo
+      .createQueryBuilder('jr')
+      .innerJoin('groups', 'g', 'g.id = jr.group_id')
+      .where('jr.id = :id', { id })
+      .andWhere('jr.deleted_at IS NULL')
+      .select([
+        'jr.id AS id',
+        'jr.user_id AS user_id',
+        'jr.group_id AS group_id',
+        'jr.full_name AS full_name',
+        'jr.gender AS gender',
+        'jr.age AS age',
+        'jr.phone_number AS phone_number',
+        'jr.occupation AS occupation',
+        'jr.city AS city',
+        'jr.memorized_hizb_count AS memorized_hizb_count',
+        'jr.tajweed_level AS tajweed_level',
+        'jr.studied_tajweed_theory AS studied_tajweed_theory',
+        'jr.studied_qalun AS studied_qalun',
+        'jr.fee_agreement AS fee_agreement',
+        'jr.program_goal AS program_goal',
+        'jr.score AS score',
+        'jr.status AS status',
+        'jr.resolution_source AS resolution_source',
+        'jr.reviewed_at AS reviewed_at',
+        'jr.reviewed_by AS reviewed_by',
+        'jr.created_at AS created_at',
+        'jr.deleted_at AS deleted_at',
+        'g.assistant_id AS assistant_id',
+      ])
+      .getRawOne<{
+        id: string;
+        user_id: string;
+        group_id: string;
+        full_name: string;
+        gender: string;
+        age: number | string;
+        phone_number: string;
+        occupation: string;
+        city: string;
+        memorized_hizb_count: number | string;
+        tajweed_level: string;
+        studied_tajweed_theory: boolean;
+        studied_qalun: boolean;
+        fee_agreement: boolean;
+        program_goal: string;
+        score: number | string;
+        status: string;
+        resolution_source: string | null;
+        reviewed_at: Date | string | null;
+        reviewed_by: string | null;
+        created_at: Date | string;
+        deleted_at: Date | string | null;
+        assistant_id: string;
+      }>();
+
+    if (!rawRow) {
+      return null;
+    }
+
+    const ahzabRows = await this.joinRequestRepo.manager.find(
+      JoinRequestAhzabTypeOrmEntity,
+      {
+        where: { joinRequestId: id },
+        order: { hizbNumber: 'ASC' },
+      },
+    );
+
+    return {
+      id: rawRow.id,
+      userId: rawRow.user_id,
+      groupId: rawRow.group_id,
+      fullName: rawRow.full_name,
+      gender: rawRow.gender,
+      age: Number(rawRow.age),
+      phoneNumber: rawRow.phone_number,
+      occupation: rawRow.occupation,
+      city: rawRow.city,
+      memorizedHizbCount: Number(rawRow.memorized_hizb_count),
+      tajweedLevel: rawRow.tajweed_level,
+      studiedTajweedTheory: Boolean(rawRow.studied_tajweed_theory),
+      studiedQalun: Boolean(rawRow.studied_qalun),
+      feeAgreement: Boolean(rawRow.fee_agreement),
+      programGoal: rawRow.program_goal,
+      score: Number(rawRow.score),
+      status: rawRow.status,
+      resolutionSource: rawRow.resolution_source,
+      reviewedAt: rawRow.reviewed_at ? new Date(rawRow.reviewed_at) : null,
+      reviewedBy: rawRow.reviewed_by,
+      createdAt: new Date(rawRow.created_at),
+      deletedAt: rawRow.deleted_at ? new Date(rawRow.deleted_at) : null,
+      assistantId: rawRow.assistant_id,
+      memorizedAhzab: ahzabRows.map((a) => Number(a.hizbNumber)),
+    };
+  }
 
   async create(joinRequest: JoinRequest): Promise<JoinRequestRecord> {
     return this.joinRequestRepo.manager.transaction(async (manager) => {

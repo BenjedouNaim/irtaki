@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -20,6 +21,8 @@ import { JoinRequestStatusDto } from '../application/get-own-join-request-status
 import { ListPendingJoinRequestsUseCase } from '../application/list-pending-join-requests/list-pending-join-requests.use-case';
 import { ListPendingJoinRequestsQueryDto } from '../application/list-pending-join-requests/list-pending-join-requests-query.dto';
 import { ListPendingJoinRequestsResponseDto } from '../application/list-pending-join-requests/list-pending-join-requests-response.dto';
+import { GetJoinRequestDetailUseCase } from '../application/get-join-request-detail/get-join-request-detail.use-case';
+import { GetJoinRequestDetailResponseDto } from '../application/get-join-request-detail/get-join-request-detail-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -35,6 +38,7 @@ export class JoinRequestsController {
     private readonly submitJoinRequestUseCase: SubmitJoinRequestUseCase,
     private readonly getOwnJoinRequestUseCase: GetOwnJoinRequestUseCase,
     private readonly listPendingJoinRequestsUseCase: ListPendingJoinRequestsUseCase,
+    private readonly getJoinRequestDetailUseCase: GetJoinRequestDetailUseCase,
   ) {}
 
   @Roles(UserRole.Assistant, UserRole.Admin)
@@ -57,6 +61,19 @@ export class JoinRequestsController {
   @Get('mine')
   async mine(@Req() req: AuthenticatedRequest): Promise<JoinRequestStatusDto> {
     return this.getOwnJoinRequestUseCase.execute(req.user.id);
+  }
+
+  @Roles(UserRole.Assistant, UserRole.Admin)
+  @Get(':id')
+  async detail(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<GetJoinRequestDetailResponseDto> {
+    return this.getJoinRequestDetailUseCase.execute(
+      req.user.id,
+      req.user.role,
+      id,
+    );
   }
 
   @Roles(UserRole.User)
