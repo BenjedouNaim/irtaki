@@ -362,7 +362,13 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
               />
               <DeleteGroupPanel
                 groupId={groupId}
-                onDeleted={() => router.replace('/admin/groups')}
+                onDeleted={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/(app)/admin');
+                  }
+                }}
               />
             </>
           ) : null}
