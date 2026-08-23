@@ -7,7 +7,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { listGroups, GroupListItemFull } from '@/shared/api/groups.client';
 import { ApiError } from '@/shared/api/types';
-import { getRecitationDayName } from './JoinStepperScreen';
+import { getRecitationDayName } from '@/features/joinRequests/screens/JoinStepperScreen';
 
 export function GroupsListScreen() {
   const router = useRouter();

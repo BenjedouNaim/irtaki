@@ -15,7 +15,7 @@ import { StaffReassignmentPanel } from '../components/StaffReassignmentPanel';
 import { GroupLifecyclePanel } from '../components/GroupLifecyclePanel';
 import { DeleteGroupPanel } from '../components/DeleteGroupPanel';
 import { EnrollmentToggle } from '../components/EnrollmentToggle';
-import { getRecitationDayName } from './JoinStepperScreen';
+import { getRecitationDayName } from '@/features/joinRequests/screens/JoinStepperScreen';
 
 export interface GroupDetailScreenProps {
   groupId: string;
