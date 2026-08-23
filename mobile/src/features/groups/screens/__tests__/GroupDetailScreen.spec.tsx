@@ -2,9 +2,12 @@ import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { GroupDetailScreen } from '../GroupDetailScreen';
 import * as groupsApi from '@/shared/api/groups.client';
+import * as usersApi from '@/shared/api/users.client';
+import { useAuthStore } from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/groups.client');
+jest.mock('@/shared/api/users.client');
 
 describe('GroupDetailScreen (SCR-29)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
@@ -28,6 +31,8 @@ describe('GroupDetailScreen (SCR-29)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    useAuthStore.setState({ role: 'Admin' });
+    jest.spyOn(usersApi, 'listUsersByRole').mockResolvedValue({ data: [] });
   });
 
   it('renders loading skeleton on initial mount', async () => {
@@ -314,6 +319,39 @@ describe('GroupDetailScreen (SCR-29)', () => {
 
       await findByTestId('group-detail-name');
       expect(queryByTestId('staff-reassignment-panel')).toBeNull();
+    });
+  });
+
+  describe('Group Lifecycle Panel (F-GRP-08)', () => {
+    it('renders GroupLifecyclePanel when user role is Admin', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Admin' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      expect(await findByTestId('group-lifecycle-panel')).toBeTruthy();
+    });
+
+    it('does not render GroupLifecyclePanel when user role is Teacher', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Teacher' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { queryByTestId, findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      await findByTestId('group-detail-name');
+      expect(queryByTestId('group-lifecycle-panel')).toBeNull();
     });
   });
 });

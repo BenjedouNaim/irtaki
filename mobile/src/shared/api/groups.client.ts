@@ -99,3 +99,16 @@ export async function reassignStaff(
 ): Promise<GroupDetailResponse> {
   return apiClient.patch<GroupDetailResponse>(`/groups/${id}/staff`, payload);
 }
+
+export interface SetLifecyclePayload {
+  lifecycle_state: 'Active' | 'Archived';
+}
+
+export async function setGroupLifecycle(
+  id: string,
+  lifecycleState: 'Active' | 'Archived',
+): Promise<GroupDetailResponse> {
+  return apiClient.patch<GroupDetailResponse>(`/groups/${id}/lifecycle`, {
+    lifecycle_state: lifecycleState,
+  });
+}

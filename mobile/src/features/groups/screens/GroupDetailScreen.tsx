@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
 import { StaffReassignmentPanel } from '../components/StaffReassignmentPanel';
+import { GroupLifecyclePanel } from '../components/GroupLifecyclePanel';
 import { EnrollmentToggle } from '../components/EnrollmentToggle';
 import { getRecitationDayName } from './JoinStepperScreen';
 
@@ -336,17 +337,27 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
             </View>
           </View>
 
-          {/* Admin Staff Reassignment Panel */}
+          {/* Admin Panels */}
           {role === 'Admin' ? (
-            <StaffReassignmentPanel
-              groupId={groupId}
-              currentTeacher={group.teacher}
-              currentAssistant={group.assistant}
-              onReassigned={(updatedGroup) => {
-                setGroup(updatedGroup);
-                setSubmitSuccess(true);
-              }}
-            />
+            <>
+              <StaffReassignmentPanel
+                groupId={groupId}
+                currentTeacher={group.teacher}
+                currentAssistant={group.assistant}
+                onReassigned={(updatedGroup) => {
+                  setGroup(updatedGroup);
+                  setSubmitSuccess(true);
+                }}
+              />
+              <GroupLifecyclePanel
+                groupId={groupId}
+                lifecycleState={group.lifecycle_state}
+                onChanged={(updatedGroup) => {
+                  setGroup(updatedGroup);
+                  setSubmitSuccess(true);
+                }}
+              />
+            </>
           ) : null}
 
           {/* Teacher Enrollment Toggle Panel */}

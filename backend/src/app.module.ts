@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validate } from './config/app.config';
@@ -23,6 +24,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
       validate,
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot(),
     SharedModule,
     DatabaseModule,
     HealthModule,
