@@ -54,4 +54,6 @@ export interface IGroupRepository {
     lifecycleState: 'Active' | 'Archived',
     archivedAt: Date | null,
   ): Promise<GroupListRow | null>;
+  hasMembershipHistory(groupId: string): Promise<boolean>;
+  deleteById(groupId: string): Promise<boolean>;
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -22,6 +23,7 @@ import { ToggleEnrollmentUseCase } from '../application/toggle-enrollment/toggle
 import { ReassignStaffUseCase } from '../application/reassign-staff/reassign-staff.use-case';
 import { ArchiveGroupUseCase } from '../application/archive-group/archive-group.use-case';
 import { UnarchiveGroupUseCase } from '../application/unarchive-group/unarchive-group.use-case';
+import { DeleteGroupUseCase } from '../application/delete-group/delete-group.use-case';
 import { ListGroupsResponseDto } from '../application/list-groups/group-list-item.dto';
 import { GroupDetailResponseDto } from '../application/group-detail/group-detail.dto';
 import { CreateGroupDto } from '../application/create-group/create-group.dto';
@@ -56,7 +58,18 @@ export class GroupsController {
     private readonly reassignStaffUseCase: ReassignStaffUseCase,
     private readonly archiveGroupUseCase: ArchiveGroupUseCase,
     private readonly unarchiveGroupUseCase: UnarchiveGroupUseCase,
+    private readonly deleteGroupUseCase: DeleteGroupUseCase,
   ) {}
+
+  @Roles(UserRole.Admin)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteGroup(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<void> {
+    return this.deleteGroupUseCase.execute(req.user.id, id);
+  }
 
   @Roles(UserRole.Admin)
   @Patch(':id/lifecycle')
