@@ -66,7 +66,11 @@ export function DeleteGroupPanel({
           err.message?.includes('سبق أن انضم')
         ) {
           setErrorMessage('لا يمكن حذف حلقة سبق أن انضم إليها طلاب');
-        } else if (err.statusCode === 422 && err.details && err.details.length > 0) {
+        } else if (
+          err.statusCode === 422 &&
+          err.details &&
+          err.details.length > 0
+        ) {
           setErrorMessage(err.details[0].message);
         } else {
           setErrorMessage(err.message || 'حدث خطأ أثناء حذف الحلقة');
@@ -92,7 +96,8 @@ export function DeleteGroupPanel({
           حذف الحلقة
         </Text>
         <Text className="text-xs text-gray-500 dark:text-gray-400 text-right leading-5">
-          حذف هذه الحلقة نهائياً من النظام. هذا الإجراء متاح فقط للحلقات التي لم ينضم إليها أي طالب سابقاً أو حالياً.
+          حذف هذه الحلقة نهائياً من النظام. هذا الإجراء متاح فقط للحلقات التي لم
+          ينضم إليها أي طالب سابقاً أو حالياً.
         </Text>
       </View>
 
