@@ -12,7 +12,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { TajweedLevel } from '../../domain/applicant-score';
+import type { TajweedLevel } from '../../domain/applicant-score';
 
 export class SubmitJoinRequestDto {
   @IsUUID('all', { message: 'معرف الحلقة غير صالح' })

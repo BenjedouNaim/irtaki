@@ -1,8 +1,5 @@
 import { uuidv7 } from 'uuidv7';
-import {
-  calculateApplicantScore,
-  TajweedLevel,
-} from './applicant-score';
+import { calculateApplicantScore, TajweedLevel } from './applicant-score';
 import {
   DomainValidationErrorDetail,
   JoinRequestValidationError,
@@ -24,7 +21,7 @@ export interface SubmitJoinRequestProps {
   studiedTajweedTheory: boolean;
   studiedQalun: boolean;
   feeAgreement: boolean;
-  programGoal: 'Memorization' | 'Revision' | string;
+  programGoal: string;
   createdAt?: Date;
 }
 

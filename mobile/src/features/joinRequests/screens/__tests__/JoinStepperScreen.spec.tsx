@@ -77,7 +77,9 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
   });
 
   it('enables Next button upon selecting Male, fetches Male groups, and renders Step 2', async () => {
-    const { getByTestId, getByText, findByText } = render(<JoinStepperScreen />);
+    const { getByTestId, getByText, findByText } = render(
+      <JoinStepperScreen />,
+    );
     await navigateToStep2(getByTestId);
 
     expect(groupsApi.listAvailableGroups).toHaveBeenCalledWith('Male');
@@ -88,13 +90,18 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
   });
 
   it('navigates to Step 3 upon pressing "التقديم على هذه الحلقة" in modal', async () => {
-    const { getByTestId, findByText, getByText } = render(<JoinStepperScreen />);
+    const { getByTestId, findByText, getByText } = render(
+      <JoinStepperScreen />,
+    );
     await navigateToStep3(getByTestId);
 
     expect(await findByText('الخطوة 3 من 3: بيانات التقديم')).toBeTruthy();
     expect(getByText('حلقة قالون رجال')).toBeTruthy();
     expect(getByTestId('step3-profile-form')).toBeTruthy();
-    expect(getByTestId('submit-application-button').props.accessibilityState.disabled).toBe(true);
+    expect(
+      getByTestId('submit-application-button').props.accessibilityState
+        .disabled,
+    ).toBe(true);
   });
 
   it('completes the Step 3 form and submits successfully (201)', async () => {
@@ -186,7 +193,10 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     fireEvent.press(getByTestId('qalun-no'));
     fireEvent.press(getByTestId('fee-agreement-checkbox'));
 
-    expect(getByTestId('submit-application-button').props.accessibilityState.disabled).toBe(false);
+    expect(
+      getByTestId('submit-application-button').props.accessibilityState
+        .disabled,
+    ).toBe(false);
 
     // Switch to Revision
     fireEvent.press(getByTestId('goal-revision'));
@@ -198,7 +208,10 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
       ),
     ).toBeTruthy();
 
-    expect(getByTestId('submit-application-button').props.accessibilityState.disabled).toBe(true);
+    expect(
+      getByTestId('submit-application-button').props.accessibilityState
+        .disabled,
+    ).toBe(true);
   });
 
   it('handles 422 validation errors by rendering inline field errors', async () => {
@@ -280,7 +293,9 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     // Should return to Step 2
     expect(await findByText('الخطوة 2 من 3: اختيار الحلقة')).toBeTruthy();
     expect(
-      await findByText('هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.'),
+      await findByText(
+        'هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.',
+      ),
     ).toBeTruthy();
   });
 

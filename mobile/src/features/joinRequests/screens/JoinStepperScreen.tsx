@@ -209,7 +209,9 @@ export function JoinStepperScreen() {
         ) {
           // Group became unavailable -> return to Step 2 and refresh (EC-09)
           setStep(2);
-          setGroupUnavailableNotice('هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.');
+          setGroupUnavailableNotice(
+            'هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.',
+          );
           fetchGroups(selectedGender);
         } else if (err.statusCode === 409) {
           // Duplicate submit race -> silent success per UF.md §13
@@ -218,7 +220,9 @@ export function JoinStepperScreen() {
           setSubmitError(err.message || 'حدث خطأ أثناء إرسال الطلب');
         }
       } else {
-        setSubmitError('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مجدداً.');
+        setSubmitError(
+          'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مجدداً.',
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -510,7 +514,10 @@ export function JoinStepperScreen() {
             >
               <View className="items-start">
                 <Text className="text-xs text-primary-700 dark:text-primary-300 font-semibold">
-                  يوم التسميع: {selectedGroup ? getRecitationDayName(selectedGroup.recitation_day) : ''}
+                  يوم التسميع:{' '}
+                  {selectedGroup
+                    ? getRecitationDayName(selectedGroup.recitation_day)
+                    : ''}
                 </Text>
                 <Text className="text-xs text-gray-500 dark:text-gray-400">
                   الفئة: {selectedGender === 'Male' ? 'ذكور' : 'إناث'}
@@ -552,7 +559,10 @@ export function JoinStepperScreen() {
                 onChangeText={(text) => {
                   setFullName(text);
                   if (fieldErrors['full_name']) {
-                    setFieldErrors((prev) => ({ ...prev, full_name: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      full_name: undefined as unknown as string,
+                    }));
                   }
                 }}
                 placeholder="مثال: أحمد بن محمد التونسي"
@@ -576,7 +586,10 @@ export function JoinStepperScreen() {
                 onChangeText={(text) => {
                   setAge(text.replace(/[^0-9]/g, ''));
                   if (fieldErrors['age']) {
-                    setFieldErrors((prev) => ({ ...prev, age: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      age: undefined as unknown as string,
+                    }));
                   }
                 }}
                 placeholder="مثال: 25"
@@ -601,7 +614,10 @@ export function JoinStepperScreen() {
                 onChangeText={(text) => {
                   setPhoneNumber(text);
                   if (fieldErrors['phone_number']) {
-                    setFieldErrors((prev) => ({ ...prev, phone_number: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phone_number: undefined as unknown as string,
+                    }));
                   }
                 }}
                 placeholder="مثال: 98123456 أو +21698123456"
@@ -625,7 +641,10 @@ export function JoinStepperScreen() {
                 onChangeText={(text) => {
                   setOccupation(text);
                   if (fieldErrors['occupation']) {
-                    setFieldErrors((prev) => ({ ...prev, occupation: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      occupation: undefined as unknown as string,
+                    }));
                   }
                 }}
                 placeholder="مثال: مهندس برمجيات / طالب جامعي"
@@ -648,7 +667,10 @@ export function JoinStepperScreen() {
                 onChangeText={(text) => {
                   setCity(text);
                   if (fieldErrors['city']) {
-                    setFieldErrors((prev) => ({ ...prev, city: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      city: undefined as unknown as string,
+                    }));
                   }
                 }}
                 placeholder="مثال: تونس / صفاقس / سوسة"
@@ -672,7 +694,10 @@ export function JoinStepperScreen() {
                 onChange={(selected) => {
                   setMemorizedAhzab(selected);
                   if (fieldErrors['memorized_ahzab']) {
-                    setFieldErrors((prev) => ({ ...prev, memorized_ahzab: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      memorized_ahzab: undefined as unknown as string,
+                    }));
                   }
                 }}
               />
@@ -687,9 +712,18 @@ export function JoinStepperScreen() {
             >
               <View className="gap-2">
                 {[
-                  { key: 'Beginner', label: 'مبتدئ (معرفة أساسية بمخارج الحروف)' },
-                  { key: 'Intermediate', label: 'متوسط (تطبيق أحكام النون والميم والمدود)' },
-                  { key: 'Advanced', label: 'متقدم (إتقان تام للأحكام والصفات)' },
+                  {
+                    key: 'Beginner',
+                    label: 'مبتدئ (معرفة أساسية بمخارج الحروف)',
+                  },
+                  {
+                    key: 'Intermediate',
+                    label: 'متوسط (تطبيق أحكام النون والميم والمدود)',
+                  },
+                  {
+                    key: 'Advanced',
+                    label: 'متقدم (إتقان تام للأحكام والصفات)',
+                  },
                 ].map((item) => {
                   const isSelected = tajweedLevel === item.key;
                   return (
@@ -702,7 +736,10 @@ export function JoinStepperScreen() {
                         triggerHaptic('selection');
                         setTajweedLevel(item.key as TajweedLevel);
                         if (fieldErrors['tajweed_level']) {
-                          setFieldErrors((prev) => ({ ...prev, tajweed_level: undefined as unknown as string }));
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            tajweed_level: undefined as unknown as string,
+                          }));
                         }
                       }}
                       className={`p-3.5 rounded-xl border flex-row items-center justify-between ${
@@ -714,7 +751,9 @@ export function JoinStepperScreen() {
                     >
                       <View
                         className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
-                          isSelected ? 'border-primary bg-primary' : 'border-gray-400'
+                          isSelected
+                            ? 'border-primary bg-primary'
+                            : 'border-gray-400'
                         }`}
                       >
                         {isSelected && (
@@ -741,7 +780,9 @@ export function JoinStepperScreen() {
                 <Pressable
                   testID="theory-yes"
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: studiedTajweedTheory === true }}
+                  accessibilityState={{
+                    selected: studiedTajweedTheory === true,
+                  }}
                   onPress={() => {
                     triggerHaptic('selection');
                     setStudiedTajweedTheory(true);
@@ -767,7 +808,9 @@ export function JoinStepperScreen() {
                 <Pressable
                   testID="theory-no"
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: studiedTajweedTheory === false }}
+                  accessibilityState={{
+                    selected: studiedTajweedTheory === false,
+                  }}
                   onPress={() => {
                     triggerHaptic('selection');
                     setStudiedTajweedTheory(false);
@@ -865,7 +908,9 @@ export function JoinStepperScreen() {
                 <Pressable
                   testID="goal-memorization"
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: programGoal === 'Memorization' }}
+                  accessibilityState={{
+                    selected: programGoal === 'Memorization',
+                  }}
                   onPress={() => {
                     triggerHaptic('selection');
                     setProgramGoal('Memorization');
@@ -943,7 +988,8 @@ export function JoinStepperScreen() {
                   testID="revision-block-notice"
                 >
                   <Text className="text-xs text-amber-800 dark:text-amber-200 text-right leading-5 font-semibold">
-                    عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.
+                    عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة
+                    اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.
                   </Text>
                 </View>
               )}
@@ -964,7 +1010,10 @@ export function JoinStepperScreen() {
                   triggerHaptic('selection');
                   setFeeAgreement(!feeAgreement);
                   if (fieldErrors['fee_agreement']) {
-                    setFieldErrors((prev) => ({ ...prev, fee_agreement: undefined as unknown as string }));
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      fee_agreement: undefined as unknown as string,
+                    }));
                   }
                 }}
                 className={`p-4 rounded-xl border flex-row items-center justify-between ${
@@ -988,7 +1037,8 @@ export function JoinStepperScreen() {
 
                 <View className="flex-1 mr-3 items-end">
                   <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right leading-5">
-                    أوافق وأتعهد بالالتزام بالرسوم الفصلية (30 دينار تونسي لكل دورة مدتها 3 أشهر).
+                    أوافق وأتعهد بالالتزام بالرسوم الفصلية (30 دينار تونسي لكل
+                    دورة مدتها 3 أشهر).
                   </Text>
                 </View>
               </Pressable>
@@ -996,7 +1046,9 @@ export function JoinStepperScreen() {
 
             {/* Submit CTA */}
             <Button
-              label={isSubmitting ? 'جاري إرسال الطلب...' : 'إرسال طلب الانضمام'}
+              label={
+                isSubmitting ? 'جاري إرسال الطلب...' : 'إرسال طلب الانضمام'
+              }
               onPress={handleSubmit}
               disabled={!isFormValid || isSubmitting}
               testID="submit-application-button"

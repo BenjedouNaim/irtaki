@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryColumn } from 'typeorm';
 
 @Entity('join_request_ahzab')
 export class JoinRequestAhzabTypeOrmEntity {

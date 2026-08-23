@@ -1,8 +1,13 @@
-import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/unbound-method */
+import {
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubmitJoinRequestUseCase } from './submit-join-request.use-case';
 import { IJoinRequestRepository } from '../../domain/join-request.repository.interface';
 import { IGroupRepository } from '../../../groups/domain/group.repository.interface';
+import { JoinRequest } from '../../domain/join-request.entity';
 import { SubmitJoinRequestDto } from './submit-join-request.dto';
 import { JoinRequestSubmittedEvent } from '../../domain/events/join-request-submitted.event';
 
@@ -45,7 +50,7 @@ describe('SubmitJoinRequestUseCase', () => {
 
   beforeEach(() => {
     mockJoinRequestRepo = {
-      create: jest.fn().mockImplementation((jr) =>
+      create: jest.fn().mockImplementation((jr: JoinRequest) =>
         Promise.resolve({
           id: jr.id,
           userId: jr.userId,

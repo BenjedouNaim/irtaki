@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 export interface AhzabChipGridProps {
@@ -20,7 +20,7 @@ export function AhzabChipGrid({
   minRequired = 5,
   testID = 'ahzab-chip-grid',
 }: AhzabChipGridProps) {
-  const selectedSet = new Set(selectedAhzab);
+  const selectedSet = useMemo(() => new Set(selectedAhzab), [selectedAhzab]);
   const count = selectedSet.size;
   const isMinMet = count >= minRequired;
 
@@ -127,9 +127,7 @@ export function AhzabChipGrid({
             >
               <Text
                 className={`text-xs font-bold ${
-                  isSelected
-                    ? 'text-white'
-                    : 'text-gray-700 dark:text-gray-300'
+                  isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
                 {hizb}

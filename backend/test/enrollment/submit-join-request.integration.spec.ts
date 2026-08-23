@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -193,7 +194,11 @@ describe('POST /join-requests (API-019 Integration)', () => {
       ],
     );
 
-    return { id: groupId, teacherId: teacher.userId, assistantId: assistant.userId };
+    return {
+      id: groupId,
+      teacherId: teacher.userId,
+      assistantId: assistant.userId,
+    };
   }
 
   it('submits a valid join request: returns 201, computes score, writes to DB and emits event', async () => {
@@ -201,7 +206,10 @@ describe('POST /join-requests (API-019 Integration)', () => {
       `user-valid-${uuidv7()}@test-submit-join-request.com`,
       UserRole.User,
     );
-    const group = await createTestGroup({ gender: 'Male', enrollmentStatus: 'Open' });
+    const group = await createTestGroup({
+      gender: 'Male',
+      enrollmentStatus: 'Open',
+    });
 
     let emittedEvent: JoinRequestSubmittedEvent | null = null;
     const listener = (event: JoinRequestSubmittedEvent) => {
@@ -253,19 +261,22 @@ describe('POST /join-requests (API-019 Integration)', () => {
     expect(dbRow.status).toBe('Pending');
 
     // Verify DB join_request_ahzab rows
-    const ahzabRows = await dataSource.query(
+    const ahzabRows = await dataSource.query<{ hizb_number: number }[]>(
       `SELECT hizb_number FROM join_request_ahzab WHERE join_request_id = $1 ORDER BY hizb_number ASC`,
       [res.body.data.id],
     );
-    expect(ahzabRows.map((r: { hizb_number: number }) => r.hizb_number)).toEqual([
+    expect(ahzabRows.map((r) => r.hizb_number)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     ]);
 
     // Verify event emission
     expect(emittedEvent).toBeDefined();
-    expect(emittedEvent?.joinRequestId).toBe(res.body.data.id);
-    expect(emittedEvent?.applicantId).toBe(user.userId);
-    expect(emittedEvent?.score).toBe(58.33);
+    const capturedEvent = emittedEvent as JoinRequestSubmittedEvent | null;
+    expect(capturedEvent?.joinRequestId).toBe(
+      (res.body as { data: { id: string } }).data.id,
+    );
+    expect(capturedEvent?.applicantId).toBe(user.userId);
+    expect(capturedEvent?.score).toBe(58.33);
 
     eventEmitter.off(JoinRequestSubmittedEvent.EVENT_NAME, listener);
   });

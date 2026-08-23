@@ -5,13 +5,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  GROUP_REPOSITORY,
-  IGroupRepository,
-} from '../../../groups/domain/group.repository.interface';
-import {
+import { GROUP_REPOSITORY } from '../../../groups/domain/group.repository.interface';
+import type { IGroupRepository } from '../../../groups/domain/group.repository.interface';
+import { JOIN_REQUEST_REPOSITORY } from '../../domain/join-request.repository.interface';
+import type {
   IJoinRequestRepository,
-  JOIN_REQUEST_REPOSITORY,
+  JoinRequestRecord,
 } from '../../domain/join-request.repository.interface';
 import { JoinRequest } from '../../domain/join-request.entity';
 import { JoinRequestValidationError } from '../../domain/join-request.errors';
@@ -101,7 +100,7 @@ export class SubmitJoinRequestUseCase {
     }
 
     // 4. Persistence with concurrency guard mapping (DB-UQ-03)
-    let record;
+    let record: JoinRequestRecord;
     try {
       record = await this.joinRequestRepository.create(joinRequest);
     } catch (err: unknown) {

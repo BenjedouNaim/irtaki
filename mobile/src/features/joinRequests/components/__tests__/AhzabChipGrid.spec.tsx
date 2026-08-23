@@ -55,7 +55,7 @@ describe('AhzabChipGrid', () => {
         selectedAhzab={[1, 2]}
         onChange={handleChange}
         readOnly={true}
-      />
+      />,
     );
 
     expect(queryByTestId('ahzab-select-all')).toBeNull();
