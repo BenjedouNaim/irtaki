@@ -49,4 +49,9 @@ export interface IGroupRepository {
     id: string,
     fields: { teacherId?: string; assistantId?: string },
   ): Promise<GroupListRow | null>;
+  updateLifecycle(
+    id: string,
+    lifecycleState: 'Active' | 'Archived',
+    archivedAt: Date | null,
+  ): Promise<GroupListRow | null>;
 }

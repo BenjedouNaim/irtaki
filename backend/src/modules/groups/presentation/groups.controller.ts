@@ -20,6 +20,8 @@ import { CreateGroupUseCase } from '../application/create-group/create-group.use
 import { UpdateGroupNameUseCase } from '../application/update-group-name/update-group-name.use-case';
 import { ToggleEnrollmentUseCase } from '../application/toggle-enrollment/toggle-enrollment.use-case';
 import { ReassignStaffUseCase } from '../application/reassign-staff/reassign-staff.use-case';
+import { ArchiveGroupUseCase } from '../application/archive-group/archive-group.use-case';
+import { UnarchiveGroupUseCase } from '../application/unarchive-group/unarchive-group.use-case';
 import { ListGroupsResponseDto } from '../application/list-groups/group-list-item.dto';
 import { GroupDetailResponseDto } from '../application/group-detail/group-detail.dto';
 import { CreateGroupDto } from '../application/create-group/create-group.dto';
@@ -30,6 +32,8 @@ import { ToggleEnrollmentDto } from '../application/toggle-enrollment/toggle-enr
 import { ToggleEnrollmentResponseDto } from '../application/toggle-enrollment/toggle-enrollment-response.dto';
 import { ReassignStaffDto } from '../application/reassign-staff/reassign-staff.dto';
 import { ReassignStaffResponseDto } from '../application/reassign-staff/reassign-staff-response.dto';
+import { SetLifecycleDto } from '../application/set-lifecycle/set-lifecycle.dto';
+import { SetLifecycleResponseDto } from '../application/set-lifecycle/set-lifecycle-response.dto';
 import { BrowseAvailableGroupsQueryDto } from './dto/browse-available-groups-query.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -50,7 +54,22 @@ export class GroupsController {
     private readonly updateGroupNameUseCase: UpdateGroupNameUseCase,
     private readonly toggleEnrollmentUseCase: ToggleEnrollmentUseCase,
     private readonly reassignStaffUseCase: ReassignStaffUseCase,
+    private readonly archiveGroupUseCase: ArchiveGroupUseCase,
+    private readonly unarchiveGroupUseCase: UnarchiveGroupUseCase,
   ) {}
+
+  @Roles(UserRole.Admin)
+  @Patch(':id/lifecycle')
+  async setLifecycle(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: SetLifecycleDto,
+  ): Promise<SetLifecycleResponseDto> {
+    if (dto.lifecycle_state === 'Archived') {
+      return this.archiveGroupUseCase.execute(req.user.id, id);
+    }
+    return this.unarchiveGroupUseCase.execute(req.user.id, id);
+  }
 
   @Roles(UserRole.Admin)
   @Patch(':id/staff')

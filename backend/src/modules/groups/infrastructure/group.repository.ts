@@ -332,6 +332,23 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
+  async updateLifecycle(
+    id: string,
+    lifecycleState: 'Active' | 'Archived',
+    archivedAt: Date | null,
+  ): Promise<GroupListRow | null> {
+    const updateResult = await this.groupRepo.update(
+      { id },
+      { lifecycleState, archivedAt },
+    );
+
+    if (!updateResult.affected || updateResult.affected === 0) {
+      return null;
+    }
+
+    return this.findByIdForDetail(id);
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,
