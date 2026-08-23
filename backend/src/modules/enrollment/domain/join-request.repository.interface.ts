@@ -27,8 +27,23 @@ export interface JoinRequestRecord {
   deletedAt: Date | null;
 }
 
+export interface JoinRequestQueueRow {
+  id: string;
+  fullName: string;
+  score: number;
+  createdAt: Date;
+}
+
 export interface IJoinRequestRepository {
   create(joinRequest: JoinRequest): Promise<JoinRequestRecord>;
   existsPendingForUser(userId: string): Promise<boolean>;
   findLatestForUser(userId: string): Promise<JoinRequestRecord | null>;
+  findPendingQueue(params: {
+    assistantId: string | null;
+    limit: number;
+    cursor: {
+      id: string;
+      sortKey: { score: number; createdAt: string };
+    } | null;
+  }): Promise<{ rows: JoinRequestQueueRow[]; hasMore: boolean }>;
 }

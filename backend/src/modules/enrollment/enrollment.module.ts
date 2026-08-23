@@ -7,6 +7,7 @@ import { JoinRequestAhzabTypeOrmEntity } from './infrastructure/join-request-ahz
 import { JoinRequestRepository } from './infrastructure/join-request.repository';
 import { SubmitJoinRequestUseCase } from './application/submit-join-request/submit-join-request.use-case';
 import { GetOwnJoinRequestUseCase } from './application/get-own-join-request-status/get-own-join-request-status.use-case';
+import { ListPendingJoinRequestsUseCase } from './application/list-pending-join-requests/list-pending-join-requests.use-case';
 import { JoinRequestsController } from './presentation/join-requests.controller';
 
 @Module({
@@ -26,7 +27,12 @@ import { JoinRequestsController } from './presentation/join-requests.controller'
     JoinRequestRepository,
     SubmitJoinRequestUseCase,
     GetOwnJoinRequestUseCase,
+    ListPendingJoinRequestsUseCase,
   ],
-  exports: [JOIN_REQUEST_REPOSITORY, SubmitJoinRequestUseCase],
+  exports: [
+    JOIN_REQUEST_REPOSITORY,
+    SubmitJoinRequestUseCase,
+    ListPendingJoinRequestsUseCase,
+  ],
 })
 export class EnrollmentModule {}

@@ -42,6 +42,12 @@ export function AssistantTabs() {
         Assistant Tabs Stub
       </Text>
       <Button
+        label="طلبات الانضمام"
+        onPress={() => router.push('/(app)/assistant/join-requests' as any)}
+        testID="assistant-join-requests-button"
+        className="mb-3"
+      />
+      <Button
         label="الملف الشخصي"
         variant="outline"
         onPress={() => router.push('/(app)/profile')}

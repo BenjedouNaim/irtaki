@@ -40,3 +40,31 @@ export interface GetMyJoinRequestResponse {
 export async function getMyJoinRequest(): Promise<GetMyJoinRequestResponse> {
   return apiClient.get<GetMyJoinRequestResponse>('/join-requests/mine');
 }
+
+export interface JoinRequestQueueItem {
+  id: string;
+  full_name: string;
+  score: number;
+  created_at: string;
+}
+
+export interface ListPendingJoinRequestsResponse {
+  data: JoinRequestQueueItem[];
+  pagination: {
+    next_cursor: string | null;
+    has_more: boolean;
+  };
+}
+
+export async function listPendingJoinRequests(params?: {
+  cursor?: string;
+  limit?: number;
+}): Promise<ListPendingJoinRequestsResponse> {
+  return apiClient.get<ListPendingJoinRequestsResponse>('/join-requests', {
+    params: {
+      status: 'pending',
+      ...(params?.cursor ? { cursor: params.cursor } : {}),
+      ...(params?.limit !== undefined ? { limit: params.limit } : {}),
+    },
+  });
+}

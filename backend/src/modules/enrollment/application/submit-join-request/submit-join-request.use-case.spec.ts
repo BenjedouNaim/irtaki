@@ -78,6 +78,7 @@ describe('SubmitJoinRequestUseCase', () => {
       ),
       existsPendingForUser: jest.fn().mockResolvedValue(false),
       findLatestForUser: jest.fn().mockResolvedValue(null),
+      findPendingQueue: jest.fn(),
     };
 
     mockGroupRepo = {

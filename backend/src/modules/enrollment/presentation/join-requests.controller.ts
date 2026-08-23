@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -15,6 +17,9 @@ import { SubmitJoinRequestDto } from '../application/submit-join-request/submit-
 import { SubmitJoinRequestResponseDto } from '../application/submit-join-request/submit-join-request-response.dto';
 import { GetOwnJoinRequestUseCase } from '../application/get-own-join-request-status/get-own-join-request-status.use-case';
 import { JoinRequestStatusDto } from '../application/get-own-join-request-status/get-own-join-request-status-response.dto';
+import { ListPendingJoinRequestsUseCase } from '../application/list-pending-join-requests/list-pending-join-requests.use-case';
+import { ListPendingJoinRequestsQueryDto } from '../application/list-pending-join-requests/list-pending-join-requests-query.dto';
+import { ListPendingJoinRequestsResponseDto } from '../application/list-pending-join-requests/list-pending-join-requests-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -29,7 +34,24 @@ export class JoinRequestsController {
   constructor(
     private readonly submitJoinRequestUseCase: SubmitJoinRequestUseCase,
     private readonly getOwnJoinRequestUseCase: GetOwnJoinRequestUseCase,
+    private readonly listPendingJoinRequestsUseCase: ListPendingJoinRequestsUseCase,
   ) {}
+
+  @Roles(UserRole.Assistant, UserRole.Admin)
+  @Get()
+  async listPending(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListPendingJoinRequestsQueryDto,
+  ): Promise<ListPendingJoinRequestsResponseDto> {
+    if (query.status !== 'pending') {
+      throw new BadRequestException('Status query parameter must be "pending"');
+    }
+    return this.listPendingJoinRequestsUseCase.execute(
+      req.user.id,
+      req.user.role,
+      query,
+    );
+  }
 
   @Roles(UserRole.User)
   @Get('mine')
