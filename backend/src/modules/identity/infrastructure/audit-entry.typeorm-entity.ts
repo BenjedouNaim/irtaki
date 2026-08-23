@@ -16,7 +16,8 @@ export class AuditEntryTypeOrmEntity {
   actorId!: string;
 
   @Column({ type: 'varchar' })
-  action!: 'ENROLLMENT_TOGGLED' | 'GROUP_CREATED' | 'LOGIN';
+  action!:
+    'ENROLLMENT_TOGGLED' | 'GROUP_CREATED' | 'LOGIN' | 'STAFF_REASSIGNED';
 
   @Column({ name: 'target_type', type: 'varchar', nullable: true })
   targetType!: string | null;

@@ -8,7 +8,10 @@ import {
   updateGroupName,
   GroupListItemFull,
 } from '@/shared/api/groups.client';
+import { useAuthStore } from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
+import { StaffReassignmentPanel } from '../components/StaffReassignmentPanel';
+import { EnrollmentToggle } from '../components/EnrollmentToggle';
 import { getRecitationDayName } from './JoinStepperScreen';
 
 export interface GroupDetailScreenProps {
@@ -16,6 +19,7 @@ export interface GroupDetailScreenProps {
 }
 
 export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
+  const role = useAuthStore((s) => s.role);
   const [group, setGroup] = useState<GroupListItemFull | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -331,6 +335,32 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
               </Text>
             </View>
           </View>
+
+          {/* Admin Staff Reassignment Panel */}
+          {role === 'Admin' ? (
+            <StaffReassignmentPanel
+              groupId={groupId}
+              currentTeacher={group.teacher}
+              currentAssistant={group.assistant}
+              onReassigned={(updatedGroup) => {
+                setGroup(updatedGroup);
+                setSubmitSuccess(true);
+              }}
+            />
+          ) : null}
+
+          {/* Teacher Enrollment Toggle Panel */}
+          {role === 'Teacher' ? (
+            <EnrollmentToggle
+              groupId={groupId}
+              enrollmentStatus={group.enrollment_status}
+              onToggled={(newStatus) => {
+                setGroup((prev) =>
+                  prev ? { ...prev, enrollment_status: newStatus } : null,
+                );
+              }}
+            />
+          ) : null}
         </View>
       ) : null}
     </ScrollView>

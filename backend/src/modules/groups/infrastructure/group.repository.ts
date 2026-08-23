@@ -307,6 +307,31 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
+  async updateStaff(
+    id: string,
+    fields: { teacherId?: string; assistantId?: string },
+  ): Promise<GroupListRow | null> {
+    const updateFields: { teacherId?: string; assistantId?: string } = {};
+    if (fields.teacherId !== undefined) {
+      updateFields.teacherId = fields.teacherId;
+    }
+    if (fields.assistantId !== undefined) {
+      updateFields.assistantId = fields.assistantId;
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return this.findByIdForDetail(id);
+    }
+
+    const updateResult = await this.groupRepo.update({ id }, updateFields);
+
+    if (!updateResult.affected || updateResult.affected === 0) {
+      return null;
+    }
+
+    return this.findByIdForDetail(id);
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,

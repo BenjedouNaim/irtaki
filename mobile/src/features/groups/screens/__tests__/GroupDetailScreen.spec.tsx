@@ -283,4 +283,37 @@ describe('GroupDetailScreen (SCR-29)', () => {
       );
     });
   });
+
+  describe('Staff Reassignment Panel (F-GRP-07)', () => {
+    it('renders StaffReassignmentPanel when user role is Admin', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Admin' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      expect(await findByTestId('staff-reassignment-panel')).toBeTruthy();
+    });
+
+    it('does not render StaffReassignmentPanel when user role is Student', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Student' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { queryByTestId, findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      await findByTestId('group-detail-name');
+      expect(queryByTestId('staff-reassignment-panel')).toBeNull();
+    });
+  });
 });

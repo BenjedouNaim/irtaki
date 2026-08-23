@@ -35,6 +35,8 @@ describe('BrowseAvailableGroupsUseCase', () => {
       findByName: jest.fn(),
       create: jest.fn(),
       updateName: jest.fn(),
+      updateEnrollmentStatus: jest.fn(),
+      updateStaff: jest.fn(),
     };
     useCase = new BrowseAvailableGroupsUseCase(mockGroupRepo);
   });

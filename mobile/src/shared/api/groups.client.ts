@@ -87,3 +87,15 @@ export async function toggleEnrollment(
     payload,
   );
 }
+
+export interface ReassignStaffPayload {
+  teacher_id?: string;
+  assistant_id?: string;
+}
+
+export async function reassignStaff(
+  id: string,
+  payload: ReassignStaffPayload,
+): Promise<GroupDetailResponse> {
+  return apiClient.patch<GroupDetailResponse>(`/groups/${id}/staff`, payload);
+}
