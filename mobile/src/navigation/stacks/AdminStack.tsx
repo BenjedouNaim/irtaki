@@ -42,6 +42,12 @@ export function AdminStack() {
         Admin Stack Stub
       </Text>
       <Button
+        label="الحلقات"
+        onPress={() => router.push('/(app)/admin/groups' as any)}
+        testID="admin-groups-button"
+        className="mb-3"
+      />
+      <Button
         label="الملف الشخصي"
         variant="outline"
         onPress={() => router.push('/(app)/profile')}
