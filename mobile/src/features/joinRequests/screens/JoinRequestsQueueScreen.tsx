@@ -103,9 +103,8 @@ export function JoinRequestsQueueScreen() {
         // Fallback
       }
     }
-    // Future detail route (F-ENR-04 / API-022)
     router.push({
-      pathname: '/(app)/assistant/join-requests/[id]' as any,
+      pathname: '/(app)/assistant/join-requests/[id]',
       params: { id: requestId },
     });
   };

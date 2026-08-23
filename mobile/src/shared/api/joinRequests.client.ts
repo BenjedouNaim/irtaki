@@ -68,3 +68,32 @@ export async function listPendingJoinRequests(params?: {
     },
   });
 }
+
+export interface ApplicantProfile {
+  id: string;
+  full_name: string;
+  gender: 'Male' | 'Female' | string;
+  age: number;
+  phone_number: string;
+  occupation: string;
+  city: string;
+  memorized_ahzab: number[];
+  tajweed_level: 'Beginner' | 'Intermediate' | 'Advanced' | string;
+  studied_tajweed_theory: boolean;
+  studied_qalun: boolean;
+  fee_agreement: boolean;
+  program_goal: string;
+  score: number;
+  status: 'Pending' | 'Accepted' | 'Rejected' | string;
+  created_at: string;
+}
+
+export interface GetJoinRequestDetailResponse {
+  data: ApplicantProfile;
+}
+
+export async function getJoinRequestDetail(
+  id: string,
+): Promise<GetJoinRequestDetailResponse> {
+  return apiClient.get<GetJoinRequestDetailResponse>(`/join-requests/${id}`);
+}
