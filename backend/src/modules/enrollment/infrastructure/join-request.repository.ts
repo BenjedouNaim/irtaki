@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   IJoinRequestRepository,
+  JoinRequestQueueRow,
   JoinRequestRecord,
 } from '../domain/join-request.repository.interface';
 import { JoinRequest } from '../domain/join-request.entity';
@@ -128,5 +129,71 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       createdAt: record.createdAt,
       deletedAt: record.deletedAt,
     };
+  }
+
+  async findPendingQueue(params: {
+    assistantId: string | null;
+    limit: number;
+    cursor: {
+      id: string;
+      sortKey: { score: number; createdAt: string };
+    } | null;
+  }): Promise<{ rows: JoinRequestQueueRow[]; hasMore: boolean }> {
+    const qb = this.joinRequestRepo
+      .createQueryBuilder('jr')
+      .where('jr.status = :status', { status: 'Pending' })
+      .andWhere('jr.deleted_at IS NULL');
+
+    if (params.assistantId !== null) {
+      qb.andWhere(
+        'jr.group_id IN (SELECT g.id FROM groups g WHERE g.assistant_id = :assistantId)',
+        { assistantId: params.assistantId },
+      );
+    }
+
+    if (params.cursor) {
+      const cursorScore = params.cursor.sortKey.score;
+      const cursorCreatedAt = params.cursor.sortKey.createdAt;
+      const cursorId = params.cursor.id;
+
+      qb.andWhere(
+        `(
+          jr.score < :cursorScore
+          OR (jr.score = :cursorScore AND jr.created_at > :cursorCreatedAt)
+          OR (jr.score = :cursorScore AND jr.created_at = :cursorCreatedAt AND jr.id > :cursorId)
+        )`,
+        { cursorScore, cursorCreatedAt, cursorId },
+      );
+    }
+
+    qb.select([
+      'jr.id AS id',
+      'jr.full_name AS full_name',
+      'jr.score AS score',
+      'jr.created_at AS created_at',
+    ])
+      .orderBy('jr.score', 'DESC')
+      .addOrderBy('jr.created_at', 'ASC')
+      .addOrderBy('jr.id', 'ASC')
+      .limit(params.limit + 1);
+
+    const rawRows = await qb.getRawMany<{
+      id: string;
+      full_name: string;
+      score: string | number;
+      created_at: Date | string;
+    }>();
+
+    const hasMore = rawRows.length > params.limit;
+    const selectedRows = hasMore ? rawRows.slice(0, params.limit) : rawRows;
+
+    const rows: JoinRequestQueueRow[] = selectedRows.map((r) => ({
+      id: r.id,
+      fullName: r.full_name,
+      score: Number(r.score),
+      createdAt: new Date(r.created_at),
+    }));
+
+    return { rows, hasMore };
   }
 }

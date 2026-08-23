@@ -1,8 +1,10 @@
 import {
   submitJoinRequest,
   getMyJoinRequest,
+  listPendingJoinRequests,
   SubmitJoinRequestPayload,
   SubmitJoinRequestResponse,
+  ListPendingJoinRequestsResponse,
 } from '../joinRequests.client';
 import { apiClient } from '../client';
 
@@ -64,6 +66,39 @@ describe('joinRequests.client', () => {
     const result = await getMyJoinRequest();
 
     expect(apiClient.get).toHaveBeenCalledWith('/join-requests/mine');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.get with /join-requests and status=pending for listPendingJoinRequests', async () => {
+    const mockResponse: ListPendingJoinRequestsResponse = {
+      data: [
+        {
+          id: 'jr-1',
+          full_name: 'أحمد التونسي',
+          score: 95.0,
+          created_at: '2026-08-23T10:00:00.000Z',
+        },
+      ],
+      pagination: {
+        next_cursor: 'cursor-abc',
+        has_more: true,
+      },
+    };
+
+    (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await listPendingJoinRequests({
+      cursor: 'prev-cursor',
+      limit: 10,
+    });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/join-requests', {
+      params: {
+        status: 'pending',
+        cursor: 'prev-cursor',
+        limit: 10,
+      },
+    });
     expect(result).toEqual(mockResponse);
   });
 });
