@@ -40,6 +40,7 @@ describe('GetOwnJoinRequestUseCase', () => {
       create: jest.fn(),
       existsPendingForUser: jest.fn(),
       findLatestForUser: jest.fn(),
+      findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
     };
 

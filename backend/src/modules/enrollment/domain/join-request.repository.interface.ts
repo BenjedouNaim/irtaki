@@ -34,10 +34,16 @@ export interface JoinRequestQueueRow {
   createdAt: Date;
 }
 
+export interface JoinRequestDetailRow extends JoinRequestRecord {
+  memorizedAhzab: number[];
+  assistantId: string;
+}
+
 export interface IJoinRequestRepository {
   create(joinRequest: JoinRequest): Promise<JoinRequestRecord>;
   existsPendingForUser(userId: string): Promise<boolean>;
   findLatestForUser(userId: string): Promise<JoinRequestRecord | null>;
+  findByIdForDetail(id: string): Promise<JoinRequestDetailRow | null>;
   findPendingQueue(params: {
     assistantId: string | null;
     limit: number;

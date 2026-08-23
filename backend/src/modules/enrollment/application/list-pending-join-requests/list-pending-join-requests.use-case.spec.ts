@@ -36,6 +36,7 @@ describe('ListPendingJoinRequestsUseCase', () => {
       create: jest.fn(),
       existsPendingForUser: jest.fn(),
       findLatestForUser: jest.fn(),
+      findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn().mockResolvedValue({
         rows: mockRows,
         hasMore: false,
