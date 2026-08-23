@@ -354,4 +354,53 @@ describe('GroupDetailScreen (SCR-29)', () => {
       expect(queryByTestId('group-lifecycle-panel')).toBeNull();
     });
   });
+
+  describe('Delete Group Panel (F-GRP-09)', () => {
+    it('renders DeleteGroupPanel when user role is Admin', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Admin' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      expect(await findByTestId('delete-group-panel')).toBeTruthy();
+    });
+
+    it('does not render DeleteGroupPanel when user role is Teacher', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Teacher' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { queryByTestId, findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      await findByTestId('group-detail-name');
+      expect(queryByTestId('delete-group-panel')).toBeNull();
+    });
+
+    it('does not render DeleteGroupPanel when user role is Student', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Student' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { queryByTestId, findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      await findByTestId('group-detail-name');
+      expect(queryByTestId('delete-group-panel')).toBeNull();
+    });
+  });
 });

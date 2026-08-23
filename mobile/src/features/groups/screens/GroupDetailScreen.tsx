@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
@@ -12,6 +13,7 @@ import { useAuthStore } from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
 import { StaffReassignmentPanel } from '../components/StaffReassignmentPanel';
 import { GroupLifecyclePanel } from '../components/GroupLifecyclePanel';
+import { DeleteGroupPanel } from '../components/DeleteGroupPanel';
 import { EnrollmentToggle } from '../components/EnrollmentToggle';
 import { getRecitationDayName } from './JoinStepperScreen';
 
@@ -20,6 +22,7 @@ export interface GroupDetailScreenProps {
 }
 
 export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
+  const router = useRouter();
   const role = useAuthStore((s) => s.role);
   const [group, setGroup] = useState<GroupListItemFull | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -356,6 +359,10 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
                   setGroup(updatedGroup);
                   setSubmitSuccess(true);
                 }}
+              />
+              <DeleteGroupPanel
+                groupId={groupId}
+                onDeleted={() => router.replace('/admin/groups')}
               />
             </>
           ) : null}

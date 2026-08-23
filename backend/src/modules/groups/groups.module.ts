@@ -16,6 +16,7 @@ import { ToggleEnrollmentUseCase } from './application/toggle-enrollment/toggle-
 import { ReassignStaffUseCase } from './application/reassign-staff/reassign-staff.use-case';
 import { ArchiveGroupUseCase } from './application/archive-group/archive-group.use-case';
 import { UnarchiveGroupUseCase } from './application/unarchive-group/unarchive-group.use-case';
+import { DeleteGroupUseCase } from './application/delete-group/delete-group.use-case';
 import { GroupsController } from './presentation/groups.controller';
 
 @Module({
@@ -44,6 +45,7 @@ import { GroupsController } from './presentation/groups.controller';
     ReassignStaffUseCase,
     ArchiveGroupUseCase,
     UnarchiveGroupUseCase,
+    DeleteGroupUseCase,
   ],
   exports: [
     GROUP_REPOSITORY,
@@ -56,6 +58,7 @@ import { GroupsController } from './presentation/groups.controller';
     ReassignStaffUseCase,
     ArchiveGroupUseCase,
     UnarchiveGroupUseCase,
+    DeleteGroupUseCase,
   ],
 })
 export class GroupsModule {}

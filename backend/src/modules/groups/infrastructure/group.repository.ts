@@ -349,6 +349,30 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
+  async hasMembershipHistory(groupId: string): Promise<boolean> {
+    const count = await this.groupRepo.manager
+      .getRepository(MembershipTypeOrmEntity)
+      .count({
+        where: { groupId },
+      });
+
+    return count > 0;
+  }
+
+  async deleteById(groupId: string): Promise<boolean> {
+    return this.groupRepo.manager.transaction(async (manager) => {
+      await manager.query('DELETE FROM join_requests WHERE group_id = $1', [
+        groupId,
+      ]);
+
+      const deleteResult = await manager.delete(GroupTypeOrmEntity, {
+        id: groupId,
+      });
+
+      return (deleteResult.affected ?? 0) > 0;
+    });
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,

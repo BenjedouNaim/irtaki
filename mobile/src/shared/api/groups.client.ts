@@ -112,3 +112,7 @@ export async function setGroupLifecycle(
     lifecycle_state: lifecycleState,
   });
 }
+
+export async function deleteGroup(id: string): Promise<void> {
+  return apiClient.delete<void>(`/groups/${id}`);
+}
