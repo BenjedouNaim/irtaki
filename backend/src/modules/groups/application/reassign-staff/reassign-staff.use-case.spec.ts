@@ -17,6 +17,7 @@ import {
   IUserRepository,
 } from '../../../identity/domain/user.repository.interface';
 import { UserRole } from '../../../identity/domain/user-role.enum';
+import { User } from '../../../identity/domain/user.entity';
 import { AuditEntryTypeOrmEntity } from '../../../identity/infrastructure/audit-entry.typeorm-entity';
 import { ReassignStaffDto } from './reassign-staff.dto';
 
@@ -53,31 +54,25 @@ describe('ReassignStaffUseCase', () => {
     },
   };
 
-  const mockNewTeacherUser = {
+  const mockNewTeacherUser = new User({
     id: newTeacherId,
     email: 'new-teacher@test.com',
     fullName: 'الشيخ الجديد',
     role: UserRole.Teacher,
-    gender: 'Male' as const,
+    gender: 'Male',
     passwordHash: 'hash',
     timezone: 'Africa/Tunis',
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  });
 
-  const mockNewAssistantUser = {
+  const mockNewAssistantUser = new User({
     id: newAssistantId,
     email: 'new-assistant@test.com',
     fullName: 'المساعد الجديد',
     role: UserRole.Assistant,
-    gender: 'Male' as const,
+    gender: 'Male',
     passwordHash: 'hash',
     timezone: 'Africa/Tunis',
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  });
 
   beforeEach(async () => {
     const mockGroupRepo: Partial<jest.Mocked<IGroupRepository>> = {
@@ -287,14 +282,24 @@ describe('ReassignStaffUseCase', () => {
   it('throws UnprocessableEntityException (422 VR-24) when both users have invalid roles without short-circuiting', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockExistingGroup);
 
-    const invalidTeacher = {
-      ...mockNewTeacherUser,
+    const invalidTeacher = new User({
+      id: newTeacherId,
+      email: 'new-teacher@test.com',
+      fullName: 'الشيخ الجديد',
       role: UserRole.Student, // Not Teacher
-    };
-    const invalidAssistant = {
-      ...mockNewAssistantUser,
+      gender: 'Male',
+      passwordHash: 'hash',
+      timezone: 'Africa/Tunis',
+    });
+    const invalidAssistant = new User({
+      id: newAssistantId,
+      email: 'new-assistant@test.com',
+      fullName: 'المساعد الجديد',
       role: UserRole.User, // Not Assistant
-    };
+      gender: 'Male',
+      passwordHash: 'hash',
+      timezone: 'Africa/Tunis',
+    });
 
     userRepository.findById
       .mockResolvedValueOnce(invalidTeacher)
@@ -346,16 +351,24 @@ describe('ReassignStaffUseCase', () => {
   });
 
   it('returns 200 no-op without repository write or audit write when reassigning to same users', async () => {
-    const currentTeacherUser = {
-      ...mockNewTeacherUser,
+    const currentTeacherUser = new User({
       id: currentTeacherId,
+      email: 'current-teacher@test.com',
+      fullName: 'الشيخ الحالي',
       role: UserRole.Teacher,
-    };
-    const currentAssistantUser = {
-      ...mockNewAssistantUser,
+      gender: 'Male',
+      passwordHash: 'hash',
+      timezone: 'Africa/Tunis',
+    });
+    const currentAssistantUser = new User({
       id: currentAssistantId,
+      email: 'current-assistant@test.com',
+      fullName: 'المساعد الحالي',
       role: UserRole.Assistant,
-    };
+      gender: 'Male',
+      passwordHash: 'hash',
+      timezone: 'Africa/Tunis',
+    });
 
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockExistingGroup);
     userRepository.findById
@@ -387,11 +400,15 @@ describe('ReassignStaffUseCase', () => {
   });
 
   it('returns 200 no-op when single provided field matches current holder', async () => {
-    const currentTeacherUser = {
-      ...mockNewTeacherUser,
+    const currentTeacherUser = new User({
       id: currentTeacherId,
+      email: 'current-teacher@test.com',
+      fullName: 'الشيخ الحالي',
       role: UserRole.Teacher,
-    };
+      gender: 'Male',
+      passwordHash: 'hash',
+      timezone: 'Africa/Tunis',
+    });
 
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockExistingGroup);
     userRepository.findById.mockResolvedValueOnce(currentTeacherUser);

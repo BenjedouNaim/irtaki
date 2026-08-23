@@ -17,10 +17,7 @@ export class AuditEntryTypeOrmEntity {
 
   @Column({ type: 'varchar' })
   action!:
-    | 'ENROLLMENT_TOGGLED'
-    | 'GROUP_CREATED'
-    | 'LOGIN'
-    | 'STAFF_REASSIGNED';
+    'ENROLLMENT_TOGGLED' | 'GROUP_CREATED' | 'LOGIN' | 'STAFF_REASSIGNED';
 
   @Column({ name: 'target_type', type: 'varchar', nullable: true })
   targetType!: string | null;
