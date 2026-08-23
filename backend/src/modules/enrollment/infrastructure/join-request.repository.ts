@@ -93,4 +93,40 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     });
     return count > 0;
   }
+
+  async findLatestForUser(userId: string): Promise<JoinRequestRecord | null> {
+    const record = await this.joinRequestRepo.findOne({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      userId: record.userId,
+      groupId: record.groupId,
+      fullName: record.fullName,
+      gender: record.gender,
+      age: record.age,
+      phoneNumber: record.phoneNumber,
+      occupation: record.occupation,
+      city: record.city,
+      memorizedHizbCount: record.memorizedHizbCount,
+      tajweedLevel: record.tajweedLevel,
+      studiedTajweedTheory: record.studiedTajweedTheory,
+      studiedQalun: record.studiedQalun,
+      feeAgreement: record.feeAgreement,
+      programGoal: record.programGoal,
+      score: Number(record.score),
+      status: record.status,
+      resolutionSource: record.resolutionSource,
+      reviewedAt: record.reviewedAt,
+      reviewedBy: record.reviewedBy,
+      createdAt: record.createdAt,
+      deletedAt: record.deletedAt,
+    };
+  }
 }

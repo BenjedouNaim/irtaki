@@ -6,6 +6,7 @@ import { JoinRequestTypeOrmEntity } from './infrastructure/join-request.typeorm-
 import { JoinRequestAhzabTypeOrmEntity } from './infrastructure/join-request-ahzab.typeorm-entity';
 import { JoinRequestRepository } from './infrastructure/join-request.repository';
 import { SubmitJoinRequestUseCase } from './application/submit-join-request/submit-join-request.use-case';
+import { GetOwnJoinRequestUseCase } from './application/get-own-join-request-status/get-own-join-request-status.use-case';
 import { JoinRequestsController } from './presentation/join-requests.controller';
 
 @Module({
@@ -24,6 +25,7 @@ import { JoinRequestsController } from './presentation/join-requests.controller'
     },
     JoinRequestRepository,
     SubmitJoinRequestUseCase,
+    GetOwnJoinRequestUseCase,
   ],
   exports: [JOIN_REQUEST_REPOSITORY, SubmitJoinRequestUseCase],
 })

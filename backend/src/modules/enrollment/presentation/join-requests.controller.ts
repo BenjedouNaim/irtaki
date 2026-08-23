@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -12,6 +13,8 @@ import { UserRole } from '../../identity/domain/user-role.enum';
 import { SubmitJoinRequestUseCase } from '../application/submit-join-request/submit-join-request.use-case';
 import { SubmitJoinRequestDto } from '../application/submit-join-request/submit-join-request.dto';
 import { SubmitJoinRequestResponseDto } from '../application/submit-join-request/submit-join-request-response.dto';
+import { GetOwnJoinRequestUseCase } from '../application/get-own-join-request-status/get-own-join-request-status.use-case';
+import { JoinRequestStatusDto } from '../application/get-own-join-request-status/get-own-join-request-status-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -25,7 +28,14 @@ interface AuthenticatedRequest extends Request {
 export class JoinRequestsController {
   constructor(
     private readonly submitJoinRequestUseCase: SubmitJoinRequestUseCase,
+    private readonly getOwnJoinRequestUseCase: GetOwnJoinRequestUseCase,
   ) {}
+
+  @Roles(UserRole.User)
+  @Get('mine')
+  async mine(@Req() req: AuthenticatedRequest): Promise<JoinRequestStatusDto> {
+    return this.getOwnJoinRequestUseCase.execute(req.user.id);
+  }
 
   @Roles(UserRole.User)
   @Post()
