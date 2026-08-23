@@ -18,12 +18,15 @@ import { BrowseAvailableGroupsUseCase } from '../application/browse-available-gr
 import { GroupDetailUseCase } from '../application/group-detail/group-detail.use-case';
 import { CreateGroupUseCase } from '../application/create-group/create-group.use-case';
 import { UpdateGroupNameUseCase } from '../application/update-group-name/update-group-name.use-case';
+import { ToggleEnrollmentUseCase } from '../application/toggle-enrollment/toggle-enrollment.use-case';
 import { ListGroupsResponseDto } from '../application/list-groups/group-list-item.dto';
 import { GroupDetailResponseDto } from '../application/group-detail/group-detail.dto';
 import { CreateGroupDto } from '../application/create-group/create-group.dto';
 import { CreateGroupResponseDto } from '../application/create-group/create-group-response.dto';
 import { UpdateGroupNameDto } from '../application/update-group-name/update-group-name.dto';
 import { UpdateGroupNameResponseDto } from '../application/update-group-name/update-group-name-response.dto';
+import { ToggleEnrollmentDto } from '../application/toggle-enrollment/toggle-enrollment.dto';
+import { ToggleEnrollmentResponseDto } from '../application/toggle-enrollment/toggle-enrollment-response.dto';
 import { BrowseAvailableGroupsQueryDto } from './dto/browse-available-groups-query.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -42,7 +45,18 @@ export class GroupsController {
     private readonly groupDetailUseCase: GroupDetailUseCase,
     private readonly createGroupUseCase: CreateGroupUseCase,
     private readonly updateGroupNameUseCase: UpdateGroupNameUseCase,
+    private readonly toggleEnrollmentUseCase: ToggleEnrollmentUseCase,
   ) {}
+
+  @Roles(UserRole.Teacher)
+  @Patch(':id/enrollment')
+  async toggleEnrollment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: ToggleEnrollmentDto,
+  ): Promise<ToggleEnrollmentResponseDto> {
+    return this.toggleEnrollmentUseCase.execute(req.user.id, id, dto);
+  }
 
   @Roles(UserRole.Admin)
   @Patch(':id')

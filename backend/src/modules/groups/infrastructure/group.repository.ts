@@ -291,6 +291,22 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
+  async updateEnrollmentStatus(
+    id: string,
+    status: 'Open' | 'Closed',
+  ): Promise<GroupListRow | null> {
+    const updateResult = await this.groupRepo.update(
+      { id },
+      { enrollmentStatus: status },
+    );
+
+    if (!updateResult.affected || updateResult.affected === 0) {
+      return null;
+    }
+
+    return this.findByIdForDetail(id);
+  }
+
   private mapRawToGroupListRow(raw: RawGroupListRow): GroupListRow {
     return {
       id: raw.id,
