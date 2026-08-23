@@ -15,7 +15,7 @@ import { Button } from '@/shared/components/Button';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { createGroup, listUsersByRole, UserListItem } from '@/shared/api';
 import { ApiError } from '@/shared/api/types';
-import { RECITATION_DAYS_MAP } from './JoinStepperScreen';
+import { RECITATION_DAYS_MAP } from '@/features/joinRequests/screens/JoinStepperScreen';
 
 export const createGroupSchema = z.object({
   name: z.string().trim().min(1, 'اسم الحلقة مطلوب'),
