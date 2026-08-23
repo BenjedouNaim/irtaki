@@ -30,3 +30,13 @@ export async function submitJoinRequest(
 ): Promise<SubmitJoinRequestResponse> {
   return apiClient.post<SubmitJoinRequestResponse>('/join-requests', payload);
 }
+
+export interface GetMyJoinRequestResponse {
+  data: {
+    status: 'Pending' | 'Accepted' | 'Rejected';
+  };
+}
+
+export async function getMyJoinRequest(): Promise<GetMyJoinRequestResponse> {
+  return apiClient.get<GetMyJoinRequestResponse>('/join-requests/mine');
+}
