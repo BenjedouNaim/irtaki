@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { IUserRepository } from '../domain/user.repository.interface';
 import { User } from '../domain/user.entity';
 import { UserRole } from '../domain/user-role.enum';
@@ -40,7 +40,25 @@ export class UserRepository implements IUserRepository {
     return this.toDomain(saved);
   }
 
+  async promoteToStudent(
+    userId: string,
+    fullName: string,
+    gender: 'Male' | 'Female',
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.query(
+      `UPDATE users
+       SET role = 'Student',
+           full_name = $2,
+           gender = $3,
+           updated_at = now()
+       WHERE id = $1`,
+      [userId, fullName, gender],
+    );
+  }
+
   private toDomain(entity: UserTypeOrmEntity): User {
+
     return new User({
       id: entity.id,
       email: entity.email,

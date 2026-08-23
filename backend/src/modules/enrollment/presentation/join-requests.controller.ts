@@ -23,6 +23,8 @@ import { ListPendingJoinRequestsQueryDto } from '../application/list-pending-joi
 import { ListPendingJoinRequestsResponseDto } from '../application/list-pending-join-requests/list-pending-join-requests-response.dto';
 import { GetJoinRequestDetailUseCase } from '../application/get-join-request-detail/get-join-request-detail.use-case';
 import { GetJoinRequestDetailResponseDto } from '../application/get-join-request-detail/get-join-request-detail-response.dto';
+import { AcceptJoinRequestUseCase } from '../application/accept-join-request/accept-join-request.use-case';
+import { AcceptJoinRequestResponseDto } from '../application/accept-join-request/accept-join-request-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -39,6 +41,7 @@ export class JoinRequestsController {
     private readonly getOwnJoinRequestUseCase: GetOwnJoinRequestUseCase,
     private readonly listPendingJoinRequestsUseCase: ListPendingJoinRequestsUseCase,
     private readonly getJoinRequestDetailUseCase: GetJoinRequestDetailUseCase,
+    private readonly acceptJoinRequestUseCase: AcceptJoinRequestUseCase,
   ) {}
 
   @Roles(UserRole.Assistant, UserRole.Admin)
@@ -76,6 +79,20 @@ export class JoinRequestsController {
     );
   }
 
+  @Roles(UserRole.Assistant, UserRole.Admin)
+  @Post(':id/accept')
+  @HttpCode(HttpStatus.OK)
+  async accept(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<AcceptJoinRequestResponseDto> {
+    return this.acceptJoinRequestUseCase.execute(
+      req.user.id,
+      req.user.role,
+      id,
+    );
+  }
+
   @Roles(UserRole.User)
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -86,3 +103,4 @@ export class JoinRequestsController {
     return this.submitJoinRequestUseCase.execute(req.user.id, dto);
   }
 }
+

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   IJoinRequestRepository,
+  JoinRequestAcceptRow,
   JoinRequestDetailRow,
   JoinRequestQueueRow,
   JoinRequestRecord,
@@ -294,4 +295,55 @@ export class JoinRequestRepository implements IJoinRequestRepository {
 
     return { rows, hasMore };
   }
+
+  async acceptConditionally(
+    id: string,
+    reviewerId: string,
+    manager: EntityManager,
+  ): Promise<JoinRequestAcceptRow | null> {
+    const updateResult = await manager.query(
+      `UPDATE join_requests
+       SET status = 'Accepted',
+           reviewed_at = now(),
+           reviewed_by = $2,
+           resolution_source = 'manual'
+       WHERE id = $1 AND status = 'Pending' AND deleted_at IS NULL
+       RETURNING user_id, group_id, full_name, gender`,
+      [id, reviewerId],
+    );
+
+    const rows = (
+      Array.isArray(updateResult) && Array.isArray(updateResult[0])
+        ? updateResult[0]
+        : Array.isArray(updateResult)
+          ? updateResult
+          : []
+    ) as Array<{
+      user_id: string;
+      group_id: string;
+      full_name: string;
+      gender: 'Male' | 'Female';
+    }>;
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    const row = rows[0];
+
+    const ahzabRows = await manager.find(JoinRequestAhzabTypeOrmEntity, {
+      where: { joinRequestId: id },
+      order: { hizbNumber: 'ASC' },
+    });
+
+    return {
+      userId: row.user_id,
+      groupId: row.group_id,
+      fullName: row.full_name,
+      gender: row.gender,
+      memorizedAhzab: ahzabRows.map((a) => Number(a.hizbNumber)),
+    };
+  }
 }
+
+

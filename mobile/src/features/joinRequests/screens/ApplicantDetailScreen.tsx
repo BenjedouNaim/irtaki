@@ -9,6 +9,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Button } from '@/shared/components/Button';
+import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import {
   StatusBadge,
@@ -16,6 +17,7 @@ import {
 } from '@/shared/components/StatusBadge';
 import {
   getJoinRequestDetail,
+  acceptJoinRequest,
   ApplicantProfile,
 } from '@/shared/api/joinRequests.client';
 import { ApiError } from '@/shared/api/types';
@@ -69,6 +71,11 @@ export function ApplicantDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(
+    null,
+  );
 
   const fetchDetail = useCallback(async () => {
     if (!requestId) {
@@ -132,6 +139,58 @@ export function ApplicantDetailScreen() {
       }
     }
     router.back();
+  };
+
+  const handleOpenAcceptConfirm = () => {
+    if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // Ignored
+      }
+    }
+    setActionErrorMessage(null);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmAccept = async () => {
+    if (!requestId) return;
+
+    setIsSubmitting(true);
+    setActionErrorMessage(null);
+
+    try {
+      await acceptJoinRequest(requestId);
+
+      if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
+        try {
+          await Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success,
+          );
+        } catch {
+          // Ignored
+        }
+      }
+
+      setShowConfirmModal(false);
+      router.back();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.errorCode === 'ALREADY_DECIDED') {
+          setActionErrorMessage('تم اتخاذ قرار بشأن هذا الطلب مسبقاً');
+        } else if (err.errorCode === 'APPLICANT_NO_LONGER_ELIGIBLE') {
+          setActionErrorMessage('المتقدم مسجل بالفعل في حلقة نشطة أخرى');
+        } else {
+          setActionErrorMessage(err.message || 'حدث خطأ أثناء قبول الطلب');
+        }
+      } else {
+        setActionErrorMessage(
+          'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.',
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const statusConfig = applicant ? mapStatus(applicant.status) : null;
@@ -508,6 +567,67 @@ export function ApplicantDetailScreen() {
               testID="applicant-ahzab-grid"
             />
           </View>
+
+          {/* Action Decision Card (SCR-19 / F-ENR-05) */}
+          {applicant.status === 'Pending' && (
+            <View
+              className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
+              style={{ borderCurve: 'continuous' }}
+              testID="applicant-actions-card"
+            >
+              <View className="gap-1">
+                <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right">
+                  اتخاذ قرار بشأن الطلب
+                </Text>
+                <Text className="text-xs text-gray-500 dark:text-gray-400 text-right leading-5">
+                  قبول المتقدم يضيفه تلقائياً كطالب في الحلقة ويسجل أحزابه
+                  المحفوظة كبداية لمسار حفظه.
+                </Text>
+              </View>
+
+              {/* Action Error Banner */}
+              {actionErrorMessage && (
+                <View
+                  className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
+                  style={{ borderCurve: 'continuous' }}
+                  testID="accept-action-error"
+                >
+                  <Text
+                    selectable
+                    className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
+                  >
+                    {actionErrorMessage}
+                  </Text>
+                </View>
+              )}
+
+              {/* Accept Button */}
+              <Button
+                label="قبول طلب الانضمام"
+                variant="primary"
+                onPress={handleOpenAcceptConfirm}
+                disabled={isSubmitting}
+                loading={isSubmitting}
+                testID="accept-join-request-button"
+              />
+
+              {/* Confirmation Dialog (Standard weight per UF.md §25) */}
+              <ConfirmationDialog
+                visible={showConfirmModal}
+                title="قبول طلب الانضمام"
+                message="هل أنت متأكد من قبول طلب انضمام هذا المتقدم؟ سيتم تسجيله كطالب في الحلقة وبدء مسار الحفظ."
+                confirmLabel="تأكيد القبول"
+                cancelLabel="إلغاء"
+                confirmVariant="primary"
+                loading={isSubmitting}
+                onConfirm={handleConfirmAccept}
+                onCancel={() => {
+                  if (!isSubmitting) setShowConfirmModal(false);
+                }}
+                testID="accept-confirm-dialog"
+              />
+            </View>
+          )}
         </View>
       ) : null}
     </ScrollView>
