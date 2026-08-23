@@ -41,4 +41,8 @@ export interface IGroupRepository {
     createdBy: string;
   }): Promise<GroupListRow>;
   updateName(id: string, name: string): Promise<GroupListRow | null>;
+  updateEnrollmentStatus(
+    id: string,
+    status: 'Open' | 'Closed',
+  ): Promise<GroupListRow | null>;
 }

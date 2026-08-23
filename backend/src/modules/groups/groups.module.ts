@@ -12,6 +12,7 @@ import { BrowseAvailableGroupsUseCase } from './application/browse-available-gro
 import { GroupDetailUseCase } from './application/group-detail/group-detail.use-case';
 import { CreateGroupUseCase } from './application/create-group/create-group.use-case';
 import { UpdateGroupNameUseCase } from './application/update-group-name/update-group-name.use-case';
+import { ToggleEnrollmentUseCase } from './application/toggle-enrollment/toggle-enrollment.use-case';
 import { GroupsController } from './presentation/groups.controller';
 
 @Module({
@@ -36,6 +37,7 @@ import { GroupsController } from './presentation/groups.controller';
     GroupDetailUseCase,
     CreateGroupUseCase,
     UpdateGroupNameUseCase,
+    ToggleEnrollmentUseCase,
   ],
   exports: [
     GROUP_REPOSITORY,
@@ -44,6 +46,7 @@ import { GroupsController } from './presentation/groups.controller';
     GroupDetailUseCase,
     CreateGroupUseCase,
     UpdateGroupNameUseCase,
+    ToggleEnrollmentUseCase,
   ],
 })
 export class GroupsModule {}
