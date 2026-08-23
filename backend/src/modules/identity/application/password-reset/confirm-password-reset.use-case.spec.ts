@@ -25,7 +25,6 @@ describe('ConfirmPasswordResetUseCase', () => {
       promoteToStudent: jest.fn(),
     };
 
-
     mockPasswordHasher = {
       hash: jest.fn().mockResolvedValue('newArgonHash123'),
       verify: jest.fn(),

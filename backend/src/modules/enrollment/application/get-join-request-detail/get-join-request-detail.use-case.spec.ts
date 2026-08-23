@@ -50,7 +50,6 @@ describe('GetJoinRequestDetailUseCase', () => {
       acceptConditionally: jest.fn(),
     };
 
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GetJoinRequestDetailUseCase,

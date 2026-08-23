@@ -45,7 +45,6 @@ describe('GetOwnJoinRequestUseCase', () => {
       acceptConditionally: jest.fn(),
     };
 
-
     useCase = new GetOwnJoinRequestUseCase(mockJoinRequestRepo);
   });
 

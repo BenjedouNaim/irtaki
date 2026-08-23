@@ -20,7 +20,6 @@ describe('RequestPasswordResetUseCase', () => {
       promoteToStudent: jest.fn(),
     };
 
-
     mockMailer = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     };

@@ -83,7 +83,6 @@ describe('SubmitJoinRequestUseCase', () => {
       acceptConditionally: jest.fn(),
     };
 
-
     mockGroupRepo = {
       findAllForList: jest.fn(),
       findByStaffIdForList: jest.fn(),

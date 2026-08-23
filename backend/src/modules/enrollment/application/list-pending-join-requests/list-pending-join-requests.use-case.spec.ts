@@ -44,7 +44,6 @@ describe('ListPendingJoinRequestsUseCase', () => {
       acceptConditionally: jest.fn(),
     };
 
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ListPendingJoinRequestsUseCase,

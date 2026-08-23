@@ -25,7 +25,6 @@ describe('LoginUseCase', () => {
       promoteToStudent: jest.fn(),
     };
 
-
     mockPasswordHasher = {
       hash: jest.fn(),
       verify: jest.fn(),

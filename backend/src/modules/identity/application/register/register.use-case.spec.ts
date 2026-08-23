@@ -27,7 +27,6 @@ describe('RegisterUseCase', () => {
       promoteToStudent: jest.fn(),
     };
 
-
     mockPasswordHasher = {
       hash: jest.fn().mockResolvedValue('$argon2id$hashedpassword'),
       verify: jest.fn().mockResolvedValue(true),
