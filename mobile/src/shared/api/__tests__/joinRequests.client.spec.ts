@@ -1,5 +1,6 @@
 import {
   submitJoinRequest,
+  getMyJoinRequest,
   SubmitJoinRequestPayload,
   SubmitJoinRequestResponse,
 } from '../joinRequests.client';
@@ -48,6 +49,21 @@ describe('joinRequests.client', () => {
     const result = await submitJoinRequest(payload);
 
     expect(apiClient.post).toHaveBeenCalledWith('/join-requests', payload);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.get with /join-requests/mine for getMyJoinRequest', async () => {
+    const mockResponse = {
+      data: {
+        status: 'Pending' as const,
+      },
+    };
+
+    (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await getMyJoinRequest();
+
+    expect(apiClient.get).toHaveBeenCalledWith('/join-requests/mine');
     expect(result).toEqual(mockResponse);
   });
 });

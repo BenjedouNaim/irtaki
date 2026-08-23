@@ -30,4 +30,5 @@ export interface JoinRequestRecord {
 export interface IJoinRequestRepository {
   create(joinRequest: JoinRequest): Promise<JoinRequestRecord>;
   existsPendingForUser(userId: string): Promise<boolean>;
+  findLatestForUser(userId: string): Promise<JoinRequestRecord | null>;
 }
