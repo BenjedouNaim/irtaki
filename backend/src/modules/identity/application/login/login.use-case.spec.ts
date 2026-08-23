@@ -22,7 +22,9 @@ describe('LoginUseCase', () => {
       findById: jest.fn(),
       findAllByRole: jest.fn(),
       save: jest.fn(),
+      promoteToStudent: jest.fn(),
     };
+
 
     mockPasswordHasher = {
       hash: jest.fn(),

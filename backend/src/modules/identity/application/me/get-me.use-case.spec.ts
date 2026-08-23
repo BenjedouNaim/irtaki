@@ -14,7 +14,9 @@ describe('GetMeUseCase', () => {
       findById: jest.fn(),
       findAllByRole: jest.fn(),
       save: jest.fn(),
+      promoteToStudent: jest.fn(),
     };
+
     useCase = new GetMeUseCase(mockUserRepository);
   });
 

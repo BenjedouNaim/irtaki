@@ -58,7 +58,6 @@ export class UserRepository implements IUserRepository {
   }
 
   private toDomain(entity: UserTypeOrmEntity): User {
-
     return new User({
       id: entity.id,
       email: entity.email,

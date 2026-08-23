@@ -67,4 +67,3 @@ export interface IJoinRequestRepository {
     manager: EntityManager,
   ): Promise<JoinRequestAcceptRow | null>;
 }
-

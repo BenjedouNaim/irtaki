@@ -103,4 +103,3 @@ export class JoinRequestsController {
     return this.submitJoinRequestUseCase.execute(req.user.id, dto);
   }
 }
-

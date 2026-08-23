@@ -42,7 +42,9 @@ describe('GetOwnJoinRequestUseCase', () => {
       findLatestForUser: jest.fn(),
       findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
+      acceptConditionally: jest.fn(),
     };
+
 
     useCase = new GetOwnJoinRequestUseCase(mockJoinRequestRepo);
   });

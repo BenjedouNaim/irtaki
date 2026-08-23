@@ -211,7 +211,6 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
     return groupId;
   }
 
-
   async function createJoinRequest(
     userId: string,
     groupId: string,
@@ -332,20 +331,28 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
       expect(coverage.ahzab_completed).toBe(8);
 
       // 5. Assert coverage intervals match hizb boundaries
-      const intervalRows = await dataSource.query(
+      const intervalRows: Array<{
+        start_ordinal: number;
+        end_ordinal: number;
+      }> = await dataSource.query(
         'SELECT * FROM coverage_intervals WHERE coverage_id = $1 ORDER BY start_ordinal ASC',
         [coverage.id],
       );
       expect(intervalRows).toHaveLength(8);
 
-      const expectedBoundaries = await dataSource.query(
+      const expectedBoundaries: Array<{
+        start_ordinal: number;
+        end_ordinal: number;
+      }> = await dataSource.query(
         'SELECT start_ordinal, end_ordinal FROM hizb_boundaries WHERE hizb_number BETWEEN 1 AND 8 ORDER BY hizb_number ASC',
       );
-      expect(intervalRows.map((i: { start_ordinal: number; end_ordinal: number }) => ({
-        start_ordinal: i.start_ordinal,
-        end_ordinal: i.end_ordinal,
-      }))).toEqual(
-        expectedBoundaries.map((b: { start_ordinal: number; end_ordinal: number }) => ({
+      expect(
+        intervalRows.map((i) => ({
+          start_ordinal: i.start_ordinal,
+          end_ordinal: i.end_ordinal,
+        })),
+      ).toEqual(
+        expectedBoundaries.map((b) => ({
           start_ordinal: b.start_ordinal,
           end_ordinal: b.end_ordinal,
         })),
@@ -367,13 +374,9 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
         'مساعد 1',
         'Male',
       );
-      const assistant2 = await registerAndLogin(
-        'assistant-conc2@test-accept.com',
-        UserRole.Assistant,
-        'مساعد 2',
-        'Male',
+      const applicant = await registerAndLogin(
+        'applicant-conc@test-accept.com',
       );
-      const applicant = await registerAndLogin('applicant-conc@test-accept.com');
 
       const groupId = await createGroup(
         teacher.userId,
@@ -388,7 +391,10 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
       });
 
       // Admin + Assistant1 both call accept at the same instant
-      const admin = await registerAndLogin('admin-conc@test-accept.com', UserRole.Admin);
+      const admin = await registerAndLogin(
+        'admin-conc@test-accept.com',
+        UserRole.Admin,
+      );
 
       const [res1, res2] = await Promise.all([
         request(app.getHttpServer())
@@ -402,7 +408,8 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
       const statuses = [res1.status, res2.status].sort();
       expect(statuses).toEqual([HttpStatus.OK, HttpStatus.CONFLICT]);
 
-      const conflictRes = res1.status === HttpStatus.CONFLICT ? res1 : res2;
+      const conflictRes =
+        res1.status === Number(HttpStatus.CONFLICT) ? res1 : res2;
       expect(conflictRes.body.error).toBe('ALREADY_DECIDED');
 
       // Exactly one membership row created
@@ -512,7 +519,9 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
         'assistant-diff2@test-accept.com',
         UserRole.Assistant,
       );
-      const applicant = await registerAndLogin('applicant-diff@test-accept.com');
+      const applicant = await registerAndLogin(
+        'applicant-diff@test-accept.com',
+      );
 
       const groupId = await createGroup(
         teacher.userId,
@@ -534,12 +543,27 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
       ['Student', UserRole.Student],
       ['User', UserRole.User],
     ])('rejects role %s with 403 Forbidden', async (roleName, role) => {
-      const caller = await registerAndLogin(`caller-${roleName.toLowerCase()}@test-accept.com`, role);
-      const teacher = await registerAndLogin(`teacher-rbac-${roleName.toLowerCase()}@test-accept.com`, UserRole.Teacher);
-      const assistant = await registerAndLogin(`ast-rbac-${roleName.toLowerCase()}@test-accept.com`, UserRole.Assistant);
-      const applicant = await registerAndLogin(`applicant-rbac-${roleName.toLowerCase()}@test-accept.com`);
+      const caller = await registerAndLogin(
+        `caller-${roleName.toLowerCase()}@test-accept.com`,
+        role,
+      );
+      const teacher = await registerAndLogin(
+        `teacher-rbac-${roleName.toLowerCase()}@test-accept.com`,
+        UserRole.Teacher,
+      );
+      const assistant = await registerAndLogin(
+        `ast-rbac-${roleName.toLowerCase()}@test-accept.com`,
+        UserRole.Assistant,
+      );
+      const applicant = await registerAndLogin(
+        `applicant-rbac-${roleName.toLowerCase()}@test-accept.com`,
+      );
 
-      const groupId = await createGroup(teacher.userId, assistant.userId, `حلقة القبول ${roleName}`);
+      const groupId = await createGroup(
+        teacher.userId,
+        assistant.userId,
+        `حلقة القبول ${roleName}`,
+      );
       const requestId = await createJoinRequest(applicant.userId, groupId);
 
       await request(app.getHttpServer())

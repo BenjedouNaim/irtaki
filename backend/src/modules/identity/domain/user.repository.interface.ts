@@ -16,4 +16,3 @@ export interface IUserRepository {
     manager: EntityManager,
   ): Promise<void>;
 }
-

@@ -301,7 +301,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     reviewerId: string,
     manager: EntityManager,
   ): Promise<JoinRequestAcceptRow | null> {
-    const updateResult = await manager.query(
+    const updateResult: unknown = await manager.query(
       `UPDATE join_requests
        SET status = 'Accepted',
            reviewed_at = now(),
@@ -345,5 +345,3 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     };
   }
 }
-
-

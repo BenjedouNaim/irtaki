@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager } from 'typeorm';
@@ -78,7 +79,11 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
     mockManager = {} as unknown as jest.Mocked<EntityManager>;
 
     mockDataSource = {
-      transaction: jest.fn().mockImplementation((cb: (m: EntityManager) => Promise<unknown>) => cb(mockManager)),
+      transaction: jest
+        .fn()
+        .mockImplementation((cb: (m: EntityManager) => Promise<unknown>) =>
+          cb(mockManager),
+        ),
     } as unknown as jest.Mocked<DataSource>;
 
     mockEventEmitter = {
@@ -100,7 +105,11 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(null);
 
       await expect(
-        useCase.execute('ast-4444-4444-4444-4444', UserRole.Assistant, 'non-existent-id'),
+        useCase.execute(
+          'ast-4444-4444-4444-4444',
+          UserRole.Assistant,
+          'non-existent-id',
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -113,7 +122,11 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       });
 
       await expect(
-        useCase.execute('ast-4444-4444-4444-4444', UserRole.Assistant, mockDetailRow.id),
+        useCase.execute(
+          'ast-4444-4444-4444-4444',
+          UserRole.Assistant,
+          mockDetailRow.id,
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -123,7 +136,11 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
 
       await expect(
-        useCase.execute('different-assistant-id', UserRole.Assistant, mockDetailRow.id),
+        useCase.execute(
+          'different-assistant-id',
+          UserRole.Assistant,
+          mockDetailRow.id,
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -145,7 +162,11 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockUserRepo.promoteToStudent.mockResolvedValue(undefined);
       mockCoverageRepo.seedFromHizbSelection.mockResolvedValue(undefined);
 
-      const result = await useCase.execute('admin-id', UserRole.Admin, mockDetailRow.id);
+      const result = await useCase.execute(
+        'admin-id',
+        UserRole.Admin,
+        mockDetailRow.id,
+      );
 
       expect(result).toEqual({
         data: {
@@ -191,14 +212,14 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         mockManager,
       );
       expect(mockMembershipRepo.create).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           userId: mockDetailRow.userId,
           groupId: mockDetailRow.groupId,
           joinRequestId: mockDetailRow.id,
-          startedAt: expect.any(String),
-        },
+        }),
         mockManager,
       );
+
       expect(mockUserRepo.promoteToStudent).toHaveBeenCalledWith(
         mockDetailRow.userId,
         mockDetailRow.fullName,

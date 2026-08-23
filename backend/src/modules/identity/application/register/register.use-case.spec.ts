@@ -24,7 +24,9 @@ describe('RegisterUseCase', () => {
       findById: jest.fn(),
       findAllByRole: jest.fn(),
       save: jest.fn().mockImplementation((user: User) => Promise.resolve(user)),
+      promoteToStudent: jest.fn(),
     };
+
 
     mockPasswordHasher = {
       hash: jest.fn().mockResolvedValue('$argon2id$hashedpassword'),
