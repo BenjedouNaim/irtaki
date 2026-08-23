@@ -45,4 +45,8 @@ export interface IGroupRepository {
     id: string,
     status: 'Open' | 'Closed',
   ): Promise<GroupListRow | null>;
+  updateStaff(
+    id: string,
+    fields: { teacherId?: string; assistantId?: string },
+  ): Promise<GroupListRow | null>;
 }
