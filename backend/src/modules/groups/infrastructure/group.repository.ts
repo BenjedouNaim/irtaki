@@ -359,6 +359,16 @@ export class GroupRepository implements IGroupRepository {
     return count > 0;
   }
 
+  async hasActiveMembership(userId: string): Promise<boolean> {
+    const count = await this.groupRepo.manager
+      .getRepository(MembershipTypeOrmEntity)
+      .count({
+        where: { userId, state: 'Active' },
+      });
+
+    return count > 0;
+  }
+
   async deleteById(groupId: string): Promise<boolean> {
     return this.groupRepo.manager.transaction(async (manager) => {
       await manager.query('DELETE FROM join_requests WHERE group_id = $1', [

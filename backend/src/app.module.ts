@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { GroupsModule } from './modules/groups/groups.module';
+import { EnrollmentModule } from './modules/enrollment/enrollment.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 @Module({
@@ -30,6 +31,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
     HealthModule,
     IdentityModule,
     GroupsModule,
+    EnrollmentModule,
   ],
   controllers: [AppController],
   providers: [
