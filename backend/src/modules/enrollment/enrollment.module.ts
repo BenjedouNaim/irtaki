@@ -51,4 +51,3 @@ import { JoinRequestsController } from './presentation/join-requests.controller'
   ],
 })
 export class EnrollmentModule {}
-

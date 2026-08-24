@@ -166,4 +166,3 @@ describe('joinRequests.client', () => {
     expect(result).toEqual(mockResponse);
   });
 });
-

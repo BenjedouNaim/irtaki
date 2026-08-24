@@ -125,4 +125,3 @@ export async function rejectJoinRequest(
     `/join-requests/${id}/reject`,
   );
 }
-

@@ -453,4 +453,3 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
     });
   });
 });
-

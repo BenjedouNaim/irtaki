@@ -237,9 +237,7 @@ export function ApplicantDetailScreen() {
         if (err.errorCode === 'ALREADY_DECIDED') {
           setRejectActionErrorMessage('تم اتخاذ قرار بشأن هذا الطلب مسبقاً');
         } else {
-          setRejectActionErrorMessage(
-            err.message || 'حدث خطأ أثناء رفض الطلب',
-          );
+          setRejectActionErrorMessage(err.message || 'حدث خطأ أثناء رفض الطلب');
         }
       } else {
         setRejectActionErrorMessage(
@@ -250,7 +248,6 @@ export function ApplicantDetailScreen() {
       setIsRejectSubmitting(false);
     }
   };
-
 
   const statusConfig = applicant ? mapStatus(applicant.status) : null;
 
