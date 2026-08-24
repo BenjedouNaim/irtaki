@@ -25,6 +25,8 @@ import { GetJoinRequestDetailUseCase } from '../application/get-join-request-det
 import { GetJoinRequestDetailResponseDto } from '../application/get-join-request-detail/get-join-request-detail-response.dto';
 import { AcceptJoinRequestUseCase } from '../application/accept-join-request/accept-join-request.use-case';
 import { AcceptJoinRequestResponseDto } from '../application/accept-join-request/accept-join-request-response.dto';
+import { RejectJoinRequestUseCase } from '../application/reject-join-request/reject-join-request.use-case';
+import { RejectJoinRequestResponseDto } from '../application/reject-join-request/reject-join-request-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -42,6 +44,7 @@ export class JoinRequestsController {
     private readonly listPendingJoinRequestsUseCase: ListPendingJoinRequestsUseCase,
     private readonly getJoinRequestDetailUseCase: GetJoinRequestDetailUseCase,
     private readonly acceptJoinRequestUseCase: AcceptJoinRequestUseCase,
+    private readonly rejectJoinRequestUseCase: RejectJoinRequestUseCase,
   ) {}
 
   @Roles(UserRole.Assistant, UserRole.Admin)
@@ -87,6 +90,20 @@ export class JoinRequestsController {
     @Param('id') id: string,
   ): Promise<AcceptJoinRequestResponseDto> {
     return this.acceptJoinRequestUseCase.execute(
+      req.user.id,
+      req.user.role,
+      id,
+    );
+  }
+
+  @Roles(UserRole.Assistant, UserRole.Admin)
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  async reject(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<RejectJoinRequestResponseDto> {
+    return this.rejectJoinRequestUseCase.execute(
       req.user.id,
       req.user.role,
       id,

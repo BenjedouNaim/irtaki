@@ -4,6 +4,7 @@ import {
   listPendingJoinRequests,
   getJoinRequestDetail,
   acceptJoinRequest,
+  rejectJoinRequest,
   SubmitJoinRequestPayload,
   SubmitJoinRequestResponse,
   ListPendingJoinRequestsResponse,
@@ -147,6 +148,21 @@ describe('joinRequests.client', () => {
     const result = await acceptJoinRequest('jr-123');
 
     expect(apiClient.post).toHaveBeenCalledWith('/join-requests/jr-123/accept');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.post with /join-requests/:id/reject for rejectJoinRequest', async () => {
+    const mockResponse = {
+      data: {
+        status: 'Rejected',
+      },
+    };
+
+    (apiClient.post as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await rejectJoinRequest('jr-123');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/join-requests/jr-123/reject');
     expect(result).toEqual(mockResponse);
   });
 });

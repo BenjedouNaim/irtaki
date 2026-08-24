@@ -42,6 +42,7 @@ describe('ListPendingJoinRequestsUseCase', () => {
         hasMore: false,
       }),
       acceptConditionally: jest.fn(),
+      rejectConditionally: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

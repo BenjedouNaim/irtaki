@@ -81,6 +81,7 @@ describe('SubmitJoinRequestUseCase', () => {
       findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
       acceptConditionally: jest.fn(),
+      rejectConditionally: jest.fn(),
     };
 
     mockGroupRepo = {

@@ -111,3 +111,17 @@ export async function acceptJoinRequest(
     `/join-requests/${id}/accept`,
   );
 }
+
+export interface RejectJoinRequestResponse {
+  data: {
+    status: string;
+  };
+}
+
+export async function rejectJoinRequest(
+  id: string,
+): Promise<RejectJoinRequestResponse> {
+  return apiClient.post<RejectJoinRequestResponse>(
+    `/join-requests/${id}/reject`,
+  );
+}
