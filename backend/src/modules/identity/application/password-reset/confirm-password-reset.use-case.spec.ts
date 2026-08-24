@@ -22,6 +22,7 @@ describe('ConfirmPasswordResetUseCase', () => {
       findById: jest.fn(),
       findAllByRole: jest.fn(),
       save: jest.fn(),
+      promoteToStudent: jest.fn(),
     };
 
     mockPasswordHasher = {

@@ -97,3 +97,17 @@ export async function getJoinRequestDetail(
 ): Promise<GetJoinRequestDetailResponse> {
   return apiClient.get<GetJoinRequestDetailResponse>(`/join-requests/${id}`);
 }
+
+export interface AcceptJoinRequestResponse {
+  data: {
+    membership_id: string;
+  };
+}
+
+export async function acceptJoinRequest(
+  id: string,
+): Promise<AcceptJoinRequestResponse> {
+  return apiClient.post<AcceptJoinRequestResponse>(
+    `/join-requests/${id}/accept`,
+  );
+}

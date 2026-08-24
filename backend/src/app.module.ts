@@ -17,6 +17,8 @@ import { HealthModule } from './health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { EnrollmentModule } from './modules/enrollment/enrollment.module';
+import { MembershipsModule } from './modules/memberships/memberships.module';
+import { ProgressModule } from './modules/progress/progress.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 @Module({
@@ -32,7 +34,10 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
     IdentityModule,
     GroupsModule,
     EnrollmentModule,
+    MembershipsModule,
+    ProgressModule,
   ],
+
   controllers: [AppController],
   providers: [
     AppService,

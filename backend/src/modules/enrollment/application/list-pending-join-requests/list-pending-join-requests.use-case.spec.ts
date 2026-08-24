@@ -41,6 +41,7 @@ describe('ListPendingJoinRequestsUseCase', () => {
         rows: mockRows,
         hasMore: false,
       }),
+      acceptConditionally: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

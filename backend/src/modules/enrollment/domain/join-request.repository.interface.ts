@@ -1,3 +1,4 @@
+import { EntityManager } from 'typeorm';
 import { JoinRequest } from './join-request.entity';
 
 export const JOIN_REQUEST_REPOSITORY = Symbol('JOIN_REQUEST_REPOSITORY');
@@ -39,6 +40,14 @@ export interface JoinRequestDetailRow extends JoinRequestRecord {
   assistantId: string;
 }
 
+export interface JoinRequestAcceptRow {
+  userId: string;
+  groupId: string;
+  fullName: string;
+  gender: 'Male' | 'Female';
+  memorizedAhzab: number[];
+}
+
 export interface IJoinRequestRepository {
   create(joinRequest: JoinRequest): Promise<JoinRequestRecord>;
   existsPendingForUser(userId: string): Promise<boolean>;
@@ -52,4 +61,9 @@ export interface IJoinRequestRepository {
       sortKey: { score: number; createdAt: string };
     } | null;
   }): Promise<{ rows: JoinRequestQueueRow[]; hasMore: boolean }>;
+  acceptConditionally(
+    id: string,
+    reviewerId: string,
+    manager: EntityManager,
+  ): Promise<JoinRequestAcceptRow | null>;
 }

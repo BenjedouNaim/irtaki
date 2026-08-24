@@ -1,3 +1,4 @@
+import { EntityManager } from 'typeorm';
 import { User } from './user.entity';
 import { UserRole } from './user-role.enum';
 
@@ -8,4 +9,10 @@ export interface IUserRepository {
   findById(id: string): Promise<User | null>;
   findAllByRole(role?: UserRole): Promise<User[]>;
   save(user: User): Promise<User>;
+  promoteToStudent(
+    userId: string,
+    fullName: string,
+    gender: 'Male' | 'Female',
+    manager: EntityManager,
+  ): Promise<void>;
 }

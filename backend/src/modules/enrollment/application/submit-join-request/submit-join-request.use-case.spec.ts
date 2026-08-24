@@ -80,6 +80,7 @@ describe('SubmitJoinRequestUseCase', () => {
       findLatestForUser: jest.fn().mockResolvedValue(null),
       findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
+      acceptConditionally: jest.fn(),
     };
 
     mockGroupRepo = {

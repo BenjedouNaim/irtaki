@@ -3,10 +3,12 @@ import {
   getMyJoinRequest,
   listPendingJoinRequests,
   getJoinRequestDetail,
+  acceptJoinRequest,
   SubmitJoinRequestPayload,
   SubmitJoinRequestResponse,
   ListPendingJoinRequestsResponse,
 } from '../joinRequests.client';
+
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({
@@ -130,6 +132,21 @@ describe('joinRequests.client', () => {
     const result = await getJoinRequestDetail('jr-123');
 
     expect(apiClient.get).toHaveBeenCalledWith('/join-requests/jr-123');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should call apiClient.post with /join-requests/:id/accept for acceptJoinRequest', async () => {
+    const mockResponse = {
+      data: {
+        membership_id: 'mem-123',
+      },
+    };
+
+    (apiClient.post as jest.Mock).mockResolvedValue(mockResponse);
+
+    const result = await acceptJoinRequest('jr-123');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/join-requests/jr-123/accept');
     expect(result).toEqual(mockResponse);
   });
 });
