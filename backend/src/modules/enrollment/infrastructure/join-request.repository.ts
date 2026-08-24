@@ -7,6 +7,7 @@ import {
   JoinRequestDetailRow,
   JoinRequestQueueRow,
   JoinRequestRecord,
+  JoinRequestRejectRow,
 } from '../domain/join-request.repository.interface';
 import { JoinRequest } from '../domain/join-request.entity';
 import { JoinRequestTypeOrmEntity } from './join-request.typeorm-entity';
@@ -344,4 +345,41 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       memorizedAhzab: ahzabRows.map((a) => Number(a.hizbNumber)),
     };
   }
+
+  async rejectConditionally(
+    id: string,
+    reviewerId: string,
+    manager?: EntityManager,
+  ): Promise<JoinRequestRejectRow | null> {
+    const em = manager ?? this.joinRequestRepo.manager;
+    const updateResult: unknown = await em.query(
+      `UPDATE join_requests
+       SET status = 'Rejected',
+           reviewed_at = now(),
+           reviewed_by = $2,
+           resolution_source = 'manual'
+       WHERE id = $1 AND status = 'Pending' AND deleted_at IS NULL
+       RETURNING user_id`,
+      [id, reviewerId],
+    );
+
+    const rows = (
+      Array.isArray(updateResult) && Array.isArray(updateResult[0])
+        ? updateResult[0]
+        : Array.isArray(updateResult)
+          ? updateResult
+          : []
+    ) as Array<{
+      user_id: string;
+    }>;
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return {
+      userId: rows[0].user_id,
+    };
+  }
 }
+

@@ -13,6 +13,7 @@ import { GetOwnJoinRequestUseCase } from './application/get-own-join-request-sta
 import { ListPendingJoinRequestsUseCase } from './application/list-pending-join-requests/list-pending-join-requests.use-case';
 import { GetJoinRequestDetailUseCase } from './application/get-join-request-detail/get-join-request-detail.use-case';
 import { AcceptJoinRequestUseCase } from './application/accept-join-request/accept-join-request.use-case';
+import { RejectJoinRequestUseCase } from './application/reject-join-request/reject-join-request.use-case';
 import { JoinRequestsController } from './presentation/join-requests.controller';
 
 @Module({
@@ -38,6 +39,7 @@ import { JoinRequestsController } from './presentation/join-requests.controller'
     ListPendingJoinRequestsUseCase,
     GetJoinRequestDetailUseCase,
     AcceptJoinRequestUseCase,
+    RejectJoinRequestUseCase,
   ],
   exports: [
     JOIN_REQUEST_REPOSITORY,
@@ -45,6 +47,8 @@ import { JoinRequestsController } from './presentation/join-requests.controller'
     ListPendingJoinRequestsUseCase,
     GetJoinRequestDetailUseCase,
     AcceptJoinRequestUseCase,
+    RejectJoinRequestUseCase,
   ],
 })
 export class EnrollmentModule {}
+

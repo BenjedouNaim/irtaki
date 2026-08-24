@@ -397,7 +397,7 @@ Server re-validates gender against the target group (VR-08) — the client's own
 
 **`POST /join-requests/{id}/accept`** → `200`, `{ membership_id }`. Side effects (one transaction, AR-04): `User.role → Student`, `full_name`/`gender` copied onto `User`, `Membership` created, `MemorizationCoverage` seeded, N-03 notification. Errors: `409 ALREADY_DECIDED` (0-row guard), `409 APPLICANT_NO_LONGER_ELIGIBLE` (already has an Active Membership elsewhere, EC-15 adjacent).
 
-**`POST /join-requests/{id}/reject`** → `200`. No reason captured (FR-REQ-06). Errors: `409 ALREADY_DECIDED`.
+**`POST /join-requests/{id}/reject`** → `200`, `{ data: { status: "Rejected" } }`. No reason captured (FR-REQ-06). Errors: `409 ALREADY_DECIDED`.
 
 ### 10.6 Memberships (API-025…028)
 
@@ -654,6 +654,7 @@ All Critical/High-severity items were already resolved upstream (SAS §29.1: zer
 | **APIQ-NEW-03** | Admin/staff `GET /groups` full item shape resolved: embeds `teacher: { id, full_name }` and `assistant: { id, full_name }` reference objects, matching existing embedding pattern (`GET /audit`, `GET /groups/{id}/memberships`). Student receives limited shape (`{ id, name, recitation_day, enrollment_status }`).                                    | New            | **Resolved**                                                                                           |
 | **APIQ-NEW-04** | Non-paginated collection envelope resolved: bounded collections (`/groups`, `/groups/available`, `/groups/{id}/memberships`) use `{ "data": [...] }` with no `pagination` key.                                                                                                                                                                               | New            | **Resolved**                                                                                           |
 | **APIQ-NEW-06** | 404 semantics resolved for `GET /join-requests/mine` and `GET /memberships/mine` when no record exists for the caller (consistent with uniform 404 behavior across API, not 200 with null). Also clarifies that `Accepted` is unobservable via `GET /join-requests/mine` due to atomic Student role flip.                                                                                                | New            | **Resolved**                                                                                           |
+| **APIQ-NEW-07** | `POST /join-requests/{id}/reject` response body resolved: `{ data: { status: "Rejected" } }`, matching the `GET /join-requests/mine` sibling shape (no `id` — accept's `membership_id` doesn't apply since reject creates no new resource). | New | **Resolved** |
 
 ## 17. API Quality Review
 

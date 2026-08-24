@@ -48,6 +48,10 @@ export interface JoinRequestAcceptRow {
   memorizedAhzab: number[];
 }
 
+export interface JoinRequestRejectRow {
+  userId: string;
+}
+
 export interface IJoinRequestRepository {
   create(joinRequest: JoinRequest): Promise<JoinRequestRecord>;
   existsPendingForUser(userId: string): Promise<boolean>;
@@ -66,4 +70,10 @@ export interface IJoinRequestRepository {
     reviewerId: string,
     manager: EntityManager,
   ): Promise<JoinRequestAcceptRow | null>;
+  rejectConditionally(
+    id: string,
+    reviewerId: string,
+    manager?: EntityManager,
+  ): Promise<JoinRequestRejectRow | null>;
 }
+

@@ -18,6 +18,7 @@ import {
 import {
   getJoinRequestDetail,
   acceptJoinRequest,
+  rejectJoinRequest,
   ApplicantProfile,
 } from '@/shared/api/joinRequests.client';
 import { ApiError } from '@/shared/api/types';
@@ -76,6 +77,11 @@ export function ApplicantDetailScreen() {
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(
     null,
   );
+  const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false);
+  const [isRejectSubmitting, setIsRejectSubmitting] = useState(false);
+  const [rejectActionErrorMessage, setRejectActionErrorMessage] = useState<
+    string | null
+  >(null);
 
   const fetchDetail = useCallback(async () => {
     if (!requestId) {
@@ -192,6 +198,59 @@ export function ApplicantDetailScreen() {
       setIsSubmitting(false);
     }
   };
+
+  const handleOpenRejectConfirm = () => {
+    if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // Ignored
+      }
+    }
+    setRejectActionErrorMessage(null);
+    setShowRejectConfirmModal(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!requestId) return;
+
+    setIsRejectSubmitting(true);
+    setRejectActionErrorMessage(null);
+
+    try {
+      await rejectJoinRequest(requestId);
+
+      if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
+        try {
+          await Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success,
+          );
+        } catch {
+          // Ignored
+        }
+      }
+
+      setShowRejectConfirmModal(false);
+      router.back();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.errorCode === 'ALREADY_DECIDED') {
+          setRejectActionErrorMessage('تم اتخاذ قرار بشأن هذا الطلب مسبقاً');
+        } else {
+          setRejectActionErrorMessage(
+            err.message || 'حدث خطأ أثناء رفض الطلب',
+          );
+        }
+      } else {
+        setRejectActionErrorMessage(
+          'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.',
+        );
+      }
+    } finally {
+      setIsRejectSubmitting(false);
+    }
+  };
+
 
   const statusConfig = applicant ? mapStatus(applicant.status) : null;
 
@@ -568,7 +627,7 @@ export function ApplicantDetailScreen() {
             />
           </View>
 
-          {/* Action Decision Card (SCR-19 / F-ENR-05) */}
+          {/* Action Decision Card (SCR-19 / F-ENR-05 & F-ENR-06) */}
           {applicant.status === 'Pending' && (
             <View
               className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
@@ -585,7 +644,7 @@ export function ApplicantDetailScreen() {
                 </Text>
               </View>
 
-              {/* Action Error Banner */}
+              {/* Accept Action Error Banner */}
               {actionErrorMessage && (
                 <View
                   className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
@@ -601,17 +660,43 @@ export function ApplicantDetailScreen() {
                 </View>
               )}
 
+              {/* Reject Action Error Banner */}
+              {rejectActionErrorMessage && (
+                <View
+                  className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
+                  style={{ borderCurve: 'continuous' }}
+                  testID="reject-action-error"
+                >
+                  <Text
+                    selectable
+                    className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
+                  >
+                    {rejectActionErrorMessage}
+                  </Text>
+                </View>
+              )}
+
               {/* Accept Button */}
               <Button
                 label="قبول طلب الانضمام"
                 variant="primary"
                 onPress={handleOpenAcceptConfirm}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRejectSubmitting}
                 loading={isSubmitting}
                 testID="accept-join-request-button"
               />
 
-              {/* Confirmation Dialog (Standard weight per UF.md §25) */}
+              {/* Reject Button */}
+              <Button
+                label="رفض طلب الانضمام"
+                variant="destructive"
+                onPress={handleOpenRejectConfirm}
+                disabled={isSubmitting || isRejectSubmitting}
+                loading={isRejectSubmitting}
+                testID="reject-join-request-button"
+              />
+
+              {/* Accept Confirmation Dialog */}
               <ConfirmationDialog
                 visible={showConfirmModal}
                 title="قبول طلب الانضمام"
@@ -625,6 +710,22 @@ export function ApplicantDetailScreen() {
                   if (!isSubmitting) setShowConfirmModal(false);
                 }}
                 testID="accept-confirm-dialog"
+              />
+
+              {/* Reject Confirmation Dialog */}
+              <ConfirmationDialog
+                visible={showRejectConfirmModal}
+                title="رفض طلب الانضمام"
+                message="هل أنت متأكد من رفض طلب انضمام هذا المتقدم؟ لن يتمكن من الانضمام إلى هذه الحلقة."
+                confirmLabel="تأكيد الرفض"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+                loading={isRejectSubmitting}
+                onConfirm={handleConfirmReject}
+                onCancel={() => {
+                  if (!isRejectSubmitting) setShowRejectConfirmModal(false);
+                }}
+                testID="reject-confirm-dialog"
               />
             </View>
           )}

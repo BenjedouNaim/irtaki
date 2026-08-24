@@ -337,4 +337,120 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
       expect(mockBack).not.toHaveBeenCalled();
     });
   });
+
+  describe('Reject Join Request flow (SCR-19 / F-ENR-06)', () => {
+    it('renders Reject button when applicant status is Pending', async () => {
+      jest
+        .spyOn(joinRequestsApi, 'getJoinRequestDetail')
+        .mockResolvedValueOnce({
+          data: mockApplicant,
+        });
+
+      const { findByTestId } = render(<ApplicantDetailScreen />);
+
+      expect(await findByTestId('applicant-actions-card')).toBeTruthy();
+      expect(await findByTestId('reject-join-request-button')).toBeTruthy();
+    });
+
+    it('does NOT render Reject button when applicant status is Accepted or Rejected', async () => {
+      jest
+        .spyOn(joinRequestsApi, 'getJoinRequestDetail')
+        .mockResolvedValueOnce({
+          data: {
+            ...mockApplicant,
+            status: 'Rejected',
+          },
+        });
+
+      const { findByTestId, queryByTestId } = render(<ApplicantDetailScreen />);
+
+      await findByTestId('applicant-full-name');
+      expect(queryByTestId('applicant-actions-card')).toBeNull();
+      expect(queryByTestId('reject-join-request-button')).toBeNull();
+    });
+
+    it('opens confirmation dialog on Reject button press and closes on cancel without calling API', async () => {
+      jest
+        .spyOn(joinRequestsApi, 'getJoinRequestDetail')
+        .mockResolvedValueOnce({
+          data: mockApplicant,
+        });
+      const rejectSpy = jest.spyOn(joinRequestsApi, 'rejectJoinRequest');
+
+      const { findByTestId, getByTestId } = render(<ApplicantDetailScreen />);
+
+      const rejectButton = await findByTestId('reject-join-request-button');
+      fireEvent.press(rejectButton);
+
+      expect(getByTestId('reject-confirm-dialog')).toBeTruthy();
+      expect(getByTestId('reject-confirm-dialog-title')).toHaveTextContent(
+        'رفض طلب الانضمام',
+      );
+
+      // Cancel dialog
+      fireEvent.press(getByTestId('reject-confirm-dialog-cancel-button'));
+      expect(rejectSpy).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('calls rejectJoinRequest on confirm and navigates back on success', async () => {
+      jest
+        .spyOn(joinRequestsApi, 'getJoinRequestDetail')
+        .mockResolvedValueOnce({
+          data: mockApplicant,
+        });
+      const rejectSpy = jest
+        .spyOn(joinRequestsApi, 'rejectJoinRequest')
+        .mockResolvedValueOnce({
+          data: {
+            status: 'Rejected',
+          },
+        });
+
+      const { findByTestId, getByTestId } = render(<ApplicantDetailScreen />);
+
+      const rejectButton = await findByTestId('reject-join-request-button');
+      fireEvent.press(rejectButton);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('reject-confirm-dialog-confirm-button'));
+      });
+
+      expect(rejectSpy).toHaveBeenCalledWith(mockApplicant.id);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders error banner for 409 ALREADY_DECIDED error and does not navigate back', async () => {
+      jest
+        .spyOn(joinRequestsApi, 'getJoinRequestDetail')
+        .mockResolvedValueOnce({
+          data: mockApplicant,
+        });
+      jest.spyOn(joinRequestsApi, 'rejectJoinRequest').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 409,
+          error: 'ALREADY_DECIDED',
+          message: 'تم اتخاذ قرار بشأن هذا الطلب مسبقاً',
+        }),
+      );
+
+      const { findByTestId, getByTestId, findByText } = render(
+        <ApplicantDetailScreen />,
+      );
+
+      const rejectButton = await findByTestId('reject-join-request-button');
+      fireEvent.press(rejectButton);
+
+      await act(async () => {
+        fireEvent.press(getByTestId('reject-confirm-dialog-confirm-button'));
+      });
+
+      expect(
+        await findByText('تم اتخاذ قرار بشأن هذا الطلب مسبقاً'),
+      ).toBeTruthy();
+      expect(getByTestId('reject-action-error')).toBeTruthy();
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+  });
 });
+
