@@ -58,6 +58,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
       acceptConditionally: jest.fn(),
+      rejectConditionally: jest.fn(),
     };
 
     mockMembershipRepo = {

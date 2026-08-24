@@ -43,6 +43,7 @@ describe('GetOwnJoinRequestUseCase', () => {
       findByIdForDetail: jest.fn(),
       findPendingQueue: jest.fn(),
       acceptConditionally: jest.fn(),
+      rejectConditionally: jest.fn(),
     };
 
     useCase = new GetOwnJoinRequestUseCase(mockJoinRequestRepo);
