@@ -42,6 +42,24 @@
       "sourceType": "github",
       "skillPath": "plugins/expo/skills/expo-router/SKILL.md",
       "computedHash": "1cc6bb6852cf44bb51e6f4cb50efb3bed48b486c7f8ba3ac8e06b6b82be2cd78"
+    },
+    "nestjs-best-practices": {
+      "source": "kadajett/agent-nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-best-practices/SKILL.md",
+      "computedHash": "29c326e77d1462ed9526996acae5da0cf4003146982abc8c67378f5dbad6b181"
+    },
+    "postgresql-optimization": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/postgresql-optimization/SKILL.md",
+      "computedHash": "8022448de70ba9a485e3b5bce34c5bbc644f93eb39b68431c9f7dabcf03aeb09"
+    },
+    "typeorm": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "typeorm/SKILL.md",
+      "computedHash": "a4a4be3b9466db2c0729ec3e011647d6c791ed87ac35437fb699cd1b65b02e38"
     }
   }
 }
