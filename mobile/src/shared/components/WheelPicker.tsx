@@ -43,9 +43,7 @@ export function WheelPicker({
   const halfVisible = Math.floor(visibleItems / 2);
   const containerHeight = itemHeight * visibleItems;
 
-  const selectedIndex = items.findIndex(
-    (item) => item.value === selectedValue,
-  );
+  const selectedIndex = items.findIndex((item) => item.value === selectedValue);
 
   const triggerHaptic = useCallback(() => {
     if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
@@ -125,8 +123,8 @@ export function WheelPicker({
             isSelected
               ? 'text-xl font-bold text-primary dark:text-primary-400'
               : isDisabled
-              ? 'text-base font-normal text-gray-400 dark:text-gray-600 line-through'
-              : 'text-base font-medium text-gray-700 dark:text-gray-300'
+                ? 'text-base font-normal text-gray-400 dark:text-gray-600 line-through'
+                : 'text-base font-medium text-gray-700 dark:text-gray-300'
           }`}
         >
           {item.label}

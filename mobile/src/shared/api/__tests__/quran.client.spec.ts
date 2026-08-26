@@ -1,4 +1,9 @@
-import { listSurahs, listHizbBoundaries, SurahDto, HizbBoundaryDto } from '../quran.client';
+import {
+  listSurahs,
+  listHizbBoundaries,
+  SurahDto,
+  HizbBoundaryDto,
+} from '../quran.client';
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({

@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
-import { WheelPicker, WheelPickerItem } from '../../../shared/components/WheelPicker';
-import { SurahDto } from '../../../shared/api/quran.client';
 import {
-  AyahPosition,
-  isAyahDisabledForTo,
-} from '../utils/ayahRange';
+  WheelPicker,
+  WheelPickerItem,
+} from '../../../shared/components/WheelPicker';
+import { SurahDto } from '../../../shared/api/quran.client';
+import { AyahPosition, isAyahDisabledForTo } from '../utils/ayahRange';
 
 export interface AyahWheelProps {
   surah: SurahDto;

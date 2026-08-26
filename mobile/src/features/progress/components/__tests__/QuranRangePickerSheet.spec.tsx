@@ -58,7 +58,9 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       />,
     );
 
-    expect(screen.getByTestId('quran-range-picker-sheet-skeleton')).toBeTruthy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-skeleton'),
+    ).toBeTruthy();
   });
 
   it('renders error banner when isError=true and allows retry', () => {
@@ -81,7 +83,9 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     expect(screen.getByTestId('quran-range-picker-sheet-error')).toBeTruthy();
     expect(screen.getByText('حدث خطأ أثناء تحميل بيانات السور')).toBeTruthy();
 
-    const retryBtn = screen.getByTestId('quran-range-picker-sheet-retry-button');
+    const retryBtn = screen.getByTestId(
+      'quran-range-picker-sheet-retry-button',
+    );
     fireEvent.press(retryBtn);
 
     expect(refetchMock).toHaveBeenCalledTimes(1);
@@ -194,7 +198,9 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       />,
     );
 
-    const closeBtn = screen.getByTestId('quran-range-picker-sheet-close-button');
+    const closeBtn = screen.getByTestId(
+      'quran-range-picker-sheet-close-button',
+    );
     fireEvent.press(closeBtn);
 
     expect(onCancelMock).toHaveBeenCalledTimes(1);
@@ -213,7 +219,9 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     // FROM: Surah 2 (Al-Baqara), Ayah 10
     fireEvent.press(screen.getByTestId('surah-row-2'));
     fireEvent.press(
-      screen.getByTestId('quran-range-picker-sheet-from-ayah-wheel-picker-item-10'),
+      screen.getByTestId(
+        'quran-range-picker-sheet-from-ayah-wheel-picker-item-10',
+      ),
     );
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-next-button'));
 

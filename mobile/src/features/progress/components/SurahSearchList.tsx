@@ -1,11 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  Pressable,
-} from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SurahDto } from '../../../shared/api/quran.client';
 
@@ -31,7 +25,6 @@ export function SurahSearchList({
       return [...surahs].sort((a, b) => a.number - b.number);
     }
 
-    const queryLower = trimmed.toLowerCase();
     return surahs.filter((surah) => {
       const nameMatches = surah.name_ar.includes(trimmed);
       const numberMatches =
@@ -67,9 +60,7 @@ export function SurahSearchList({
         accessibilityLabel={`سورة ${item.name_ar}، رقم ${item.number}، ${item.ayah_count} آية`}
         accessibilityState={{ selected: isSelected }}
         className={`flex-row-reverse items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-gray-800 active:bg-gray-100 dark:active:bg-gray-800/60 ${
-          isSelected
-            ? 'bg-primary/10 dark:bg-primary-950/40'
-            : 'bg-transparent'
+          isSelected ? 'bg-primary/10 dark:bg-primary-950/40' : 'bg-transparent'
         }`}
       >
         <View className="flex-row-reverse items-center gap-3">
@@ -83,9 +74,7 @@ export function SurahSearchList({
           >
             <Text
               className={`text-xs font-bold ${
-                isSelected
-                  ? 'text-white'
-                  : 'text-gray-700 dark:text-gray-300'
+                isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-300'
               }`}
             >
               {item.number}

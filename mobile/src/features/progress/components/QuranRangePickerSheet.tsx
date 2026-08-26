@@ -1,10 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-} from 'react-native';
+import { Modal, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useSurahs } from '../hooks/useSurahs';
@@ -21,10 +16,7 @@ import { Button } from '../../../shared/components/Button';
 import { SkeletonLoader } from '../../../shared/components/SkeletonLoader';
 
 export type QuranRangePickerStep =
-  | 'from-surah'
-  | 'from-ayah'
-  | 'to-surah'
-  | 'to-ayah';
+  'from-surah' | 'from-ayah' | 'to-surah' | 'to-ayah';
 
 export interface QuranRangePickerSheetProps {
   visible: boolean;
@@ -45,10 +37,7 @@ export function QuranRangePickerSheet({
 }: QuranRangePickerSheetProps) {
   const { data: surahs, isLoading, isError, refetch } = useSurahs();
 
-  const surahIndex = useMemo(
-    () => buildSurahIndex(surahs || []),
-    [surahs],
-  );
+  const surahIndex = useMemo(() => buildSurahIndex(surahs || []), [surahs]);
 
   const [step, setStep] = useState<QuranRangePickerStep>('from-surah');
   const [draftFrom, setDraftFrom] = useState<AyahPosition>({
@@ -100,21 +89,18 @@ export function QuranRangePickerSheet({
     }
   }, [step, onCancel, triggerHaptic]);
 
-  const handleSelectFromSurah = useCallback(
-    (surah: SurahDto) => {
-      setDraftFrom({
-        surah: surah.number,
-        ayah: 1,
-      });
-      // Also pre-seed TO surah to match FROM surah
-      setDraftTo({
-        surah: surah.number,
-        ayah: 1,
-      });
-      setStep('from-ayah');
-    },
-    [],
-  );
+  const handleSelectFromSurah = useCallback((surah: SurahDto) => {
+    setDraftFrom({
+      surah: surah.number,
+      ayah: 1,
+    });
+    // Also pre-seed TO surah to match FROM surah
+    setDraftTo({
+      surah: surah.number,
+      ayah: 1,
+    });
+    setStep('from-ayah');
+  }, []);
 
   const handleNextFromAyah = useCallback(() => {
     triggerHaptic();
@@ -256,7 +242,9 @@ export function QuranRangePickerSheet({
               testID={`${testID}-summary-from`}
               className="text-xs font-semibold text-gray-900 dark:text-gray-100"
             >
-              {fromSurah ? `سورة ${fromSurah.name_ar} (آية ${draftFrom.ayah})` : '—'}
+              {fromSurah
+                ? `سورة ${fromSurah.name_ar} (آية ${draftFrom.ayah})`
+                : '—'}
             </Text>
           </View>
 
@@ -281,10 +269,7 @@ export function QuranRangePickerSheet({
         <View className="flex-1 w-full">
           {isLoading && !surahs ? (
             /* First load skeleton */
-            <View
-              testID={`${testID}-skeleton`}
-              className="flex-1 p-4 gap-3"
-            >
+            <View testID={`${testID}-skeleton`} className="flex-1 p-4 gap-3">
               <SkeletonLoader count={8} />
             </View>
           ) : isError && !surahs ? (

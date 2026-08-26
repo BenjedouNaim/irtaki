@@ -62,8 +62,12 @@ describe('ayahRange utilities', () => {
       const fatihaEnd: AyahPosition = { surah: 1, ayah: 7 };
       const baqaraStart: AyahPosition = { surah: 2, ayah: 1 };
 
-      expect(compareAyahPositions(surahIndex, fatihaEnd, baqaraStart)).toBeLessThan(0);
-      expect(compareAyahPositions(surahIndex, baqaraStart, fatihaEnd)).toBeGreaterThan(0);
+      expect(
+        compareAyahPositions(surahIndex, fatihaEnd, baqaraStart),
+      ).toBeLessThan(0);
+      expect(
+        compareAyahPositions(surahIndex, baqaraStart, fatihaEnd),
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -71,36 +75,56 @@ describe('ayahRange utilities', () => {
     const fromPosition: AyahPosition = { surah: 2, ayah: 15 }; // ordinal = 7 + 15 = 22
 
     it('returns false if fromPosition is undefined', () => {
-      expect(isAyahDisabledForTo(surahIndex, undefined, { surah: 2, ayah: 10 })).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, undefined, { surah: 2, ayah: 10 }),
+      ).toBe(false);
     });
 
     it('disables candidate ayahs within the same surah that are before fromPosition', () => {
       // Ayah 14 (ordinal 21) < Ayah 15 (ordinal 22) -> disabled
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 14 })).toBe(true);
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 1 })).toBe(true);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 14 }),
+      ).toBe(true);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 1 }),
+      ).toBe(true);
     });
 
     it('enables the exact same ayah (single-ayah range)', () => {
       // Ayah 15 (ordinal 22) == Ayah 15 (ordinal 22) -> enabled
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 15 })).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 15 }),
+      ).toBe(false);
     });
 
     it('enables candidate ayahs within the same surah that are after fromPosition', () => {
       // Ayah 16 (ordinal 23) > Ayah 15 (ordinal 22) -> enabled
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 16 })).toBe(false);
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 286 })).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 16 }),
+      ).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 2, ayah: 286 }),
+      ).toBe(false);
     });
 
     it('disables all candidate ayahs in surahs before fromPosition (cross-surah)', () => {
       // Surah 1 (Al-Fatiha) ayahs 1..7 (ordinals 1..7) < 22 -> all disabled
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 1, ayah: 1 })).toBe(true);
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 1, ayah: 7 })).toBe(true);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 1, ayah: 1 }),
+      ).toBe(true);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 1, ayah: 7 }),
+      ).toBe(true);
     });
 
     it('enables all candidate ayahs in surahs after fromPosition (cross-surah)', () => {
       // Surah 3 (Aal Imran) ayahs 1..200 (ordinals >= 294) > 22 -> all enabled
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 3, ayah: 1 })).toBe(false);
-      expect(isAyahDisabledForTo(surahIndex, fromPosition, { surah: 114, ayah: 6 })).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 3, ayah: 1 }),
+      ).toBe(false);
+      expect(
+        isAyahDisabledForTo(surahIndex, fromPosition, { surah: 114, ayah: 6 }),
+      ).toBe(false);
     });
   });
 });
