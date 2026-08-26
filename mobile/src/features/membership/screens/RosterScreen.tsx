@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList } from 'react-native';
+import { View, Text, FlatList, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
@@ -10,6 +11,7 @@ import {
 import { ApiError } from '@/shared/api/types';
 
 export default function RosterScreen({ groupId }: { groupId: string }) {
+  const router = useRouter();
   const [entries, setEntries] = useState<RosterEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -35,25 +37,39 @@ export default function RosterScreen({ groupId }: { groupId: string }) {
     fetchRoster();
   }, [fetchRoster]);
 
-  const renderItem = ({ item }: { item: RosterEntry }) => (
-    <View
-      testID={`roster-row-${item.id}`}
-      className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex-row-reverse items-center justify-between gap-3"
-      style={{ borderCurve: 'continuous' }}
-    >
-      <Text
-        selectable
-        className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right flex-1"
+  const handleRowPress = (item: RosterEntry) => {
+    if (item.state === 'Terminated') {
+      router.push({
+        pathname: '/(app)/admin/memberships/[id]/recovery' as any,
+        params: { id: item.id },
+      });
+    }
+  };
+
+  const renderItem = ({ item }: { item: RosterEntry }) => {
+    const isTerminated = item.state === 'Terminated';
+    return (
+      <Pressable
+        testID={`roster-row-${item.id}`}
+        disabled={!isTerminated}
+        onPress={() => handleRowPress(item)}
+        className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex-row-reverse items-center justify-between gap-3 active:opacity-70"
+        style={{ borderCurve: 'continuous' }}
       >
-        {item.user.full_name || 'غير محدد'}
-      </Text>
-      <StatusBadge
-        status={item.state === 'Active' ? 'نشطة' : 'محذوف'}
-        variant={item.state === 'Active' ? 'info' : 'error'}
-        testID={`roster-state-badge-${item.id}`}
-      />
-    </View>
-  );
+        <Text
+          selectable
+          className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right flex-1"
+        >
+          {item.user.full_name || 'غير محدد'}
+        </Text>
+        <StatusBadge
+          status={item.state === 'Active' ? 'نشطة' : 'محذوف'}
+          variant={item.state === 'Active' ? 'info' : 'error'}
+          testID={`roster-state-badge-${item.id}`}
+        />
+      </Pressable>
+    );
+  };
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-gray-950" testID="roster-screen">

@@ -12,6 +12,8 @@ import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
 import { GetOwnMembershipUseCase } from '../application/get-own-membership/get-own-membership.use-case';
 import { OwnMembershipResponseDto } from '../application/get-own-membership/get-own-membership-response.dto';
+import { GetRecoveryUseCase } from '../application/get-recovery/get-recovery.use-case';
+import { GetMembershipRecoveryResponseDto } from '../application/get-recovery/get-recovery-response.dto';
 import { TerminateMembershipUseCase } from '../application/terminate-membership/terminate-membership.use-case';
 import { TerminateMembershipResponseDto } from '../application/terminate-membership/terminate-membership-response.dto';
 
@@ -27,6 +29,7 @@ interface AuthenticatedRequest extends Request {
 export class MembershipsController {
   constructor(
     private readonly getOwnMembershipUseCase: GetOwnMembershipUseCase,
+    private readonly getRecoveryUseCase: GetRecoveryUseCase,
     private readonly terminateMembershipUseCase: TerminateMembershipUseCase,
   ) {}
 
@@ -36,6 +39,14 @@ export class MembershipsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<OwnMembershipResponseDto> {
     return this.getOwnMembershipUseCase.execute(req.user.id);
+  }
+
+  @Roles(UserRole.Admin)
+  @Get(':id/recovery')
+  async recovery(
+    @Param('id') id: string,
+  ): Promise<GetMembershipRecoveryResponseDto> {
+    return this.getRecoveryUseCase.execute(id);
   }
 
   @Roles(UserRole.Admin)

@@ -3,6 +3,7 @@ on:
   # Always trigger on pull_request (no path filter here) so the required check
   # is always reported. The actual work is gated inside the job via the filter step.
   pull_request:
+    branches: [main]
   push:
     branches: [main]
     paths: ['mobile/**']

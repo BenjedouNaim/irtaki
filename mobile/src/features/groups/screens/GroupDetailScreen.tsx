@@ -72,7 +72,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
 
   const handleOpenRoster = () => {
     router.push({
-      pathname: '/(app)/admin/groups/[id]/roster',
+      pathname: '/(app)/admin/groups/[id]/roster' as any,
       params: { id: groupId },
     });
   };

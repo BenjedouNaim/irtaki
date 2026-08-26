@@ -407,7 +407,7 @@ Server re-validates gender against the target group (VR-08) — the client's own
 
 **`DELETE /memberships/{id}`** → `200`, `{ membership_id, state: "Terminated" }` (soft operation, not `204`, since the response confirms the resulting state rather than signalling nothing-to-return). Side effects: cascade soft-delete of reports/weekly-reports/payments/join-request, `User.role → User`, N-08. Errors: `403 CANNOT_REMOVE_SELF` (FR-ADMIN-02 — though Admin removing a Student is a different actor than the Admin removing themselves; this guards the Admin-removes-Admin edge case which structurally can't occur but is guarded anyway), `409 ALREADY_TERMINATED`.
 
-**`GET /memberships/{id}/recovery`** (Admin) → `{ membership, daily_reports: [...], weekly_reports: [...], payment_records: [...] }` — full soft-deleted dump, **read-only JSON, no export/download format** (APIQ-08, DBQ-04). No write path exists on this endpoint or anywhere else that clears `deleted_at`.
+**`GET /memberships/{id}/recovery`** (Admin) → `{ data: { membership, daily_reports: [...], weekly_reports: [...], payment_records: [...] } }` — full soft-deleted dump (`deleted_at IS NOT NULL` rows), **read-only JSON, no export/download format** (APIQ-08, DBQ-04). No write path exists on this endpoint or anywhere else that clears `deleted_at`. Any membership state (Active or Terminated) is accepted (APIQ-NEW-10). Returns `404 NOT_FOUND` if the membership id does not exist (APIQ-NEW-09).
 
 ### 10.7 Daily Reports (API-029…032)
 
@@ -655,6 +655,8 @@ All Critical/High-severity items were already resolved upstream (SAS §29.1: zer
 | **APIQ-NEW-04** | Non-paginated collection envelope resolved: bounded collections (`/groups`, `/groups/available`, `/groups/{id}/memberships`) use `{ "data": [...] }` with no `pagination` key.                                                                                                                                                                               | New            | **Resolved**                                                                                           |
 | **APIQ-NEW-06** | 404 semantics resolved for `GET /join-requests/mine` and `GET /memberships/mine` when no record exists for the caller (consistent with uniform 404 behavior across API, not 200 with null). Also clarifies that `Accepted` is unobservable via `GET /join-requests/mine` due to atomic Student role flip.                                                                                                | New            | **Resolved**                                                                                           |
 | **APIQ-NEW-07** | `POST /join-requests/{id}/reject` response body resolved: `{ data: { status: "Rejected" } }`, matching the `GET /join-requests/mine` sibling shape (no `id` — accept's `membership_id` doesn't apply since reject creates no new resource). | New | **Resolved** |
+| **APIQ-NEW-09** | `GET /memberships/{id}/recovery` 404 vs 403 for nonexistent membership id resolved: returns `404 NOT_FOUND` (Admin-only with unrestricted scope, no scope-enumeration leak). | New | **Resolved** |
+| **APIQ-NEW-10** | `GET /memberships/{id}/recovery` state restriction resolved: accepts any membership state (Active or Terminated); returns rows where `deleted_at IS NOT NULL` (Active memberships naturally return empty arrays). | New | **Resolved** |
 
 ## 17. API Quality Review
 

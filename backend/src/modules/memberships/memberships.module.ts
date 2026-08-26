@@ -8,6 +8,7 @@ import { GroupsModule } from '../groups/groups.module';
 import { IdentityModule } from '../identity/identity.module';
 import { GetOwnMembershipUseCase } from './application/get-own-membership/get-own-membership.use-case';
 import { GetRosterUseCase } from './application/get-roster/get-roster.use-case';
+import { GetRecoveryUseCase } from './application/get-recovery/get-recovery.use-case';
 import { TerminateMembershipUseCase } from './application/terminate-membership/terminate-membership.use-case';
 import { MembershipsController } from './presentation/memberships.controller';
 import { GroupMembershipsController } from './presentation/group-memberships.controller';
@@ -27,6 +28,7 @@ import { GroupMembershipsController } from './presentation/group-memberships.con
     MembershipRepository,
     GetOwnMembershipUseCase,
     GetRosterUseCase,
+    GetRecoveryUseCase,
     TerminateMembershipUseCase,
   ],
   exports: [
@@ -34,6 +36,7 @@ import { GroupMembershipsController } from './presentation/group-memberships.con
     MembershipRepository,
     GetOwnMembershipUseCase,
     GetRosterUseCase,
+    GetRecoveryUseCase,
     TerminateMembershipUseCase,
   ],
 })
