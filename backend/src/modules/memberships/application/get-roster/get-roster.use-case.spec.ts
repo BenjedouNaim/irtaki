@@ -36,6 +36,7 @@ describe('GetRosterUseCase', () => {
       create: jest.fn(),
       findActiveByUserId: jest.fn(),
       findRosterByGroupId: jest.fn(),
+      findByIdForRecovery: jest.fn(),
     };
 
     useCase = new GetRosterUseCase(groupRepository, membershipRepository);
