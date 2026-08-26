@@ -1,9 +1,11 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Param, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
 import { GetOwnMembershipUseCase } from '../application/get-own-membership/get-own-membership.use-case';
 import { OwnMembershipResponseDto } from '../application/get-own-membership/get-own-membership-response.dto';
+import { GetRecoveryUseCase } from '../application/get-recovery/get-recovery.use-case';
+import { GetMembershipRecoveryResponseDto } from '../application/get-recovery/get-recovery-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -17,6 +19,7 @@ interface AuthenticatedRequest extends Request {
 export class MembershipsController {
   constructor(
     private readonly getOwnMembershipUseCase: GetOwnMembershipUseCase,
+    private readonly getRecoveryUseCase: GetRecoveryUseCase,
   ) {}
 
   @Roles(UserRole.Student)
@@ -25,5 +28,13 @@ export class MembershipsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<OwnMembershipResponseDto> {
     return this.getOwnMembershipUseCase.execute(req.user.id);
+  }
+
+  @Roles(UserRole.Admin)
+  @Get(':id/recovery')
+  async recovery(
+    @Param('id') id: string,
+  ): Promise<GetMembershipRecoveryResponseDto> {
+    return this.getRecoveryUseCase.execute(id);
   }
 }
