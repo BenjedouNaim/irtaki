@@ -57,6 +57,16 @@ export class UserRepository implements IUserRepository {
     );
   }
 
+  async demoteToUser(userId: string, manager: EntityManager): Promise<void> {
+    await manager.query(
+      `UPDATE users
+       SET role = 'User',
+           updated_at = now()
+       WHERE id = $1`,
+      [userId],
+    );
+  }
+
   private toDomain(entity: UserTypeOrmEntity): User {
     return new User({
       id: entity.id,

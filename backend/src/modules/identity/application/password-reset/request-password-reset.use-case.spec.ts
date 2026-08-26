@@ -18,6 +18,7 @@ describe('RequestPasswordResetUseCase', () => {
       findAllByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
+      demoteToUser: jest.fn(),
     };
 
     mockMailer = {
