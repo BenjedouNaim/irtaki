@@ -64,6 +64,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
     mockMembershipRepo = {
       create: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findRosterByGroupId: jest.fn(),
     };
 
     mockUserRepo = {

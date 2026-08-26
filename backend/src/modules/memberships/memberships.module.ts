@@ -4,14 +4,18 @@ import { MembershipTypeOrmEntity } from './infrastructure/membership.typeorm-ent
 import { MEMBERSHIP_REPOSITORY } from './domain/membership.repository.interface';
 import { MembershipRepository } from './infrastructure/membership.repository';
 import { GroupTypeOrmEntity } from '../groups/infrastructure/group.typeorm-entity';
+import { GroupsModule } from '../groups/groups.module';
 import { GetOwnMembershipUseCase } from './application/get-own-membership/get-own-membership.use-case';
+import { GetRosterUseCase } from './application/get-roster/get-roster.use-case';
 import { MembershipsController } from './presentation/memberships.controller';
+import { GroupMembershipsController } from './presentation/group-memberships.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MembershipTypeOrmEntity, GroupTypeOrmEntity]),
+    GroupsModule,
   ],
-  controllers: [MembershipsController],
+  controllers: [MembershipsController, GroupMembershipsController],
   providers: [
     {
       provide: MEMBERSHIP_REPOSITORY,
@@ -19,11 +23,13 @@ import { MembershipsController } from './presentation/memberships.controller';
     },
     MembershipRepository,
     GetOwnMembershipUseCase,
+    GetRosterUseCase,
   ],
   exports: [
     MEMBERSHIP_REPOSITORY,
     MembershipRepository,
     GetOwnMembershipUseCase,
+    GetRosterUseCase,
   ],
 })
 export class MembershipsModule {}

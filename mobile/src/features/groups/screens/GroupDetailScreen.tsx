@@ -70,6 +70,13 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
     setNameDraft(group?.name || '');
   };
 
+  const handleOpenRoster = () => {
+    router.push({
+      pathname: '/(app)/admin/groups/[id]/roster',
+      params: { id: groupId },
+    });
+  };
+
   const handleSaveName = async () => {
     const trimmed = nameDraft.trim();
     if (!trimmed) {
@@ -258,6 +265,15 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
                 testID="group-detail-lifecycle-badge"
               />
             </View>
+
+            {role === 'Admin' ? (
+              <Button
+                label="قائمة الطلاب"
+                variant="secondary"
+                onPress={handleOpenRoster}
+                testID="group-detail-roster-button"
+              />
+            ) : null}
           </View>
 
           {/* Group Details Card */}

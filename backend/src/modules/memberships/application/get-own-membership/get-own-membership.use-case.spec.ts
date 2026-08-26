@@ -25,6 +25,7 @@ describe('GetOwnMembershipUseCase', () => {
     membershipRepository = {
       create: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findRosterByGroupId: jest.fn(),
     };
     useCase = new GetOwnMembershipUseCase(membershipRepository);
   });
