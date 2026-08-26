@@ -418,4 +418,93 @@ export class MembershipRepository implements IMembershipRepository {
       })),
     };
   }
+
+  async findStateAndUserById(
+    membershipId: string,
+    manager: EntityManager,
+  ): Promise<{ userId: string; state: string } | null> {
+    const queryResult: unknown = await manager.query(
+      `SELECT user_id AS "userId", state FROM memberships WHERE id = $1 LIMIT 1`,
+      [membershipId],
+    );
+
+    const rows = (
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : []
+    ) as Array<{ userId: string; state: string }>;
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return { userId: rows[0].userId, state: rows[0].state };
+  }
+
+  async terminateConditionally(
+    membershipId: string,
+    endedBy: string,
+    endedAt: string,
+    manager: EntityManager,
+  ): Promise<{ userId: string; joinRequestId: string | null } | null> {
+    const updateResult: unknown = await manager.query(
+      `UPDATE memberships
+       SET state = 'Terminated',
+           ended_at = $3::date,
+           ended_by = $2,
+           updated_at = now()
+       WHERE id = $1 AND state = 'Active'
+       RETURNING user_id AS "userId", join_request_id AS "joinRequestId"`,
+      [membershipId, endedBy, endedAt],
+    );
+
+    const rows = (
+      Array.isArray(updateResult) && Array.isArray(updateResult[0])
+        ? updateResult[0]
+        : Array.isArray(updateResult)
+          ? updateResult
+          : []
+    ) as Array<{ userId: string; joinRequestId: string | null }>;
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return {
+      userId: rows[0].userId,
+      joinRequestId: rows[0].joinRequestId ?? null,
+    };
+  }
+
+  async softDeleteMembershipRecords(
+    membershipId: string,
+    joinRequestId: string | null,
+    manager: EntityManager,
+  ): Promise<void> {
+    // AR-04 cohesion: termination and its cascade must land in one transaction so a crash can never leave live records pointing at a Terminated membership.
+    await manager.query(
+      `UPDATE daily_reports SET deleted_at = now() WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+    await manager.query(
+      `UPDATE weekly_reports SET deleted_at = now() WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+    await manager.query(
+      `UPDATE payment_records SET deleted_at = now() WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+    if (joinRequestId) {
+      await manager.query(
+        `UPDATE join_requests SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`,
+        [joinRequestId],
+      );
+    }
+    await manager.query(
+      `UPDATE memorization_coverage SET deleted_at = now(), updated_at = now() WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+  }
 }

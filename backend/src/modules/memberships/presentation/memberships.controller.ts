@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Req } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
@@ -6,6 +14,8 @@ import { GetOwnMembershipUseCase } from '../application/get-own-membership/get-o
 import { OwnMembershipResponseDto } from '../application/get-own-membership/get-own-membership-response.dto';
 import { GetRecoveryUseCase } from '../application/get-recovery/get-recovery.use-case';
 import { GetMembershipRecoveryResponseDto } from '../application/get-recovery/get-recovery-response.dto';
+import { TerminateMembershipUseCase } from '../application/terminate-membership/terminate-membership.use-case';
+import { TerminateMembershipResponseDto } from '../application/terminate-membership/terminate-membership-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -20,6 +30,7 @@ export class MembershipsController {
   constructor(
     private readonly getOwnMembershipUseCase: GetOwnMembershipUseCase,
     private readonly getRecoveryUseCase: GetRecoveryUseCase,
+    private readonly terminateMembershipUseCase: TerminateMembershipUseCase,
   ) {}
 
   @Roles(UserRole.Student)
@@ -36,5 +47,15 @@ export class MembershipsController {
     @Param('id') id: string,
   ): Promise<GetMembershipRecoveryResponseDto> {
     return this.getRecoveryUseCase.execute(id);
+  }
+
+  @Roles(UserRole.Admin)
+  @HttpCode(HttpStatus.OK)
+  @Delete(':id')
+  async terminate(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TerminateMembershipResponseDto> {
+    return this.terminateMembershipUseCase.execute(req.user.id, id);
   }
 }

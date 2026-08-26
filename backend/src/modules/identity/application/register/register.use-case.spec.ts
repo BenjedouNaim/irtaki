@@ -25,6 +25,7 @@ describe('RegisterUseCase', () => {
       findAllByRole: jest.fn(),
       save: jest.fn().mockImplementation((user: User) => Promise.resolve(user)),
       promoteToStudent: jest.fn(),
+      demoteToUser: jest.fn(),
     };
 
     mockPasswordHasher = {

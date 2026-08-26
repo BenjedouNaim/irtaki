@@ -120,4 +120,19 @@ export interface IMembershipRepository {
     options: { asOf?: string },
   ): Promise<RosterRow[]>;
   findByIdForRecovery(id: string): Promise<MembershipRecoveryData | null>;
+  findStateAndUserById(
+    membershipId: string,
+    manager: EntityManager,
+  ): Promise<{ userId: string; state: string } | null>;
+  terminateConditionally(
+    membershipId: string,
+    endedBy: string,
+    endedAt: string,
+    manager: EntityManager,
+  ): Promise<{ userId: string; joinRequestId: string | null } | null>;
+  softDeleteMembershipRecords(
+    membershipId: string,
+    joinRequestId: string | null,
+    manager: EntityManager,
+  ): Promise<void>;
 }

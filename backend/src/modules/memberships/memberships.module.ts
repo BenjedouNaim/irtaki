@@ -5,9 +5,11 @@ import { MEMBERSHIP_REPOSITORY } from './domain/membership.repository.interface'
 import { MembershipRepository } from './infrastructure/membership.repository';
 import { GroupTypeOrmEntity } from '../groups/infrastructure/group.typeorm-entity';
 import { GroupsModule } from '../groups/groups.module';
+import { IdentityModule } from '../identity/identity.module';
 import { GetOwnMembershipUseCase } from './application/get-own-membership/get-own-membership.use-case';
 import { GetRosterUseCase } from './application/get-roster/get-roster.use-case';
 import { GetRecoveryUseCase } from './application/get-recovery/get-recovery.use-case';
+import { TerminateMembershipUseCase } from './application/terminate-membership/terminate-membership.use-case';
 import { MembershipsController } from './presentation/memberships.controller';
 import { GroupMembershipsController } from './presentation/group-memberships.controller';
 
@@ -15,6 +17,7 @@ import { GroupMembershipsController } from './presentation/group-memberships.con
   imports: [
     TypeOrmModule.forFeature([MembershipTypeOrmEntity, GroupTypeOrmEntity]),
     GroupsModule,
+    IdentityModule,
   ],
   controllers: [MembershipsController, GroupMembershipsController],
   providers: [
@@ -26,6 +29,7 @@ import { GroupMembershipsController } from './presentation/group-memberships.con
     GetOwnMembershipUseCase,
     GetRosterUseCase,
     GetRecoveryUseCase,
+    TerminateMembershipUseCase,
   ],
   exports: [
     MEMBERSHIP_REPOSITORY,
@@ -33,6 +37,7 @@ import { GroupMembershipsController } from './presentation/group-memberships.con
     GetOwnMembershipUseCase,
     GetRosterUseCase,
     GetRecoveryUseCase,
+    TerminateMembershipUseCase,
   ],
 })
 export class MembershipsModule {}
