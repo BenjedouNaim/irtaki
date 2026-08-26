@@ -15,4 +15,5 @@ export interface IUserRepository {
     gender: 'Male' | 'Female',
     manager: EntityManager,
   ): Promise<void>;
+  demoteToUser(userId: string, manager: EntityManager): Promise<void>;
 }

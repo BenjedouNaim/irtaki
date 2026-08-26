@@ -65,6 +65,9 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       create: jest.fn(),
       findActiveByUserId: jest.fn(),
       findRosterByGroupId: jest.fn(),
+      findStateAndUserById: jest.fn(),
+      terminateConditionally: jest.fn(),
+      softDeleteMembershipRecords: jest.fn(),
     };
 
     mockUserRepo = {
@@ -73,6 +76,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findAllByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
+      demoteToUser: jest.fn(),
     };
 
     mockCoverageRepo = {

@@ -26,6 +26,9 @@ describe('GetOwnMembershipUseCase', () => {
       create: jest.fn(),
       findActiveByUserId: jest.fn(),
       findRosterByGroupId: jest.fn(),
+      findStateAndUserById: jest.fn(),
+      terminateConditionally: jest.fn(),
+      softDeleteMembershipRecords: jest.fn(),
     };
     useCase = new GetOwnMembershipUseCase(membershipRepository);
   });
