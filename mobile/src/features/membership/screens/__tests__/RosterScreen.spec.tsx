@@ -79,7 +79,7 @@ describe('RosterScreen (F-MEM-02)', () => {
     expect(await findByText('محذوف')).toBeTruthy();
   });
 
-  it('does not navigate when pressing a roster row (rows are non-navigable)', async () => {
+  it('navigates to recovery when pressing a terminated member, but does not navigate for active member', async () => {
     jest
       .spyOn(membershipsApi, 'getGroupMemberships')
       .mockResolvedValueOnce({ data: mockRoster });
@@ -90,14 +90,20 @@ describe('RosterScreen (F-MEM-02)', () => {
 
     expect(await findByText('فاطمة بن صالح')).toBeTruthy();
 
-    await act(async () => {
-      fireEvent.press(getByTestId('roster-row-membership-2'));
-    });
+    // Pressing active membership does not navigate
     await act(async () => {
       fireEvent.press(getByTestId('roster-row-membership-1'));
     });
-
     expect(mockPush).not.toHaveBeenCalled();
+
+    // Pressing terminated membership navigates to recovery
+    await act(async () => {
+      fireEvent.press(getByTestId('roster-row-membership-2'));
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/admin/memberships/[id]/recovery',
+      params: { id: 'membership-2' },
+    });
   });
 
   it('renders empty state when the group has no members', async () => {
