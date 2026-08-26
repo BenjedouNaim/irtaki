@@ -4,8 +4,8 @@ import {
   View,
   Text,
   Pressable,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useSurahs } from '../hooks/useSurahs';
 import {
