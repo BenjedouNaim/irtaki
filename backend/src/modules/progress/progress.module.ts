@@ -9,6 +9,9 @@ import { CoverageRepository } from './infrastructure/coverage.repository';
 import { SURAH_REPOSITORY } from './domain/surah.repository.interface';
 import { SurahRepository } from './infrastructure/surah.repository';
 import { ListSurahsUseCase } from './application/list-surahs/list-surahs.use-case';
+import { HIZB_BOUNDARY_REPOSITORY } from './domain/hizb-boundary.repository.interface';
+import { HizbBoundaryRepository } from './infrastructure/hizb-boundary.repository';
+import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get-hizb-boundaries.use-case';
 import { QuranController } from './presentation/quran.controller';
 
 @Module({
@@ -33,12 +36,20 @@ import { QuranController } from './presentation/quran.controller';
     },
     SurahRepository,
     ListSurahsUseCase,
+    {
+      provide: HIZB_BOUNDARY_REPOSITORY,
+      useClass: HizbBoundaryRepository,
+    },
+    HizbBoundaryRepository,
+    GetHizbBoundariesUseCase,
   ],
   exports: [
     COVERAGE_REPOSITORY,
     CoverageRepository,
     SURAH_REPOSITORY,
     SurahRepository,
+    HIZB_BOUNDARY_REPOSITORY,
+    HizbBoundaryRepository,
   ],
 })
 export class ProgressModule {}
