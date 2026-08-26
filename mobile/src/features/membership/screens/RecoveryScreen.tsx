@@ -91,7 +91,10 @@ export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-gray-50 dark:bg-gray-950 p-4" testID="recovery-screen">
+      <View
+        className="flex-1 bg-gray-50 dark:bg-gray-950 p-4"
+        testID="recovery-screen"
+      >
         <SkeletonLoader variant="row" count={4} testID="recovery-skeleton" />
       </View>
     );
@@ -99,7 +102,10 @@ export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
 
   if (errorMessage || !data) {
     return (
-      <View className="flex-1 bg-gray-50 dark:bg-gray-950 p-4" testID="recovery-screen">
+      <View
+        className="flex-1 bg-gray-50 dark:bg-gray-950 p-4"
+        testID="recovery-screen"
+      >
         <View
           className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
           style={{ borderCurve: 'continuous' }}
@@ -305,7 +311,9 @@ export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
                   </Text>
                   <StatusBadge
                     status={report.state === 'Finalised' ? 'مؤكد' : 'مفتوح'}
-                    variant={report.state === 'Finalised' ? 'success' : 'neutral'}
+                    variant={
+                      report.state === 'Finalised' ? 'success' : 'neutral'
+                    }
                   />
                 </View>
                 <View className="flex-row-reverse justify-between">
@@ -362,7 +370,8 @@ export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
                 </View>
                 <View className="flex-row-reverse justify-between">
                   <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    تاريخ الدفع: {payment.paid_at ? payment.paid_at.split('T')[0] : '—'}
+                    تاريخ الدفع:{' '}
+                    {payment.paid_at ? payment.paid_at.split('T')[0] : '—'}
                   </Text>
                   {payment.deleted_at && (
                     <Text className="text-xs text-gray-400 dark:text-gray-500 text-right">

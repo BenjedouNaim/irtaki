@@ -132,15 +132,13 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
   });
 
   it('renders error view with retry button on API failure, and retries on press', async () => {
-    jest
-      .spyOn(membershipsApi, 'getMembershipRecovery')
-      .mockRejectedValueOnce(
-        new ApiError({
-          statusCode: 404,
-          error: 'NOT_FOUND',
-          message: 'المورد المطلوب غير موجود',
-        }),
-      );
+    jest.spyOn(membershipsApi, 'getMembershipRecovery').mockRejectedValueOnce(
+      new ApiError({
+        statusCode: 404,
+        error: 'NOT_FOUND',
+        message: 'المورد المطلوب غير موجود',
+      }),
+    );
 
     const { getByTestId, findByText, queryByTestId } = render(
       <RecoveryScreen membershipId={mockMembershipId} />,
@@ -168,7 +166,7 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
       .spyOn(membershipsApi, 'getMembershipRecovery')
       .mockResolvedValueOnce(mockRecoveryEmptyHistory);
 
-    const { getByTestId, findByText, queryByTestId } = render(
+    const { getByTestId, findByText } = render(
       <RecoveryScreen membershipId={mockMembershipId} />,
     );
 

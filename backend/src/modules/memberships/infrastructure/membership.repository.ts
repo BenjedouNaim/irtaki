@@ -252,7 +252,10 @@ export class MembershipRepository implements IMembershipRepository {
 
   async findByIdForRecovery(
     id: string,
-  ): Promise<import('../domain/membership.repository.interface').MembershipRecoveryData | null> {
+  ): Promise<
+    | import('../domain/membership.repository.interface').MembershipRecoveryData
+    | null
+  > {
     const membershipRow = await this.membershipRepo
       .createQueryBuilder('m')
       .innerJoin(GroupTypeOrmEntity, 'g', 'g.id = m.group_id')
@@ -375,15 +378,19 @@ export class MembershipRepository implements IMembershipRepository {
         submittedAt: toIsoString(r.submitted_at),
         submittedTimezone: r.submitted_timezone,
         noMemorizationToday: r.no_memorization_today ?? null,
-        memoFromOrdinal: r.memo_from_ordinal != null ? Number(r.memo_from_ordinal) : null,
-        memoToOrdinal: r.memo_to_ordinal != null ? Number(r.memo_to_ordinal) : null,
+        memoFromOrdinal:
+          r.memo_from_ordinal != null ? Number(r.memo_from_ordinal) : null,
+        memoToOrdinal:
+          r.memo_to_ordinal != null ? Number(r.memo_to_ordinal) : null,
         memoTimeFrom: r.memo_time_from ? String(r.memo_time_from) : null,
         memoTimeTo: r.memo_time_to ? String(r.memo_time_to) : null,
         completed50Repetitions: r.completed_50_repetitions ?? null,
         repetitionsInSingleSession: r.repetitions_in_single_session ?? null,
         noRevisionToday: r.no_revision_today ?? null,
-        revFromOrdinal: r.rev_from_ordinal != null ? Number(r.rev_from_ordinal) : null,
-        revToOrdinal: r.rev_to_ordinal != null ? Number(r.rev_to_ordinal) : null,
+        revFromOrdinal:
+          r.rev_from_ordinal != null ? Number(r.rev_from_ordinal) : null,
+        revToOrdinal:
+          r.rev_to_ordinal != null ? Number(r.rev_to_ordinal) : null,
         revTimeFrom: r.rev_time_from ? String(r.rev_time_from) : null,
         revTimeTo: r.rev_time_to ? String(r.rev_time_to) : null,
         readTafsir: r.read_tafsir ?? null,
@@ -411,7 +418,8 @@ export class MembershipRepository implements IMembershipRepository {
         id: r.id,
         membershipId: r.membership_id,
         cycleIndex: Number(r.cycle_index),
-        amount: typeof r.amount === 'number' ? r.amount.toFixed(2) : String(r.amount),
+        amount:
+          typeof r.amount === 'number' ? r.amount.toFixed(2) : String(r.amount),
         paidAt: toIsoString(r.paid_at),
         recordedBy: r.recorded_by,
         deletedAt: toIsoString(r.deleted_at),
