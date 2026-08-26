@@ -69,12 +69,8 @@ describe('RosterScreen (F-MEM-02)', () => {
     expect(getByTestId('roster-list')).toBeTruthy();
     expect(queryByTestId('roster-skeleton')).toBeNull();
 
-    expect(
-      getByTestId('roster-row-membership-1'),
-    ).toBeTruthy();
-    expect(
-      getByTestId('roster-row-membership-2'),
-    ).toBeTruthy();
+    expect(getByTestId('roster-row-membership-1')).toBeTruthy();
+    expect(getByTestId('roster-row-membership-2')).toBeTruthy();
 
     // Active membership shows the active badge label
     expect(await findByText('نشطة')).toBeTruthy();
@@ -113,9 +109,7 @@ describe('RosterScreen (F-MEM-02)', () => {
       <RosterScreen groupId={mockGroupId} />,
     );
 
-    expect(
-      await findByText('لا يوجد طلاب في هذه الحلقة بعد'),
-    ).toBeTruthy();
+    expect(await findByText('لا يوجد طلاب في هذه الحلقة بعد')).toBeTruthy();
     expect(getByTestId('roster-empty')).toBeTruthy();
     expect(queryByTestId('roster-list')).toBeNull();
     expect(queryByTestId('roster-skeleton')).toBeNull();
