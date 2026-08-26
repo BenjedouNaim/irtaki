@@ -72,6 +72,7 @@
     "lint": "eslint \"{src,app}/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"{src,app}/**/*.{ts,tsx}\" --fix",
     "type-check": "tsc --noEmit",
+    "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests"
   },
   "private": true
