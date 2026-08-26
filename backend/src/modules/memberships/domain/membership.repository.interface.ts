@@ -22,10 +22,23 @@ export interface OwnActiveMembershipRecord {
   state: 'Active';
 }
 
+export interface RosterRow {
+  id: string;
+  userId: string;
+  fullName: string | null;
+  gender: string | null;
+  startedAt: string;
+  state: 'Active' | 'Terminated';
+}
+
 export interface IMembershipRepository {
   create(
     props: CreateMembershipRecordProps,
     manager: EntityManager,
   ): Promise<{ id: string; startedAt: string }>;
   findActiveByUserId(userId: string): Promise<OwnActiveMembershipRecord | null>;
+  findRosterByGroupId(
+    groupId: string,
+    options: { asOf?: string },
+  ): Promise<RosterRow[]>;
 }

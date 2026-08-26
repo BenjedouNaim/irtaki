@@ -6,6 +6,20 @@ import * as usersApi from '@/shared/api/users.client';
 import { useAuthStore } from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
 
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+  }),
+}));
+
 jest.mock('@/shared/api/groups.client');
 jest.mock('@/shared/api/users.client');
 
@@ -401,6 +415,63 @@ describe('GroupDetailScreen (SCR-29)', () => {
 
       await findByTestId('group-detail-name');
       expect(queryByTestId('delete-group-panel')).toBeNull();
+    });
+  });
+
+  describe('Group Roster Link (F-MEM-02)', () => {
+    it('renders the roster button when user role is Admin', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Admin' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      expect(await findByTestId('group-detail-roster-button')).toBeTruthy();
+    });
+
+    it('navigates to the group roster screen with the group id when pressed', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Admin' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      const rosterButton = await findByTestId('group-detail-roster-button');
+
+      await act(async () => {
+        fireEvent.press(rosterButton);
+      });
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/admin/groups/[id]/roster',
+        params: { id: mockGroupId },
+      });
+    });
+
+    it('does not render the roster button when user role is Student', async () => {
+      const { useAuthStore } = require('@/shared/auth/authStore');
+      useAuthStore.setState({ role: 'Student' });
+
+      jest.spyOn(groupsApi, 'getGroupDetail').mockResolvedValueOnce({
+        data: mockGroupDetail,
+      });
+
+      const { queryByTestId, findByTestId } = render(
+        <GroupDetailScreen groupId={mockGroupId} />,
+      );
+
+      await findByTestId('group-detail-name');
+      expect(queryByTestId('group-detail-roster-button')).toBeNull();
     });
   });
 });
