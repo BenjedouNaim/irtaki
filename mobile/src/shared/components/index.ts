@@ -3,3 +3,4 @@ export * from './FormField';
 export * from './StatusBadge';
 export * from './SkeletonLoader';
 export * from './ConfirmationDialog';
+export * from './WheelPicker';
