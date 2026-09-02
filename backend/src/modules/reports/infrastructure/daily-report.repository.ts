@@ -44,18 +44,6 @@ interface RawDailyReportRow {
   absence_reason: 'Sick' | 'Studying' | 'Other' | null;
 }
 
-/**
- * Resolves a global ordinal to its (surah, ayah) pair from the `surahs`
- * reference table: the surah is the one with the greatest `ordinal_offset`
- * strictly below the ordinal, and `ayah = ordinal - ordinal_offset`
- * (SAS §17.6 `ordinal = surahs[s].ordinal_offset + a`). Pure read of seeded
- * reference data (F-FND-06) — ordinals never leave the API (APIS §11).
- */
-const SURAH_OF = (col: string): string =>
-  `(SELECT s.number FROM surahs s WHERE s.ordinal_offset < r.${col} ORDER BY s.ordinal_offset DESC LIMIT 1)`;
-const AYAH_OF = (col: string): string =>
-  `(r.${col} - (SELECT s.ordinal_offset FROM surahs s WHERE s.ordinal_offset < r.${col} ORDER BY s.ordinal_offset DESC LIMIT 1))`;
-
 function toPosition(
   surah: number | string | null,
   ayah: number | string | null,
@@ -120,6 +108,11 @@ export class DailyReportRepository implements IDailyReportRepository {
     reportDate: string,
   ): Promise<DailyReportRecord | null> {
     // Hits DB-UQ-04 (membership_id, report_date) WHERE deleted_at IS NULL.
+    // Each stored ordinal is reconstructed to its (surah, ayah) pair through a
+    // join to `surahs` for display only (TS §23): the surah is the one with the
+    // greatest `ordinal_offset` strictly below the ordinal and
+    // `ayah = ordinal - ordinal_offset` (SAS §17.6). Ordinals never leave the
+    // API (APIS §11). One literal, parameterised statement (TS §36).
     const rows = await this.dailyReportRepo.manager.query<RawDailyReportRow[]>(
       `SELECT r.id,
               r.membership_id,
@@ -128,24 +121,44 @@ export class DailyReportRepository implements IDailyReportRepository {
               r.submitted_at::text       AS submitted_at,
               r.submitted_timezone,
               r.no_memorization_today,
-              ${SURAH_OF('memo_from_ordinal')} AS memo_from_surah,
-              ${AYAH_OF('memo_from_ordinal')}  AS memo_from_ayah,
-              ${SURAH_OF('memo_to_ordinal')}   AS memo_to_surah,
-              ${AYAH_OF('memo_to_ordinal')}    AS memo_to_ayah,
+              mf.number                  AS memo_from_surah,
+              r.memo_from_ordinal - mf.ordinal_offset AS memo_from_ayah,
+              mt.number                  AS memo_to_surah,
+              r.memo_to_ordinal - mt.ordinal_offset   AS memo_to_ayah,
               r.memo_time_from::text     AS memo_time_from,
               r.memo_time_to::text       AS memo_time_to,
               r.completed_50_repetitions,
               r.repetitions_in_single_session,
               r.no_revision_today,
-              ${SURAH_OF('rev_from_ordinal')}  AS rev_from_surah,
-              ${AYAH_OF('rev_from_ordinal')}   AS rev_from_ayah,
-              ${SURAH_OF('rev_to_ordinal')}    AS rev_to_surah,
-              ${AYAH_OF('rev_to_ordinal')}     AS rev_to_ayah,
+              rf.number                  AS rev_from_surah,
+              r.rev_from_ordinal - rf.ordinal_offset  AS rev_from_ayah,
+              rt.number                  AS rev_to_surah,
+              r.rev_to_ordinal - rt.ordinal_offset    AS rev_to_ayah,
               r.rev_time_from::text      AS rev_time_from,
               r.rev_time_to::text        AS rev_time_to,
               r.read_tafsir,
               r.absence_reason
          FROM daily_reports r
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mt ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rt ON true
         WHERE r.membership_id = $1
           AND r.report_date = $2::date
           AND r.deleted_at IS NULL
