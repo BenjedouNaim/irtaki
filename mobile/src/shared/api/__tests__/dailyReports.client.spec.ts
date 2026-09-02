@@ -1,5 +1,7 @@
 import {
   getTodayReportStatus,
+  listOwnDailyReports,
+  ListOwnDailyReportsResponse,
   submitDailyReport,
   SubmitDailyReportPayload,
   TodayReportStatusDto,
@@ -121,6 +123,64 @@ describe('dailyReports.client', () => {
 
       await expect(submitDailyReport(payload)).rejects.toBe(error);
       expect(error.existingReport).toEqual(mockStatus.existing_report);
+    });
+  });
+
+  describe('listOwnDailyReports (API-031)', () => {
+    const page: ListOwnDailyReportsResponse = {
+      data: [mockStatus.existing_report!],
+      pagination: { next_cursor: 'eyJpZCI6IjEifQ==', has_more: true },
+    };
+
+    it('should GET /daily-reports with only limit on the first page and return the whole { data, pagination } envelope (APIS §9.1/§9.2)', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      const result = await listOwnDailyReports({ limit: 20 });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/daily-reports', {
+        params: { limit: 20 },
+      });
+      expect(result).toEqual(page);
+      expect(result.pagination.has_more).toBe(true);
+    });
+
+    it('should send the opaque cursor and the from/to filters when given', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      await listOwnDailyReports({
+        cursor: 'eyJpZCI6IjEifQ==',
+        from: '2026-08-01',
+        to: '2026-08-31',
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/daily-reports', {
+        params: {
+          from: '2026-08-01',
+          to: '2026-08-31',
+          cursor: 'eyJpZCI6IjEifQ==',
+        },
+      });
+    });
+
+    it('should send no params at all by default', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      await listOwnDailyReports();
+
+      expect(apiClient.get).toHaveBeenCalledWith('/daily-reports', {
+        params: {},
+      });
+    });
+
+    it('should propagate apiClient errors unchanged', async () => {
+      const error = new ApiError({
+        statusCode: 403,
+        error: 'SCOPE_DENIED',
+        message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+      });
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(listOwnDailyReports()).rejects.toBe(error);
     });
   });
 });

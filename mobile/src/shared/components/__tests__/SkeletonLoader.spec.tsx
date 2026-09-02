@@ -43,4 +43,20 @@ describe('SkeletonLoader', () => {
     expect(screen.getByTestId('skeleton-card-button')).toBeTruthy();
     expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
   });
+
+  it('renders reportRow variant as N history rows with two text lines and a type pill (UF §22)', async () => {
+    await render(
+      <SkeletonLoader
+        variant="reportRow"
+        count={3}
+        testID="history-skeleton"
+      />,
+    );
+
+    expect(screen.getByTestId('history-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-report-row-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-report-row-2')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-report-row-3')).toBeNull();
+    expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
+  });
 });
