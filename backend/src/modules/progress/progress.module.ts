@@ -15,6 +15,7 @@ import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get
 import { UpdateCoverageUseCase } from './application/update-coverage/update-coverage.use-case';
 import { GetOwnProgressUseCase } from './application/get-own-progress/get-own-progress.use-case';
 import { GetMembershipProgressUseCase } from './application/get-membership-progress/get-membership-progress.use-case';
+import { MembershipProgressScopeGuard } from './presentation/guards/membership-progress-scope.guard';
 import { QuranController } from './presentation/quran.controller';
 import { ProgressController } from './presentation/progress.controller';
 
@@ -50,6 +51,7 @@ import { ProgressController } from './presentation/progress.controller';
     UpdateCoverageUseCase,
     GetOwnProgressUseCase,
     GetMembershipProgressUseCase,
+    MembershipProgressScopeGuard,
   ],
   exports: [
     COVERAGE_REPOSITORY,

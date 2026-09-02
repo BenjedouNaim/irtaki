@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Req } from '@nestjs/common';
+import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
+import { MembershipProgressScopeGuard } from './guards/membership-progress-scope.guard';
 import { GetMembershipProgressUseCase } from '../application/get-membership-progress/get-membership-progress.use-case';
 import { GetMembershipProgressResponseDto } from '../application/get-membership-progress/get-membership-progress-response.dto';
 import { GetOwnProgressUseCase } from '../application/get-own-progress/get-own-progress.use-case';
@@ -40,17 +41,14 @@ export class ProgressController {
   /**
    * API-042 `GET /memberships/{id}/progress` — Teacher (assigned group) and
    * Admin (all). Assistant is deliberately absent from @Roles() (DEC-B09).
+   * Scope is verified upstream by MembershipProgressScopeGuard (TS §15.2).
    */
   @Roles(UserRole.Admin, UserRole.Teacher)
+  @UseGuards(MembershipProgressScopeGuard)
   @Get('memberships/:id/progress')
   async forMembership(
-    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<GetMembershipProgressResponseDto> {
-    return this.getMembershipProgressUseCase.execute(
-      req.user.id,
-      req.user.role as UserRole,
-      id,
-    );
+    return this.getMembershipProgressUseCase.execute(id);
   }
 }

@@ -59,18 +59,6 @@ export interface ICoverageRepository {
    */
   findActiveByUserId(userId: string): Promise<CoverageRecord | null>;
 
-  /**
-   * Staff-scope read (API-042): the live coverage of a membership, resolved
-   * by one indexed lookup joined on `memberships`/`groups` with the caller's
-   * scope in the predicate (TS §15.2, SA §14 — `g.teacher_id = :caller`,
-   * bypassed for Admin per DEC-C07). Null for out-of-scope, non-existent and
-   * non-live coverage alike: the caller cannot tell them apart (NFR-20).
-   */
-  findByMembershipIdForStaff(
-    membershipId: string,
-    scope: { callerId: string; isAdmin: boolean },
-  ): Promise<CoverageRecord | null>;
-
   /** Persists one DS-05 merge result inside the caller's transaction. */
   applyMerge(
     coverageId: string,

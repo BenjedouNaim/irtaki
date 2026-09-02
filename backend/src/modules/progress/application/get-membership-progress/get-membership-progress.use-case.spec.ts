@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-import { ForbiddenException } from '@nestjs/common';
-import { UserRole } from '../../../identity/domain/user-role.enum';
+import { NotFoundException } from '@nestjs/common';
 import {
   CoverageRecord,
   ICoverageRepository,
@@ -17,8 +16,6 @@ describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
   let surahRepository: jest.Mocked<ISurahRepository>;
 
   const membershipId = '01912f4e-6c1a-7b3c-9d5e-1f2a3b4c5d6e';
-  const teacherId = 'teacher-1';
-  const adminId = 'admin-1';
 
   const surahs: SurahRecord[] = [
     { number: 1, nameAr: 'أ', ayahCount: 100, ordinalOffset: 0 },
@@ -30,6 +27,7 @@ describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
     membershipId,
     ahzabCompleted: 4,
     lastMemorizedOrdinal: 250,
+    updatedAt: new Date(),
     intervals: [{ startOrdinal: 1, endOrdinal: 500 }],
   };
 
@@ -47,7 +45,6 @@ describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
-      findByMembershipIdForStaff: jest.fn(),
       applyMerge: jest.fn(),
     };
     surahRepository = { findAll: jest.fn().mockResolvedValue(surahs) };
@@ -58,90 +55,23 @@ describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
     );
   });
 
-  describe('Teacher', () => {
-    it('returns the student coverage resolved with the Teacher scope in the query', async () => {
-      coverageRepository.findByMembershipIdForStaff.mockResolvedValue(coverage);
+  it('returns the student progress envelope when coverage exists', async () => {
+    coverageRepository.findByMembershipId.mockResolvedValue(coverage);
 
-      const result = await useCase.execute(
-        teacherId,
-        UserRole.Teacher,
-        membershipId,
-      );
+    const result = await useCase.execute(membershipId);
 
-      expect(
-        coverageRepository.findByMembershipIdForStaff,
-      ).toHaveBeenCalledWith(membershipId, {
-        callerId: teacherId,
-        isAdmin: false,
-      });
-      expect(result).toEqual(expectedPayload);
-    });
-
-    it('throws the uniform 403 when the scoped lookup returns nothing (out of scope, non-existent or terminated — NFR-20)', async () => {
-      coverageRepository.findByMembershipIdForStaff.mockResolvedValue(null);
-
-      await expect(
-        useCase.execute(teacherId, UserRole.Teacher, membershipId),
-      ).rejects.toThrow(ForbiddenException);
-      expect(surahRepository.findAll).not.toHaveBeenCalled();
-    });
-
-    it('throws 403 for a malformed id without hitting the database', async () => {
-      await expect(
-        useCase.execute(teacherId, UserRole.Teacher, 'not-a-uuid'),
-      ).rejects.toThrow(ForbiddenException);
-      expect(
-        coverageRepository.findByMembershipIdForStaff,
-      ).not.toHaveBeenCalled();
-    });
+    expect(coverageRepository.findByMembershipId).toHaveBeenCalledWith(
+      membershipId,
+    );
+    expect(result).toEqual(expectedPayload);
   });
 
-  describe('Admin', () => {
-    it('returns any student coverage with the scope predicate bypassed (DEC-C07)', async () => {
-      coverageRepository.findByMembershipIdForStaff.mockResolvedValue(coverage);
+  it('throws 404 NOT_FOUND when the membership or live coverage does not exist', async () => {
+    coverageRepository.findByMembershipId.mockResolvedValue(null);
 
-      const result = await useCase.execute(
-        adminId,
-        UserRole.Admin,
-        membershipId,
-      );
-
-      expect(
-        coverageRepository.findByMembershipIdForStaff,
-      ).toHaveBeenCalledWith(membershipId, {
-        callerId: adminId,
-        isAdmin: true,
-      });
-      expect(result).toEqual(expectedPayload);
-    });
-
-    it('throws the same 403 as a Teacher for a non-existent or terminated membership (SA §14)', async () => {
-      coverageRepository.findByMembershipIdForStaff.mockResolvedValue(null);
-
-      await expect(
-        useCase.execute(adminId, UserRole.Admin, membershipId),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('throws the same 403 for a malformed id', async () => {
-      await expect(
-        useCase.execute(adminId, UserRole.Admin, 'not-a-uuid'),
-      ).rejects.toThrow(ForbiddenException);
-      expect(
-        coverageRepository.findByMembershipIdForStaff,
-      ).not.toHaveBeenCalled();
-    });
+    await expect(useCase.execute(membershipId)).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(surahRepository.findAll).not.toHaveBeenCalled();
   });
-
-  it.each([UserRole.Assistant, UserRole.Student, UserRole.User])(
-    'throws 403 for the %s role without any lookup',
-    async (role) => {
-      await expect(
-        useCase.execute('someone', role, membershipId),
-      ).rejects.toThrow(ForbiddenException);
-      expect(
-        coverageRepository.findByMembershipIdForStaff,
-      ).not.toHaveBeenCalled();
-    },
-  );
 });

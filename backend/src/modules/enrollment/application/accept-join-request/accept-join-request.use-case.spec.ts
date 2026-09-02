@@ -84,7 +84,6 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
-      findByMembershipIdForStaff: jest.fn(),
       applyMerge: jest.fn(),
     };
 
