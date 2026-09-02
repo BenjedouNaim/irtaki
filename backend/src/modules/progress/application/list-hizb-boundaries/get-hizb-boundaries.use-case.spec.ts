@@ -12,6 +12,8 @@ describe('GetHizbBoundariesUseCase', () => {
   const mockBoundaries: HizbBoundaryRecord[] = [
     {
       hizbNumber: 1,
+      startOrdinal: 1,
+      endOrdinal: 81,
       startSurah: 1,
       startAyah: 1,
       endSurah: 2,
@@ -19,6 +21,8 @@ describe('GetHizbBoundariesUseCase', () => {
     },
     {
       hizbNumber: 2,
+      startOrdinal: 82,
+      endOrdinal: 147,
       startSurah: 2,
       startAyah: 75,
       endSurah: 2,
@@ -26,6 +30,8 @@ describe('GetHizbBoundariesUseCase', () => {
     },
     {
       hizbNumber: 60,
+      startOrdinal: 5644,
+      endOrdinal: 6214,
       startSurah: 87,
       startAyah: 1,
       endSurah: 114,

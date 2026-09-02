@@ -2,6 +2,8 @@ export const HIZB_BOUNDARY_REPOSITORY = Symbol('HIZB_BOUNDARY_REPOSITORY');
 
 export interface HizbBoundaryRecord {
   hizbNumber: number;
+  startOrdinal: number;
+  endOrdinal: number;
   startSurah: number;
   startAyah: number;
   endSurah: number;

@@ -12,6 +12,8 @@ import { ListSurahsUseCase } from './application/list-surahs/list-surahs.use-cas
 import { HIZB_BOUNDARY_REPOSITORY } from './domain/hizb-boundary.repository.interface';
 import { HizbBoundaryRepository } from './infrastructure/hizb-boundary.repository';
 import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get-hizb-boundaries.use-case';
+import { UpdateCoverageUseCase } from './application/update-coverage/update-coverage.use-case';
+import { DailyReportSubmittedListener } from './application/update-coverage/daily-report-submitted.listener';
 import { QuranController } from './presentation/quran.controller';
 
 @Module({
@@ -42,6 +44,9 @@ import { QuranController } from './presentation/quran.controller';
     },
     HizbBoundaryRepository,
     GetHizbBoundariesUseCase,
+    // F-PRG-01: DS-05 wiring — DE-05 subscriber (dormant until EPIC-05 emits)
+    UpdateCoverageUseCase,
+    DailyReportSubmittedListener,
   ],
   exports: [
     COVERAGE_REPOSITORY,
