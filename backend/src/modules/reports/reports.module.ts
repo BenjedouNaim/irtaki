@@ -6,6 +6,7 @@ import { DailyReportRepository } from './infrastructure/daily-report.repository'
 import { ProgressModule } from '../progress/progress.module';
 import { GetTodayReportStatusUseCase } from './application/get-today-report-status/get-today-report-status.use-case';
 import { SubmitDailyReportUseCase } from './application/submit-daily-report/submit-daily-report.use-case';
+import { ListOwnDailyReportsUseCase } from './application/list-own-daily-reports/list-own-daily-reports.use-case';
 import { DailyReportsController } from './presentation/daily-reports.controller';
 
 /**
@@ -30,6 +31,7 @@ import { DailyReportsController } from './presentation/daily-reports.controller'
     DailyReportRepository,
     GetTodayReportStatusUseCase,
     SubmitDailyReportUseCase,
+    ListOwnDailyReportsUseCase,
   ],
   exports: [DAILY_REPORT_REPOSITORY, DailyReportRepository],
 })
