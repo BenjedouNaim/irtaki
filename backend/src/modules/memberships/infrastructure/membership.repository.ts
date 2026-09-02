@@ -4,6 +4,7 @@ import { EntityManager, Repository } from 'typeorm';
 import {
   CreateMembershipRecordProps,
   IMembershipRepository,
+  MembershipScopeRecord,
   OwnActiveMembershipRecord,
   RosterRow,
 } from '../domain/membership.repository.interface';
@@ -171,6 +172,37 @@ export class MembershipRepository implements IMembershipRepository {
     return {
       id: domain.id,
       startedAt: domain.startedAt,
+    };
+  }
+
+  async findScopeById(
+    membershipId: string,
+  ): Promise<MembershipScopeRecord | null> {
+    const row = await this.membershipRepo
+      .createQueryBuilder('m')
+      .where('m.id = :id', { id: membershipId })
+      .select([
+        'm.id AS membership_id',
+        'm.group_id AS group_id',
+        'm.user_id AS user_id',
+        'm.state AS state',
+      ])
+      .getRawOne<{
+        membership_id: string;
+        group_id: string;
+        user_id: string;
+        state: 'Active' | 'Terminated';
+      }>();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.membership_id,
+      groupId: row.group_id,
+      userId: row.user_id,
+      state: row.state,
     };
   }
 

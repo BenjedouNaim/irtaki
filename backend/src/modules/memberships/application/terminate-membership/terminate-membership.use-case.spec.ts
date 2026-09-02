@@ -33,6 +33,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
       findStateAndUserById: jest.fn(),
       terminateConditionally: jest.fn(),
       softDeleteMembershipRecords: jest.fn(),
+      findScopeById: jest.fn(),
     };
 
     mockUserRepo = {
