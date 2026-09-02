@@ -10,11 +10,14 @@ import { MemorizationCoverageTypeOrmEntity } from './memorization-coverage.typeo
 import { CoverageIntervalTypeOrmEntity } from './coverage-interval.typeorm-entity';
 import { HizbBoundaryTypeOrmEntity } from './hizb-boundary.typeorm-entity';
 
+import { CoverageConcurrencyConflictError } from '../domain/coverage.errors';
+
 interface RawCoverageRow {
   id: string;
   membership_id: string;
   ahzab_completed: number | string;
   last_memorized_ordinal: number | string | null;
+  updated_at: string | Date;
 }
 
 interface RawIntervalRow {
@@ -64,7 +67,7 @@ export class CoverageRepository implements ICoverageRepository {
     manager: EntityManager,
   ): Promise<CoverageRecord | null> {
     const rows = await manager.query<RawCoverageRow[]>(
-      `SELECT id, membership_id, ahzab_completed, last_memorized_ordinal
+      `SELECT id, membership_id, ahzab_completed, last_memorized_ordinal, updated_at::text AS updated_at
          FROM memorization_coverage
         WHERE membership_id = $1 AND deleted_at IS NULL`,
       [membershipId],
@@ -82,6 +85,36 @@ export class CoverageRepository implements ICoverageRepository {
     params: ApplyCoverageMergeParams,
     manager: EntityManager,
   ): Promise<void> {
+    // Optimistic concurrency serialization (TS §20 constraint-based style):
+    // verify updated_at matches our read before applying changes.
+    // Compares with microsecond precision or millisecond truncation fallback.
+    const updateResult = await manager.query<Array<{ id: string }>>(
+      `UPDATE memorization_coverage
+          SET ahzab_completed = $2,
+              last_memorized_ordinal = $3,
+              updated_at = now()
+        WHERE id = $1
+          AND (
+            updated_at = $4::timestamptz
+            OR date_trunc('milliseconds', updated_at) = date_trunc('milliseconds', $4::timestamptz)
+          )
+        RETURNING id`,
+      [
+        coverageId,
+        params.ahzabCompleted,
+        params.lastMemorizedOrdinal,
+        typeof params.expectedUpdatedAt === 'string'
+          ? params.expectedUpdatedAt
+          : params.expectedUpdatedAt.toISOString(),
+      ],
+    );
+
+    if (!updateResult || updateResult.length === 0) {
+      throw new CoverageConcurrencyConflictError(
+        'Concurrent update detected on memorization_coverage',
+      );
+    }
+
     // Every interval absorbed by the merge lies inside `merged`, and no
     // surviving interval can (they are disjoint and non-adjacent to it), so a
     // bounded delete + one insert reproduces (coverage − candidates) ∪ {merged}.
@@ -102,15 +135,6 @@ export class CoverageRepository implements ICoverageRepository {
         params.merged.startOrdinal,
         params.merged.endOrdinal,
       ],
-    );
-
-    await manager.query(
-      `UPDATE memorization_coverage
-          SET ahzab_completed = $2,
-              last_memorized_ordinal = $3,
-              updated_at = now()
-        WHERE id = $1`,
-      [coverageId, params.ahzabCompleted, params.lastMemorizedOrdinal],
     );
   }
 
@@ -134,6 +158,7 @@ export class CoverageRepository implements ICoverageRepository {
         row.last_memorized_ordinal == null
           ? null
           : Number(row.last_memorized_ordinal),
+      updatedAt: new Date(row.updated_at),
       intervals: intervalRows.map((i) => ({
         startOrdinal: Number(i.start_ordinal),
         endOrdinal: Number(i.end_ordinal),

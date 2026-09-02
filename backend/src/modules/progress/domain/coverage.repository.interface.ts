@@ -14,6 +14,7 @@ export interface CoverageRecord {
   membershipId: string;
   ahzabCompleted: number;
   lastMemorizedOrdinal: number | null;
+  updatedAt: Date;
   /** Ascending by startOrdinal; disjoint and non-adjacent (VO-07). */
   intervals: CoverageIntervalRecord[];
 }
@@ -27,6 +28,7 @@ export interface ApplyCoverageMergeParams {
   merged: CoverageIntervalRecord;
   ahzabCompleted: number;
   lastMemorizedOrdinal: number;
+  expectedUpdatedAt: Date;
 }
 
 export interface ICoverageRepository {

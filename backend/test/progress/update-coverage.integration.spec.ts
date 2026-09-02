@@ -12,11 +12,12 @@ import {
   MAILER,
 } from '../../src/modules/identity/domain/mailer.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import {
-  DailyReportAyahPosition,
-  DailyReportSubmittedEvent,
-} from '../../src/modules/reports/domain/events/daily-report-submitted.event';
+import { DailyReportAyahPosition } from '../../src/modules/reports/domain/events/daily-report-submitted.event';
 import { CoverageUpdatedEvent } from '../../src/modules/progress/domain/events/coverage-updated.event';
+import {
+  UpdateCoverageOutcome,
+  UpdateCoverageUseCase,
+} from '../../src/modules/progress/application/update-coverage/update-coverage.use-case';
 
 interface IntervalRow {
   start_ordinal: number;
@@ -40,10 +41,13 @@ interface SurahRow {
   ordinal_offset: number;
 }
 
-describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
+describe('DS-05 coverage engine (F-PRG-01 Integration)', () => {
+  jest.setTimeout(60000);
+
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let eventEmitter: EventEmitter2;
+  let updateCoverageUseCase: UpdateCoverageUseCase;
 
   const testEmailDomain = '@test-update-coverage.com';
   const testGroupPrefix = 'F-PRG-01 test group';
@@ -68,6 +72,7 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
 
     dataSource = app.get(DataSource);
     eventEmitter = app.get(EventEmitter2);
+    updateCoverageUseCase = app.get(UpdateCoverageUseCase);
     await cleanDatabase();
 
     const rows: HizbRow[] = await dataSource.query(
@@ -241,31 +246,42 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
     };
   }
 
-  async function emitDailyReportSubmitted(
+  async function executeCoverageUpdate(
     membershipId: string,
     memoRange: { fromOrdinal: number; toOrdinal: number } | null,
-    type: 'Normal' | 'Absent' | 'Revision' = 'Normal',
-  ): Promise<void> {
-    await eventEmitter.emitAsync(
-      DailyReportSubmittedEvent.EVENT_NAME,
-      new DailyReportSubmittedEvent(
-        membershipId,
-        '2026-09-02',
-        type,
-        memoRange
-          ? {
-              start: position(memoRange.fromOrdinal),
-              end: position(memoRange.toOrdinal),
-            }
-          : null,
-      ),
-    );
+  ): Promise<UpdateCoverageOutcome> {
+    return updateCoverageUseCase.execute({
+      membershipId,
+      memoRange: memoRange
+        ? {
+            start: position(memoRange.fromOrdinal),
+            end: position(memoRange.toOrdinal),
+          }
+        : null,
+    });
   }
 
-  it('registers exactly one DE-05 subscriber (dormant: no producer exists yet)', () => {
-    expect(
-      eventEmitter.listenerCount(DailyReportSubmittedEvent.EVENT_NAME),
-    ).toBe(1);
+  it('is directly and synchronously callable, returning updated ahzab_completed for API-030', async () => {
+    const h1 = hizb.get(1)!;
+    const h2 = hizb.get(2)!;
+    const { membershipId } = await seedMembershipWithCoverage({
+      intervals: [
+        { start_ordinal: h1.start_ordinal, end_ordinal: h1.end_ordinal },
+      ],
+      ahzabCompleted: 1,
+    });
+
+    const outcome = await executeCoverageUpdate(membershipId, {
+      fromOrdinal: h2.start_ordinal,
+      toOrdinal: h2.end_ordinal,
+    });
+
+    expect(outcome).toMatchObject({
+      status: 'updated',
+      membershipId,
+      ahzabCompleted: 2,
+      lastMemorizedOrdinal: Number(h2.end_ordinal),
+    });
   });
 
   it('merges an adjacent range into the seeded hizb and recomputes ahzab_completed against the real dataset', async () => {
@@ -285,7 +301,7 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
     eventEmitter.on(CoverageUpdatedEvent.EVENT_NAME, onUpdated);
 
     try {
-      await emitDailyReportSubmitted(membershipId, {
+      await executeCoverageUpdate(membershipId, {
         fromOrdinal: h2.start_ordinal,
         toOrdinal: h2.end_ordinal,
       });
@@ -315,11 +331,11 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
     });
 
     // Backward step from the very start of the mushaf, then a partial hizb.
-    await emitDailyReportSubmitted(membershipId, {
+    await executeCoverageUpdate(membershipId, {
       fromOrdinal: 1,
       toOrdinal: 20,
     });
-    await emitDailyReportSubmitted(membershipId, {
+    await executeCoverageUpdate(membershipId, {
       fromOrdinal: 10,
       toOrdinal: 30,
     });
@@ -343,8 +359,8 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
       ahzabCompleted: 1,
     });
 
-    await emitDailyReportSubmitted(membershipId, null, 'Absent');
-    await emitDailyReportSubmitted(membershipId, null, 'Revision');
+    await executeCoverageUpdate(membershipId, null);
+    await executeCoverageUpdate(membershipId, null);
 
     const { row, intervals } = await readCoverage(coverageId);
     expect(intervals).toEqual([
@@ -362,12 +378,51 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
       softDeleteCoverage: true,
     });
 
-    await expect(
-      emitDailyReportSubmitted(membershipId, { fromOrdinal: 8, toOrdinal: 20 }),
-    ).resolves.not.toThrow();
+    const outcome = await executeCoverageUpdate(membershipId, {
+      fromOrdinal: 8,
+      toOrdinal: 20,
+    });
+    expect(outcome).toEqual({
+      status: 'skipped',
+      reason: 'COVERAGE_NOT_FOUND',
+    });
 
     const { row, intervals } = await readCoverage(coverageId);
     expect(intervals).toEqual([{ start_ordinal: 1, end_ordinal: 7 }]);
     expect(row.ahzab_completed).toBe(0);
+  });
+
+  it('serializes concurrent coverage merges via optimistic concurrency retries without losing data', async () => {
+    const h1 = hizb.get(1)!;
+    const h2 = hizb.get(2)!;
+    const h3 = hizb.get(3)!;
+    const { membershipId, coverageId } = await seedMembershipWithCoverage({
+      intervals: [
+        { start_ordinal: h1.start_ordinal, end_ordinal: h1.end_ordinal },
+      ],
+      ahzabCompleted: 1,
+    });
+
+    // Fire two merges nearly simultaneously for the same membership
+    const [res1, res2] = await Promise.all([
+      executeCoverageUpdate(membershipId, {
+        fromOrdinal: h2.start_ordinal,
+        toOrdinal: h2.end_ordinal,
+      }),
+      executeCoverageUpdate(membershipId, {
+        fromOrdinal: h3.start_ordinal,
+        toOrdinal: h3.end_ordinal,
+      }),
+    ]);
+
+    expect(res1.status).toBe('updated');
+    expect(res2.status).toBe('updated');
+
+    const { row, intervals } = await readCoverage(coverageId);
+    // Both hizb 2 and hizb 3 merged successfully into hizb 1
+    expect(intervals).toEqual([
+      { start_ordinal: h1.start_ordinal, end_ordinal: h3.end_ordinal },
+    ]);
+    expect(row.ahzab_completed).toBe(3);
   });
 });

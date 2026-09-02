@@ -11,7 +11,10 @@ import {
   CoverageRecord,
   ICoverageRepository,
 } from '../../domain/coverage.repository.interface';
-import { InvalidCoverageIntervalError } from '../../domain/coverage.errors';
+import {
+  CoverageConcurrencyConflictError,
+  InvalidCoverageIntervalError,
+} from '../../domain/coverage.errors';
 import { CoverageUpdatedEvent } from '../../domain/events/coverage-updated.event';
 import {
   HizbBoundaryRecord,
@@ -68,11 +71,14 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
     },
   ];
 
+  const testUpdatedAt = new Date('2026-09-01T12:00:00Z');
+
   const seededRecord: CoverageRecord = {
     id: 'coverage-1',
     membershipId,
     ahzabCompleted: 1,
     lastMemorizedOrdinal: null,
+    updatedAt: testUpdatedAt,
     intervals: [{ startOrdinal: 1, endOrdinal: 100 }],
   };
 
@@ -144,6 +150,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
         merged: { startOrdinal: 1, endOrdinal: 200 },
         ahzabCompleted: 2,
         lastMemorizedOrdinal: 200,
+        expectedUpdatedAt: testUpdatedAt,
       },
       manager,
     );
@@ -160,6 +167,36 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
     );
   });
 
+  it('supports direct invocation inside an external manager without opening a second transaction', async () => {
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
+    const customManager = {} as EntityManager;
+
+    const outcome = await useCase.execute(
+      {
+        membershipId,
+        memoRange: {
+          start: { surah: 2, ayah: 1 },
+          end: { surah: 2, ayah: 100 },
+        },
+      },
+      customManager,
+    );
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(coverageRepository.findByMembershipId).toHaveBeenCalledWith(
+      membershipId,
+      customManager,
+    );
+    expect(coverageRepository.applyMerge).toHaveBeenCalledWith(
+      'coverage-1',
+      expect.objectContaining({
+        expectedUpdatedAt: testUpdatedAt,
+      }),
+      customManager,
+    );
+    expect(outcome.status).toBe('updated');
+  });
+
   it('never shrinks coverage: a re-memorised sub-range keeps the existing block (INV-18)', async () => {
     coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
 
@@ -173,6 +210,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
         merged: { startOrdinal: 1, endOrdinal: 100 },
         ahzabCompleted: 1,
         lastMemorizedOrdinal: 20,
+        expectedUpdatedAt: testUpdatedAt,
       },
       manager,
     );
@@ -226,5 +264,19 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
     );
 
     expect(outcome).toMatchObject({ status: 'updated', ahzabCompleted: 1 });
+  });
+
+  it('retries when CoverageConcurrencyConflictError is encountered on optimistic concurrency mismatch', async () => {
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
+    coverageRepository.applyMerge
+      .mockRejectedValueOnce(new CoverageConcurrencyConflictError('conflict'))
+      .mockResolvedValueOnce(undefined);
+
+    const outcome = await useCase.execute(
+      event({ fromOrdinal: 101, toOrdinal: 200 }),
+    );
+
+    expect(outcome.status).toBe('updated');
+    expect(coverageRepository.applyMerge).toHaveBeenCalledTimes(2);
   });
 });

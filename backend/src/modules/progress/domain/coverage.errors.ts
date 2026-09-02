@@ -22,3 +22,16 @@ export class CoverageShrinkError extends Error {
     this.name = 'CoverageShrinkError';
   }
 }
+
+/**
+ * Raised if a concurrent modification was made to memorization_coverage
+ * between the read and write phases (optimistic concurrency conflict).
+ */
+export class CoverageConcurrencyConflictError extends Error {
+  constructor(
+    message = 'Concurrent modification detected on memorization coverage',
+  ) {
+    super(message);
+    this.name = 'CoverageConcurrencyConflictError';
+  }
+}

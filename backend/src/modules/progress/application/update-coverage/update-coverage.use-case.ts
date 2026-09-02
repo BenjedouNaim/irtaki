@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
-import { DailyReportSubmittedEvent } from '../../../reports/domain/events/daily-report-submitted.event';
+import { DataSource, EntityManager } from 'typeorm';
 import { AyahRange } from '../../domain/ayah-range';
+import { CoverageConcurrencyConflictError } from '../../domain/coverage.errors';
 import {
   COVERAGE_REPOSITORY,
   type ICoverageRepository,
@@ -19,6 +19,19 @@ import {
 } from '../../domain/surah.repository.interface';
 import { toCoverageSet } from '../coverage-set.mapper';
 
+export interface UpdateCoverageAyahCoordinate {
+  surah: number;
+  ayah: number;
+}
+
+export interface UpdateCoverageCommand {
+  membershipId: string;
+  memoRange?: {
+    start: UpdateCoverageAyahCoordinate;
+    end: UpdateCoverageAyahCoordinate;
+  } | null;
+}
+
 export type UpdateCoverageOutcome =
   | { status: 'skipped'; reason: 'NO_MEMO_RANGE' | 'COVERAGE_NOT_FOUND' }
   | {
@@ -30,11 +43,12 @@ export type UpdateCoverageOutcome =
     };
 
 /**
- * Internal-only use case (TS §11: Progress "reacts to DE-05"). Applies DS-05
- * to one submitted memorisation range in its own transaction, deliberately
- * separate from the report insert (TS §19, ADR-026/029).
+ * Service use case applying DS-05 to one submitted memorisation range.
+ * Directly, synchronously callable by SubmitDailyReportUseCase (EPIC-05)
+ * so post-submission ahzab_completed is returned in the API-030 201 response.
  *
- * No API endpoint of its own (F-PRG-01).
+ * Supports execution inside an external transaction (via optional EntityManager)
+ * or in its own transaction with optimistic concurrency retry (TS §20).
  */
 @Injectable()
 export class UpdateCoverageUseCase {
@@ -52,19 +66,21 @@ export class UpdateCoverageUseCase {
   ) {}
 
   async execute(
-    event: DailyReportSubmittedEvent,
+    command: UpdateCoverageCommand,
+    manager?: EntityManager,
   ): Promise<UpdateCoverageOutcome> {
-    // DE-05 → DS-05 only "if a memo range is present" (DMS §17).
-    if (!event.memoRange) {
+    // DS-05 only "if a memo range is present" (DMS §17).
+    if (!command.memoRange) {
       return { status: 'skipped', reason: 'NO_MEMO_RANGE' };
     }
 
     const surahs = await this.surahRepository.findAll();
 
     // VO-02: the one place BR-52 and the ordinal derivation are enforced.
+    // Validated before starting the transaction.
     const range = AyahRange.fromSurahAyah(
-      event.memoRange.start,
-      event.memoRange.end,
+      command.memoRange.start,
+      command.memoRange.end,
       surahs,
     );
 
@@ -72,55 +88,92 @@ export class UpdateCoverageUseCase {
       AyahRange.fromOrdinals(h.startOrdinal, h.endOrdinal, surahs),
     );
 
-    const merge = await this.dataSource.transaction(async (manager) => {
-      const record = await this.coverageRepository.findByMembershipId(
-        event.membershipId,
-        manager,
-      );
-      if (!record) {
-        return null;
-      }
-
-      const current = toCoverageSet(record.intervals, surahs);
-      const result = MemorizationProgressEngine.merge(
-        current,
+    if (manager) {
+      return this.executeWithManager(
+        command,
         range,
         hizbRanges,
-      );
-
-      await this.coverageRepository.applyMerge(
-        record.id,
-        {
-          merged: {
-            startOrdinal: result.merged.startOrdinal,
-            endOrdinal: result.merged.endOrdinal,
-          },
-          ahzabCompleted: result.ahzabCompleted,
-          lastMemorizedOrdinal: result.lastMemorizedOrdinal,
-        },
+        surahs,
         manager,
       );
+    }
 
-      return result;
-    });
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.dataSource.transaction(async (txManager) => {
+          return this.executeWithManager(
+            command,
+            range,
+            hizbRanges,
+            surahs,
+            txManager,
+          );
+        });
+      } catch (err) {
+        if (
+          err instanceof CoverageConcurrencyConflictError &&
+          attempt < MAX_RETRIES
+        ) {
+          this.logger.warn(
+            `Concurrent coverage update detected for membership ${command.membershipId}, retrying (attempt ${attempt}/${MAX_RETRIES})`,
+          );
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    if (!merge) {
+    throw new CoverageConcurrencyConflictError(
+      `Failed to update coverage for membership ${command.membershipId} after ${MAX_RETRIES} attempts due to concurrent updates`,
+    );
+  }
+
+  private async executeWithManager(
+    command: UpdateCoverageCommand,
+    range: AyahRange,
+    hizbRanges: readonly AyahRange[],
+    surahs: readonly import('../../domain/ayah-position').SurahOrdinalInfo[],
+    manager: EntityManager,
+  ): Promise<UpdateCoverageOutcome> {
+    const record = await this.coverageRepository.findByMembershipId(
+      command.membershipId,
+      manager,
+    );
+    if (!record) {
       // INV-17 says a live membership always has coverage; a terminated one
       // has it soft-deleted. Nothing to update either way.
       this.logger.warn(
-        `DE-05 received for membership ${event.membershipId} with no live coverage row`,
+        `Coverage update requested for membership ${command.membershipId} with no live coverage row`,
       );
       return { status: 'skipped', reason: 'COVERAGE_NOT_FOUND' };
     }
+
+    const current = toCoverageSet(record.intervals, surahs);
+    const result = MemorizationProgressEngine.merge(current, range, hizbRanges);
+
+    await this.coverageRepository.applyMerge(
+      record.id,
+      {
+        merged: {
+          startOrdinal: result.merged.startOrdinal,
+          endOrdinal: result.merged.endOrdinal,
+        },
+        ahzabCompleted: result.ahzabCompleted,
+        lastMemorizedOrdinal: result.lastMemorizedOrdinal,
+        expectedUpdatedAt: record.updatedAt,
+      },
+      manager,
+    );
 
     // DE-06 CoverageUpdated — post-commit, fire-and-forget (ADR-026/032).
     try {
       this.eventEmitter.emit(
         CoverageUpdatedEvent.EVENT_NAME,
         new CoverageUpdatedEvent(
-          event.membershipId,
-          merge.coverage.intervals,
-          merge.ahzabCompleted,
+          command.membershipId,
+          result.coverage.intervals,
+          result.ahzabCompleted,
         ),
       );
     } catch {
@@ -129,10 +182,10 @@ export class UpdateCoverageUseCase {
 
     return {
       status: 'updated',
-      membershipId: event.membershipId,
-      ahzabCompleted: merge.ahzabCompleted,
-      lastMemorizedOrdinal: merge.lastMemorizedOrdinal,
-      intervals: merge.coverage.intervals,
+      membershipId: command.membershipId,
+      ahzabCompleted: result.ahzabCompleted,
+      lastMemorizedOrdinal: result.lastMemorizedOrdinal,
+      intervals: result.coverage.intervals,
     };
   }
 }
