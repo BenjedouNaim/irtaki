@@ -7,6 +7,8 @@ import {
   DailyReportAyahPositionRecord,
   DailyReportPage,
   DailyReportRecord,
+  DailyReportsPageParams,
+  FindMembershipDailyReportsParams,
   FindOwnDailyReportsParams,
   IDailyReportRepository,
   TodayReportContextRecord,
@@ -92,6 +94,90 @@ function toRecord(row: RawDailyReportRow): DailyReportRecord {
   };
 }
 
+/**
+ * The projection every daily-report read shares. Each stored ordinal is
+ * reconstructed to its (surah, ayah) pair through `SURAH_POSITION_JOINS`
+ * for display only (TS §23): the surah is the one with the greatest
+ * `ordinal_offset` strictly below the ordinal and
+ * `ayah = ordinal - ordinal_offset` (SAS §17.6). Ordinals never leave the
+ * API (APIS §11). These fragments are literal SQL — no caller input is ever
+ * interpolated; every value travels as a bound parameter (TS §36).
+ */
+const DAILY_REPORT_COLUMNS = `r.id,
+              r.membership_id,
+              r.report_date::text        AS report_date,
+              r.type,
+              r.submitted_at::text       AS submitted_at,
+              r.submitted_timezone,
+              r.no_memorization_today,
+              mf.number                  AS memo_from_surah,
+              r.memo_from_ordinal - mf.ordinal_offset AS memo_from_ayah,
+              mt.number                  AS memo_to_surah,
+              r.memo_to_ordinal - mt.ordinal_offset   AS memo_to_ayah,
+              r.memo_time_from::text     AS memo_time_from,
+              r.memo_time_to::text       AS memo_time_to,
+              r.completed_50_repetitions,
+              r.repetitions_in_single_session,
+              r.no_revision_today,
+              rf.number                  AS rev_from_surah,
+              r.rev_from_ordinal - rf.ordinal_offset  AS rev_from_ayah,
+              rt.number                  AS rev_to_surah,
+              r.rev_to_ordinal - rt.ordinal_offset    AS rev_to_ayah,
+              r.rev_time_from::text      AS rev_time_from,
+              r.rev_time_to::text        AS rev_time_to,
+              r.read_tafsir,
+              r.absence_reason`;
+
+const SURAH_POSITION_JOINS = `LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mt ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rt ON true`;
+
+/**
+ * Optional `from`/`to` bounds and the keyset position, expressed as
+ * nullable parameters `$2..$5` so each history statement stays ONE literal
+ * query. `$6` is `limit + 1`. Order of {@link pageParameters} must match.
+ */
+const HISTORY_PAGE_PREDICATE = `AND ($2::date IS NULL OR r.report_date >= $2::date)
+          AND ($3::date IS NULL OR r.report_date <= $3::date)
+          AND ($4::date IS NULL
+               OR r.report_date < $4::date
+               OR (r.report_date = $4::date AND r.id < $5::uuid))`;
+
+function pageParameters(
+  params: DailyReportsPageParams,
+): [string | null, string | null, string | null, string | null, number] {
+  return [
+    params.from,
+    params.to,
+    params.cursor?.sortKey.reportDate ?? null,
+    params.cursor?.id ?? null,
+    params.limit + 1,
+  ];
+}
+
+function toPage(rows: RawDailyReportRow[], limit: number): DailyReportPage {
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  return { rows: page.map(toRecord), hasMore };
+}
+
 @Injectable()
 export class DailyReportRepository implements IDailyReportRepository {
   constructor(
@@ -167,57 +253,11 @@ export class DailyReportRepository implements IDailyReportRepository {
     reportDate: string,
   ): Promise<DailyReportRecord | null> {
     // Hits DB-UQ-04 (membership_id, report_date) WHERE deleted_at IS NULL.
-    // Each stored ordinal is reconstructed to its (surah, ayah) pair through a
-    // join to `surahs` for display only (TS §23): the surah is the one with the
-    // greatest `ordinal_offset` strictly below the ordinal and
-    // `ayah = ordinal - ordinal_offset` (SAS §17.6). Ordinals never leave the
-    // API (APIS §11). One literal, parameterised statement (TS §36).
+    // One literal, parameterised statement (TS §36).
     const rows = await this.dailyReportRepo.manager.query<RawDailyReportRow[]>(
-      `SELECT r.id,
-              r.membership_id,
-              r.report_date::text        AS report_date,
-              r.type,
-              r.submitted_at::text       AS submitted_at,
-              r.submitted_timezone,
-              r.no_memorization_today,
-              mf.number                  AS memo_from_surah,
-              r.memo_from_ordinal - mf.ordinal_offset AS memo_from_ayah,
-              mt.number                  AS memo_to_surah,
-              r.memo_to_ordinal - mt.ordinal_offset   AS memo_to_ayah,
-              r.memo_time_from::text     AS memo_time_from,
-              r.memo_time_to::text       AS memo_time_to,
-              r.completed_50_repetitions,
-              r.repetitions_in_single_session,
-              r.no_revision_today,
-              rf.number                  AS rev_from_surah,
-              r.rev_from_ordinal - rf.ordinal_offset  AS rev_from_ayah,
-              rt.number                  AS rev_to_surah,
-              r.rev_to_ordinal - rt.ordinal_offset    AS rev_to_ayah,
-              r.rev_time_from::text      AS rev_time_from,
-              r.rev_time_to::text        AS rev_time_to,
-              r.read_tafsir,
-              r.absence_reason
+      `SELECT ${DAILY_REPORT_COLUMNS}
          FROM daily_reports r
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.memo_from_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) mf ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.memo_to_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) mt ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.rev_from_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) rf ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.rev_to_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) rt ON true
+         ${SURAH_POSITION_JOINS}
         WHERE r.membership_id = $1
           AND r.report_date = $2::date
           AND r.deleted_at IS NULL
@@ -246,74 +286,41 @@ export class DailyReportRepository implements IDailyReportRepository {
     // findByMembershipAndDate (TS §23, APIS §11). `LIMIT limit + 1` derives
     // `hasMore` without a COUNT (APIS §9.1).
     const rows = await this.dailyReportRepo.manager.query<RawDailyReportRow[]>(
-      `SELECT r.id,
-              r.membership_id,
-              r.report_date::text        AS report_date,
-              r.type,
-              r.submitted_at::text       AS submitted_at,
-              r.submitted_timezone,
-              r.no_memorization_today,
-              mf.number                  AS memo_from_surah,
-              r.memo_from_ordinal - mf.ordinal_offset AS memo_from_ayah,
-              mt.number                  AS memo_to_surah,
-              r.memo_to_ordinal - mt.ordinal_offset   AS memo_to_ayah,
-              r.memo_time_from::text     AS memo_time_from,
-              r.memo_time_to::text       AS memo_time_to,
-              r.completed_50_repetitions,
-              r.repetitions_in_single_session,
-              r.no_revision_today,
-              rf.number                  AS rev_from_surah,
-              r.rev_from_ordinal - rf.ordinal_offset  AS rev_from_ayah,
-              rt.number                  AS rev_to_surah,
-              r.rev_to_ordinal - rt.ordinal_offset    AS rev_to_ayah,
-              r.rev_time_from::text      AS rev_time_from,
-              r.rev_time_to::text        AS rev_time_to,
-              r.read_tafsir,
-              r.absence_reason
+      `SELECT ${DAILY_REPORT_COLUMNS}
          FROM memberships m
          JOIN daily_reports r ON r.membership_id = m.id
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.memo_from_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) mf ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.memo_to_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) mt ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.rev_from_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) rf ON true
-         LEFT JOIN LATERAL (
-           SELECT s.number, s.ordinal_offset FROM surahs s
-            WHERE s.ordinal_offset < r.rev_to_ordinal
-            ORDER BY s.ordinal_offset DESC LIMIT 1
-         ) rt ON true
+         ${SURAH_POSITION_JOINS}
         WHERE m.user_id = $1
           AND m.state = 'Active'
           AND r.deleted_at IS NULL
-          AND ($2::date IS NULL OR r.report_date >= $2::date)
-          AND ($3::date IS NULL OR r.report_date <= $3::date)
-          AND ($4::date IS NULL
-               OR r.report_date < $4::date
-               OR (r.report_date = $4::date AND r.id < $5::uuid))
+          ${HISTORY_PAGE_PREDICATE}
         ORDER BY r.report_date DESC, r.id DESC
         LIMIT $6`,
-      [
-        params.userId,
-        params.from,
-        params.to,
-        params.cursor?.sortKey.reportDate ?? null,
-        params.cursor?.id ?? null,
-        params.limit + 1,
-      ],
+      [params.userId, ...pageParameters(params)],
     );
 
-    const hasMore = rows.length > params.limit;
-    const page = hasMore ? rows.slice(0, params.limit) : rows;
-    return { rows: page.map(toRecord), hasMore };
+    return toPage(rows, params.limit);
+  }
+
+  async findHistoryByMembershipId(
+    params: FindMembershipDailyReportsParams,
+  ): Promise<DailyReportPage> {
+    // API-032: the membership id already passed the route-specific
+    // ScopeGuard (TS §15.2 step 4), so the query binds to exactly that id
+    // and re-derives nothing. Same DB-IDX-01 backward range walk, same
+    // keyset cursor, same `limit + 1` page as the own history above.
+    const rows = await this.dailyReportRepo.manager.query<RawDailyReportRow[]>(
+      `SELECT ${DAILY_REPORT_COLUMNS}
+         FROM daily_reports r
+         ${SURAH_POSITION_JOINS}
+        WHERE r.membership_id = $1
+          AND r.deleted_at IS NULL
+          ${HISTORY_PAGE_PREDICATE}
+        ORDER BY r.report_date DESC, r.id DESC
+        LIMIT $6`,
+      [params.membershipId, ...pageParameters(params)],
+    );
+
+    return toPage(rows, params.limit);
   }
 }
