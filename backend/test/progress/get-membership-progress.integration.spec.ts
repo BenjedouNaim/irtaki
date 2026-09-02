@@ -275,7 +275,8 @@ describe('GET /memberships/{id}/progress (F-PRG-03 / API-042 Integration)', () =
     return {
       data: {
         ahzab_completed: 2,
-        coverage_percent: Math.round((covered / totalAyahs) * 100 * 100) / 100,
+        // SAS §17.6 formula, unrounded.
+        coverage_percent: (covered / totalAyahs) * 100,
         last_memorized_position: {
           surah: h2.end_surah,
           ayah: h2.end_ayah,
