@@ -15,8 +15,12 @@ import Animated, {
  *   a text line and a notice block) — mirrors the Progress section's layout (UF §22).
  * - `card`: a status/CTA card (badge, title, one text line, one 48dp button)
  *   — mirrors the Daily Report CTA card on Student Home (UF §22).
+ * - `reportRow`: a history row (date line + summary line on the reading
+ *   side, a type pill on the far side) — mirrors SCR-14's list rows
+ *   (UF §22 "Report history (first page): skeleton rows").
  */
-export type SkeletonVariant = 'row' | 'dashboard' | 'ring' | 'card';
+export type SkeletonVariant =
+  'row' | 'dashboard' | 'ring' | 'card' | 'reportRow';
 
 export interface SkeletonLoaderProps {
   variant?: SkeletonVariant;
@@ -146,6 +150,40 @@ export function SkeletonLoader({
   }
 
   const items = Array.from({ length: count }, (_, i) => i);
+
+  if (variant === 'reportRow') {
+    return (
+      <View
+        testID={testID}
+        className={`w-full gap-3 ${className ?? ''}`}
+        style={style}
+      >
+        {items.map((key) => (
+          <View
+            key={key}
+            testID={`skeleton-report-row-${key}`}
+            className="flex-row-reverse items-center justify-between min-h-[64px] px-4 py-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 gap-3"
+            style={{ borderCurve: 'continuous' }}
+          >
+            <View className="flex-1 gap-2 items-end">
+              <Animated.View
+                style={[animatedStyle, { borderCurve: 'continuous' }]}
+                className="w-2/5 h-4 rounded bg-gray-200 dark:bg-gray-700"
+              />
+              <Animated.View
+                style={[animatedStyle, { borderCurve: 'continuous' }]}
+                className="w-3/5 h-3 rounded bg-gray-100 dark:bg-gray-800"
+              />
+            </View>
+            <Animated.View
+              style={[animatedStyle, { borderCurve: 'continuous' }]}
+              className="w-16 h-6 rounded-full bg-gray-200 dark:bg-gray-700"
+            />
+          </View>
+        ))}
+      </View>
+    );
+  }
 
   return (
     <View

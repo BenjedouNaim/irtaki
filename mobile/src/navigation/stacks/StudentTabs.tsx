@@ -59,6 +59,14 @@ export function StudentTabs() {
           className="mb-6"
         />
 
+        {/* Progress tab → History (UF §26); SCR-14 (F-DR-05). */}
+        <Button
+          label="سجل التقارير"
+          variant="secondary"
+          onPress={() => router.push('/(app)/student/reports/history')}
+          testID="report-history-button"
+          className="mb-3 w-full"
+        />
         <Button
           label="الملف الشخصي"
           variant="outline"
