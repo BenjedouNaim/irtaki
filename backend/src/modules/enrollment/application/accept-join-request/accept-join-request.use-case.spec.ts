@@ -82,6 +82,8 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
 
     mockCoverageRepo = {
       seedFromHizbSelection: jest.fn(),
+      findByMembershipId: jest.fn(),
+      applyMerge: jest.fn(),
     };
 
     mockManager = {} as unknown as jest.Mocked<EntityManager>;

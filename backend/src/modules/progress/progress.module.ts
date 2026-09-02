@@ -12,6 +12,7 @@ import { ListSurahsUseCase } from './application/list-surahs/list-surahs.use-cas
 import { HIZB_BOUNDARY_REPOSITORY } from './domain/hizb-boundary.repository.interface';
 import { HizbBoundaryRepository } from './infrastructure/hizb-boundary.repository';
 import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get-hizb-boundaries.use-case';
+import { UpdateCoverageUseCase } from './application/update-coverage/update-coverage.use-case';
 import { QuranController } from './presentation/quran.controller';
 
 @Module({
@@ -42,6 +43,8 @@ import { QuranController } from './presentation/quran.controller';
     },
     HizbBoundaryRepository,
     GetHizbBoundariesUseCase,
+    // F-PRG-01: DS-05 coverage engine entry point (synchronously callable by SubmitDailyReportUseCase)
+    UpdateCoverageUseCase,
   ],
   exports: [
     COVERAGE_REPOSITORY,
@@ -50,6 +53,7 @@ import { QuranController } from './presentation/quran.controller';
     SurahRepository,
     HIZB_BOUNDARY_REPOSITORY,
     HizbBoundaryRepository,
+    UpdateCoverageUseCase,
   ],
 })
 export class ProgressModule {}

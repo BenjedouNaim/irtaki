@@ -21,6 +21,8 @@ export class HizbBoundaryRepository implements IHizbBoundaryRepository {
 
     return rows.map((row) => ({
       hizbNumber: row.hizbNumber,
+      startOrdinal: row.startOrdinal,
+      endOrdinal: row.endOrdinal,
       startSurah: row.startSurah,
       startAyah: row.startAyah,
       endSurah: row.endSurah,
