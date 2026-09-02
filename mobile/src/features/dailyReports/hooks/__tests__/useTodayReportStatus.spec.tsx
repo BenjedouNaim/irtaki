@@ -38,8 +38,8 @@ describe('useTodayReportStatus (F-DR-01 / API-029)', () => {
     jest.clearAllMocks();
   });
 
-  it('exposes the stable query key ["dailyReports","today"] for mutation invalidation (TS §26)', () => {
-    expect(TODAY_REPORT_STATUS_QUERY_KEY).toEqual(['dailyReports', 'today']);
+  it('exposes the stable query key ["daily-reports","today"] for mutation invalidation (TS §26)', () => {
+    expect(TODAY_REPORT_STATUS_QUERY_KEY).toEqual(['daily-reports', 'today']);
   });
 
   it('wires getTodayReportStatus as the queryFn under that key and resolves the DTO', async () => {
@@ -56,7 +56,7 @@ describe('useTodayReportStatus (F-DR-01 / API-029)', () => {
     expect(dailyReportsApi.getTodayReportStatus).toHaveBeenCalledTimes(1);
     expect(result.current.data).toEqual(mockStatus);
     expect(
-      queryClient.getQueryData(['dailyReports', 'today', 'anonymous']),
+      queryClient.getQueryData(['daily-reports', 'today', 'anonymous']),
     ).toEqual(mockStatus);
     expect(
       queryClient
@@ -114,10 +114,10 @@ describe('useTodayReportStatus (F-DR-01 / API-029)', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(
-      queryClient.getQueryData(['dailyReports', 'today', 'student-user-123']),
+      queryClient.getQueryData(['daily-reports', 'today', 'student-user-123']),
     ).toEqual(mockStatus);
     expect(
-      queryClient.getQueryData(['dailyReports', 'today', 'other-user-456']),
+      queryClient.getQueryData(['daily-reports', 'today', 'other-user-456']),
     ).toBeUndefined();
 
     queryClient.clear();

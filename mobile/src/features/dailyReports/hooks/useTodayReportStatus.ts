@@ -6,11 +6,16 @@ import {
 import { useAuthStore } from '@/shared/auth';
 
 /**
- * Query key for the caller's today-report status (API-029).
- * Exported so the submission mutation (F-DR-02) can invalidate it — a
- * successful submit flips the Home CTA to "View Today's Report" (UF §10).
+ * Query key for the caller's today-report status (API-029) — the exact key
+ * TS §26 names for `SubmitDailyReportUseCase`'s invalidation
+ * (`['daily-reports','today']`). Exported so the submission mutation
+ * (F-DR-02) can invalidate it — a successful submit flips the Home CTA to
+ * "View Today's Report" (UF §10).
  */
-export const TODAY_REPORT_STATUS_QUERY_KEY = ['dailyReports', 'today'] as const;
+export const TODAY_REPORT_STATUS_QUERY_KEY = [
+  'daily-reports',
+  'today',
+] as const;
 
 /**
  * Account-scoped query key for the authenticated user, preventing
