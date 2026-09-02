@@ -83,7 +83,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
     });
   });
 
-  it('rounds coverage_percent to two decimals', async () => {
+  it('returns coverage_percent as the raw SAS §17.6 quotient, unrounded', async () => {
     coverageRepository.findActiveByUserId.mockResolvedValue({
       id: 'coverage-1',
       membershipId: 'membership-1',
@@ -94,7 +94,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
 
     const result = await useCase.execute(userId);
 
-    expect(result.data.coverage_percent).toBe(0.1);
+    expect(result.data.coverage_percent).toBe((1 / 1000) * 100);
   });
 
   it('throws 404 NOT_FOUND when the caller has no active membership with live coverage', async () => {

@@ -238,8 +238,8 @@ describe('GET /me/progress (F-PRG-02 / API-041 Integration)', () => {
       h1.start_ordinal +
       1 +
       (h60.end_ordinal - h60.start_ordinal + 1);
-    const expectedPercent =
-      Math.round((covered / totalAyahs) * 100 * 100) / 100;
+    // SAS §17.6 formula, unrounded.
+    const expectedPercent = (covered / totalAyahs) * 100;
 
     expect(response.body).toEqual({
       data: {
