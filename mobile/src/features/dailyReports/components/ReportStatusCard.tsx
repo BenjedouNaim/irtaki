@@ -7,14 +7,21 @@ import {
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { Button } from '@/shared/components/Button';
 import { ApiError } from '@/shared/api/types';
-import { DailyReportBlockReason } from '@/shared/api/dailyReports.client';
+import {
+  DailyReportBlockReason,
+  DailyReportDto,
+} from '@/shared/api/dailyReports.client';
 import { useTodayReportStatus } from '@/features/dailyReports/hooks/useTodayReportStatus';
 
 export interface ReportStatusCardProps {
   /** `block_reason` absent → "Submit Today's Report" → opens SCR-09. */
   onSubmitReport?: () => void;
-  /** `already_submitted` → "View Today's Report" → today's report, read-only (SCR-15). */
-  onViewReport?: () => void;
+  /**
+   * `already_submitted` → "View Today's Report" → today's report, read-only
+   * (SCR-15), rendered from the `existing_report` API-029 already returned
+   * (F-DR-07: no second request).
+   */
+  onViewReport?: (report: DailyReportDto) => void;
   /** `recitation_day` → "Complete Weekly Report" → Weekly Report (SCR-12). */
   onCompleteWeeklyReport?: () => void;
   testID?: string;
@@ -168,12 +175,16 @@ export function ReportStatusCard({
     : (data.block_reason ?? 'membership_inactive');
   const state = CTA_STATES[reason];
 
+  const existingReport = data.existing_report;
   const handlers: Record<
     DailyReportBlockReason | 'none',
     (() => void) | undefined
   > = {
     none: onSubmitReport,
-    already_submitted: onViewReport,
+    already_submitted:
+      onViewReport && existingReport
+        ? () => onViewReport(existingReport)
+        : undefined,
     recitation_day: onCompleteWeeklyReport,
     group_archived: undefined,
     membership_inactive: undefined,
