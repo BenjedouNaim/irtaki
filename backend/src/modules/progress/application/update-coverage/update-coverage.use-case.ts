@@ -108,8 +108,7 @@ export class UpdateCoverageUseCase {
       // INV-17 says a live membership always has coverage; a terminated one
       // has it soft-deleted. Nothing to update either way.
       this.logger.warn(
-        { membershipId: event.membershipId },
-        'DE-05 received for a membership with no live coverage row',
+        `DE-05 received for membership ${event.membershipId} with no live coverage row`,
       );
       return { status: 'skipped', reason: 'COVERAGE_NOT_FOUND' };
     }

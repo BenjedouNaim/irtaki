@@ -27,13 +27,12 @@ export class DailyReportSubmittedListener {
     try {
       await this.updateCoverageUseCase.execute(event);
     } catch (err: unknown) {
+      // String-first, like every other logger call (TS §30 Pino bridge):
+      // the message carries the context, the stack rides as the second
+      // argument.
       this.logger.error(
-        {
-          membershipId: event?.membershipId,
-          reportDate: event?.reportDate,
-          err: err instanceof Error ? err.stack : err,
-        },
-        'DS-05 coverage update failed; left for CoverageReconciliationJob (ADR-029)',
+        `DS-05 coverage update failed for membership ${event?.membershipId} on ${event?.reportDate}; left for CoverageReconciliationJob (ADR-029): ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
       );
     }
   }
