@@ -9,7 +9,7 @@ import {
   type ISurahRepository,
 } from '../../domain/surah.repository.interface';
 import { toProgressDto } from '../progress-summary.mapper';
-import { GetStudentProgressResponseDto } from './get-student-progress-response.dto';
+import { GetMembershipProgressResponseDto } from './get-membership-progress-response.dto';
 
 const MEMBERSHIP_ID_SHAPE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +25,7 @@ const MEMBERSHIP_ID_SHAPE =
  * RolesGuard).
  */
 @Injectable()
-export class GetStudentProgressUseCase {
+export class GetMembershipProgressUseCase {
   constructor(
     @Inject(COVERAGE_REPOSITORY)
     private readonly coverageRepository: ICoverageRepository,
@@ -37,7 +37,7 @@ export class GetStudentProgressUseCase {
     callerId: string,
     callerRole: UserRole,
     membershipId: string,
-  ): Promise<GetStudentProgressResponseDto> {
+  ): Promise<GetMembershipProgressResponseDto> {
     if (callerRole !== UserRole.Admin && callerRole !== UserRole.Teacher) {
       throw new ForbiddenException();
     }

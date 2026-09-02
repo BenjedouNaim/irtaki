@@ -41,7 +41,7 @@ describe('GET /memberships/{id}/progress (F-PRG-03 / API-042 Integration)', () =
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
-  const testEmailDomain = '@test-get-student-progress.com';
+  const testEmailDomain = '@test-get-membership-progress.com';
   const testGroupPrefix = 'F-PRG-03 test group';
   const mockMailer: IMailer = {
     sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),

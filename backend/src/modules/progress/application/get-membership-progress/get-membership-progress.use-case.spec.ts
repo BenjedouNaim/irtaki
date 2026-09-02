@@ -9,10 +9,10 @@ import {
   ISurahRepository,
   SurahRecord,
 } from '../../domain/surah.repository.interface';
-import { GetStudentProgressUseCase } from './get-student-progress.use-case';
+import { GetMembershipProgressUseCase } from './get-membership-progress.use-case';
 
-describe('GetStudentProgressUseCase (F-PRG-03 / API-042)', () => {
-  let useCase: GetStudentProgressUseCase;
+describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
+  let useCase: GetMembershipProgressUseCase;
   let coverageRepository: jest.Mocked<ICoverageRepository>;
   let surahRepository: jest.Mocked<ISurahRepository>;
 
@@ -52,7 +52,7 @@ describe('GetStudentProgressUseCase (F-PRG-03 / API-042)', () => {
     };
     surahRepository = { findAll: jest.fn().mockResolvedValue(surahs) };
 
-    useCase = new GetStudentProgressUseCase(
+    useCase = new GetMembershipProgressUseCase(
       coverageRepository,
       surahRepository,
     );

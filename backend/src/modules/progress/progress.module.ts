@@ -14,10 +14,9 @@ import { HizbBoundaryRepository } from './infrastructure/hizb-boundary.repositor
 import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get-hizb-boundaries.use-case';
 import { UpdateCoverageUseCase } from './application/update-coverage/update-coverage.use-case';
 import { GetOwnProgressUseCase } from './application/get-own-progress/get-own-progress.use-case';
-import { GetStudentProgressUseCase } from './application/get-student-progress/get-student-progress.use-case';
+import { GetMembershipProgressUseCase } from './application/get-membership-progress/get-membership-progress.use-case';
 import { QuranController } from './presentation/quran.controller';
 import { ProgressController } from './presentation/progress.controller';
-import { MembershipProgressController } from './presentation/membership-progress.controller';
 
 @Module({
   imports: [
@@ -28,11 +27,7 @@ import { MembershipProgressController } from './presentation/membership-progress
       SurahTypeOrmEntity,
     ]),
   ],
-  controllers: [
-    QuranController,
-    ProgressController,
-    MembershipProgressController,
-  ],
+  controllers: [QuranController, ProgressController],
   providers: [
     {
       provide: COVERAGE_REPOSITORY,
@@ -54,7 +49,7 @@ import { MembershipProgressController } from './presentation/membership-progress
     // F-PRG-01: DS-05 coverage engine entry point (synchronously callable by SubmitDailyReportUseCase)
     UpdateCoverageUseCase,
     GetOwnProgressUseCase,
-    GetStudentProgressUseCase,
+    GetMembershipProgressUseCase,
   ],
   exports: [
     COVERAGE_REPOSITORY,
