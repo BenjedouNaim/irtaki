@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { Button } from '@/shared/components/Button';
+import { ReportStatusCard } from '@/features/dailyReports/components/ReportStatusCard';
 import { logoutUser } from '@/shared/api/auth.client';
 import {
   useAuthStore,
@@ -31,30 +32,49 @@ export function StudentTabs() {
   };
 
   return (
-    <View
-      className="flex-1 items-center justify-center p-4 bg-white dark:bg-gray-950"
+    <ScrollView
+      className="flex-1 bg-white dark:bg-gray-950"
+      contentContainerStyle={{
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+      }}
+      contentInsetAdjustmentBehavior="automatic"
       testID="student-tabs"
     >
-      <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
-        شاشة الطالب (الرئيسية · التقدم · الاشتراكات)
-      </Text>
-      <Text className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Student Tabs Stub
-      </Text>
-      <Button
-        label="الملف الشخصي"
-        variant="outline"
-        onPress={() => router.push('/(app)/profile')}
-        testID="profile-button"
-        className="mb-3"
-      />
-      <Button
-        label="تسجيل الخروج"
-        variant="destructive"
-        loading={isLoggingOut}
-        onPress={handleLogout}
-        testID="logout-button"
-      />
-    </View>
+      <View className="w-full max-w-md items-center">
+        <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
+          شاشة الطالب (الرئيسية · التقدم · الاشتراكات)
+        </Text>
+        <Text className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          Student Tabs Stub
+        </Text>
+
+        {/* SCR-08 Daily Report CTA (F-DR-01). Home → Type Selection (UF §26). */}
+        <ReportStatusCard
+          onSubmitReport={() =>
+            router.push('/(app)/student/daily-report/type-selection')
+          }
+          className="mb-6"
+        />
+
+        <Button
+          label="الملف الشخصي"
+          variant="outline"
+          onPress={() => router.push('/(app)/profile')}
+          testID="profile-button"
+          className="mb-3 w-full"
+        />
+        <Button
+          label="تسجيل الخروج"
+          variant="destructive"
+          loading={isLoggingOut}
+          onPress={handleLogout}
+          testID="logout-button"
+          className="w-full"
+        />
+      </View>
+    </ScrollView>
   );
 }

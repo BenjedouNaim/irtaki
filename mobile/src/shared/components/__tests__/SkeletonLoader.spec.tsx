@@ -32,4 +32,15 @@ describe('SkeletonLoader', () => {
     expect(screen.getByTestId('skeleton-ring-line-1')).toBeTruthy();
     expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
   });
+
+  it('renders card variant as badge, title, text line and a 48dp button block (UF §22)', async () => {
+    await render(<SkeletonLoader variant="card" testID="card-skeleton" />);
+
+    expect(screen.getByTestId('card-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-card-badge')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-card-title')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-card-line')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-card-button')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
+  });
 });
