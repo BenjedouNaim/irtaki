@@ -109,9 +109,23 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
       screen.getByText('لا يمكن تعديل التقرير أو حذفه بعد إرساله.'),
     ).toBeTruthy();
 
+    // F-DR-07: the CTA hands over the report API-029 already returned —
+    // SCR-15 renders it without a second request.
     fireEvent.press(screen.getByTestId('view-report-button'));
     expect(onViewReport).toHaveBeenCalledTimes(1);
+    expect(onViewReport).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'report-1', type: 'Absent' }),
+    );
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
+  });
+
+  it('renders "View Today\'s Report" disabled when the payload carries no existing_report (nothing to render)', async () => {
+    mockStatus({ can_submit: false, block_reason: 'already_submitted' });
+
+    renderCard({ onViewReport: jest.fn() });
+
+    const button = await screen.findByTestId('view-report-button');
+    expect(button.props.accessibilityState.disabled).toBe(true);
   });
 
   it('renders "Complete Weekly Report" for recitation_day and never offers the daily path', async () => {
