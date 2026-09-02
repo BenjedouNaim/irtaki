@@ -9,6 +9,11 @@ export interface ApiErrorEnvelope {
   error: string;
   message: string;
   details?: ApiErrorDetail[];
+  /**
+   * `409 DUPLICATE_REPORT` only (APIS §9.7 / §12, APIQ-09): the already
+   * persisted daily report, so a retried submission is a safe no-op.
+   */
+  existing_report?: unknown;
   correlationId?: string;
 }
 
@@ -16,6 +21,7 @@ export class ApiError extends Error {
   public readonly statusCode: number;
   public readonly errorCode: string;
   public readonly details?: ApiErrorDetail[];
+  public readonly existingReport?: unknown;
   public readonly correlationId?: string;
 
   constructor(envelope: ApiErrorEnvelope) {
@@ -24,6 +30,7 @@ export class ApiError extends Error {
     this.statusCode = envelope.statusCode;
     this.errorCode = envelope.error;
     this.details = envelope.details;
+    this.existingReport = envelope.existing_report;
     this.correlationId = envelope.correlationId;
   }
 }
