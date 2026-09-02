@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { EntityManager, In } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   ApplyCoverageMergeParams,
@@ -12,21 +13,27 @@ import { HizbBoundaryTypeOrmEntity } from './hizb-boundary.typeorm-entity';
 
 import { CoverageConcurrencyConflictError } from '../domain/coverage.errors';
 
-interface RawCoverageRow {
+interface RawAggregatedInterval {
+  start_ordinal: number | string;
+  end_ordinal: number | string;
+}
+
+interface RawCoverageWithIntervalsRow {
   id: string;
   membership_id: string;
   ahzab_completed: number | string;
   last_memorized_ordinal: number | string | null;
   updated_at: string | Date;
-}
-
-interface RawIntervalRow {
-  start_ordinal: number | string;
-  end_ordinal: number | string;
+  intervals: RawAggregatedInterval[] | string | null;
 }
 
 @Injectable()
 export class CoverageRepository implements ICoverageRepository {
+  constructor(
+    @InjectRepository(MemorizationCoverageTypeOrmEntity)
+    private readonly coverageRepo: Repository<MemorizationCoverageTypeOrmEntity>,
+  ) {}
+
   async seedFromHizbSelection(
     membershipId: string,
     hizbNumbers: number[],
@@ -64,12 +71,29 @@ export class CoverageRepository implements ICoverageRepository {
 
   async findByMembershipId(
     membershipId: string,
-    manager: EntityManager,
+    manager: EntityManager = this.coverageRepo.manager,
   ): Promise<CoverageRecord | null> {
-    const rows = await manager.query<RawCoverageRow[]>(
-      `SELECT id, membership_id, ahzab_completed, last_memorized_ordinal, updated_at::text AS updated_at
-         FROM memorization_coverage
-        WHERE membership_id = $1 AND deleted_at IS NULL`,
+    // Single-statement atomic read using json_agg to guarantee internal consistency
+    // across coverage and intervals under READ COMMITTED.
+    const rows = await manager.query<RawCoverageWithIntervalsRow[]>(
+      `SELECT c.id,
+              c.membership_id,
+              c.ahzab_completed,
+              c.last_memorized_ordinal,
+              c.updated_at::text AS updated_at,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'start_ordinal', i.start_ordinal,
+                    'end_ordinal', i.end_ordinal
+                  ) ORDER BY i.start_ordinal ASC
+                ) FILTER (WHERE i.id IS NOT NULL),
+                '[]'::json
+              ) AS intervals
+         FROM memorization_coverage c
+         LEFT JOIN coverage_intervals i ON i.coverage_id = c.id
+        WHERE c.membership_id = $1 AND c.deleted_at IS NULL
+        GROUP BY c.id`,
       [membershipId],
     );
 
@@ -77,7 +101,43 @@ export class CoverageRepository implements ICoverageRepository {
       return null;
     }
 
-    return this.hydrate(rows[0], manager);
+    return this.hydrate(rows[0]);
+  }
+
+  async findActiveByUserId(userId: string): Promise<CoverageRecord | null> {
+    const manager = this.coverageRepo.manager;
+    // Single-statement atomic read using json_agg to guarantee internal consistency
+    // across coverage and intervals under READ COMMITTED.
+    const rows = await manager.query<RawCoverageWithIntervalsRow[]>(
+      `SELECT c.id,
+              c.membership_id,
+              c.ahzab_completed,
+              c.last_memorized_ordinal,
+              c.updated_at::text AS updated_at,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'start_ordinal', i.start_ordinal,
+                    'end_ordinal', i.end_ordinal
+                  ) ORDER BY i.start_ordinal ASC
+                ) FILTER (WHERE i.id IS NOT NULL),
+                '[]'::json
+              ) AS intervals
+         FROM memorization_coverage c
+         JOIN memberships m ON m.id = c.membership_id
+         LEFT JOIN coverage_intervals i ON i.coverage_id = c.id
+        WHERE m.user_id = $1
+          AND m.state = 'Active'
+          AND c.deleted_at IS NULL
+        GROUP BY c.id`,
+      [userId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.hydrate(rows[0]);
   }
 
   async applyMerge(
@@ -138,17 +198,17 @@ export class CoverageRepository implements ICoverageRepository {
     );
   }
 
-  private async hydrate(
-    row: RawCoverageRow,
-    manager: EntityManager,
-  ): Promise<CoverageRecord> {
-    const intervalRows = await manager.query<RawIntervalRow[]>(
-      `SELECT start_ordinal, end_ordinal
-         FROM coverage_intervals
-        WHERE coverage_id = $1
-        ORDER BY start_ordinal ASC`,
-      [row.id],
-    );
+  private hydrate(row: RawCoverageWithIntervalsRow): CoverageRecord {
+    let parsedIntervals: RawAggregatedInterval[] = [];
+    if (Array.isArray(row.intervals)) {
+      parsedIntervals = row.intervals;
+    } else if (typeof row.intervals === 'string') {
+      try {
+        parsedIntervals = JSON.parse(row.intervals) as RawAggregatedInterval[];
+      } catch {
+        parsedIntervals = [];
+      }
+    }
 
     return {
       id: row.id,
@@ -159,7 +219,7 @@ export class CoverageRepository implements ICoverageRepository {
           ? null
           : Number(row.last_memorized_ordinal),
       updatedAt: new Date(row.updated_at),
-      intervals: intervalRows.map((i) => ({
+      intervals: parsedIntervals.map((i) => ({
         startOrdinal: Number(i.start_ordinal),
         endOrdinal: Number(i.end_ordinal),
       })),

@@ -40,15 +40,24 @@ export interface ICoverageRepository {
   ): Promise<void>;
 
   /**
-   * Loads the live (non-soft-deleted) coverage row for a membership through
-   * the caller's `EntityManager` (use-case-owned transaction, ADR-028). No row
-   * lock: TS §20 resolves concurrency without row-locking or elevated
+   * The live (non-soft-deleted) coverage of a membership. Pass the caller's
+   * `EntityManager` to read inside a use-case-owned transaction (ADR-028).
+   * No row lock: TS §20 resolves concurrency without row-locking or elevated
    * isolation.
    */
   findByMembershipId(
     membershipId: string,
-    manager: EntityManager,
+    manager?: EntityManager,
   ): Promise<CoverageRecord | null>;
+
+  /**
+   * Own-scope read (API-041): the live coverage of the caller's Active
+   * membership, resolved by one indexed lookup joined on `memberships` with
+   * `user_id = :caller` (TS §15.2 — scope applied in the query, never
+   * post-filtered). Null when the caller has no Active membership or its
+   * coverage is not live.
+   */
+  findActiveByUserId(userId: string): Promise<CoverageRecord | null>;
 
   /** Persists one DS-05 merge result inside the caller's transaction. */
   applyMerge(
