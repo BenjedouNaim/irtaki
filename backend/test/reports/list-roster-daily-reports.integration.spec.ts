@@ -546,6 +546,39 @@ describe('GET /memberships/{id}/daily-reports (F-DR-06 / API-032 Integration)', 
     });
   });
 
+  describe('Admin requests (DEC-C07 scope bypass; 404 only when the membership genuinely does not exist, APIS §9.6 / APIQ-NEW-09 — same as API-042)', () => {
+    it('returns 404 NOT_FOUND (Arabic, no data) for a non-existent membership', async () => {
+      const admin = await registerAndLogin(UserRole.Admin);
+
+      const response = await list(admin, uuidv7()).expect(HttpStatus.NOT_FOUND);
+
+      expect(response.body).toMatchObject({
+        statusCode: HttpStatus.NOT_FOUND,
+        error: 'NOT_FOUND',
+      });
+      expect(response.body.message).toMatch(/[\u0600-\u06FF]/);
+      expect(response.body).not.toHaveProperty('data');
+      expect(response.body.correlationId).toBeDefined();
+    });
+
+    it('returns an empty 200 page for a TERMINATED membership whose reports are soft-deleted — the membership exists; its rows belong to the recovery view (UC-16, DB-IDX-11)', async () => {
+      const fx = await seedFixture({ state: 'Terminated' });
+      await createNormalReport({
+        membershipId: fx.membershipId,
+        reportDate: '2026-07-01',
+        deleted: true,
+      });
+      const admin = await registerAndLogin(UserRole.Admin);
+
+      const response = await list(admin, fx.membershipId).expect(HttpStatus.OK);
+
+      expect(response.body).toEqual({
+        data: [],
+        pagination: { next_cursor: null, has_more: false },
+      });
+    });
+  });
+
   describe('role denial (RolesGuard alone, DEC-B09)', () => {
     it('returns 403 SCOPE_DENIED to the Assistant of the VERY SAME group — unconditionally, scope membership is irrelevant', async () => {
       const fx = await seedFixture({ dates: ['2026-08-01'] });

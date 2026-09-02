@@ -3,15 +3,18 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../../../shared/pagination/cursor.util';
+import { NotFoundException } from '@nestjs/common';
 import {
   DailyReportRecord,
   IDailyReportRepository,
 } from '../../domain/daily-report.repository.interface';
+import { IMembershipReportScope } from '../../domain/membership-report-scope.interface';
 import { ListRosterDailyReportsUseCase } from './list-roster-daily-reports.use-case';
 
 describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
   let useCase: ListRosterDailyReportsUseCase;
   let repository: jest.Mocked<IDailyReportRepository>;
+  let scope: jest.Mocked<IMembershipReportScope>;
 
   const membershipId = '01916362-e61e-7f61-8270-b74e892c90aa';
 
@@ -68,7 +71,13 @@ describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
     };
-    useCase = new ListRosterDailyReportsUseCase(repository);
+    scope = {
+      isActiveMembershipOfTeacher: jest.fn(),
+      // The membership passed the guard in every case below unless a test
+      // says otherwise.
+      membershipExists: jest.fn().mockResolvedValue(true),
+    };
+    useCase = new ListRosterDailyReportsUseCase(repository, scope);
   });
 
   it('queries by the guard-verified membership id only, with the default limit of 20 and no filters (TS §15.2 step 4, APIS §9.2)', async () => {
@@ -87,6 +96,9 @@ describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
       cursor: null,
     });
     expect(repository.findOwnHistoryByUserId).not.toHaveBeenCalled();
+    // A non-empty page already proves the membership exists (DB-FK).
+    expect(scope.membershipExists).not.toHaveBeenCalled();
+    expect(scope.isActiveMembershipOfTeacher).not.toHaveBeenCalled();
     expect(result.pagination).toEqual({ next_cursor: null, has_more: false });
     expect(result.data.map((r) => r.id)).toEqual([newer.id, older.id]);
   });
@@ -187,7 +199,7 @@ describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
     );
   });
 
-  it('returns an empty page (not an error) when the membership has no live reports', async () => {
+  it('returns an empty page (not an error) when the membership exists but has no live reports', async () => {
     repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [],
       hasMore: false,
@@ -197,5 +209,30 @@ describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
       data: [],
       pagination: { next_cursor: null, has_more: false },
     });
+    expect(scope.membershipExists).toHaveBeenCalledTimes(1);
+    expect(scope.membershipExists).toHaveBeenCalledWith(membershipId);
+  });
+
+  it('throws 404 NOT_FOUND (Arabic, no internals) when the membership does not exist at all — the Admin path past the DEC-C07 bypass (APIS §9.6, APIQ-NEW-09)', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
+      rows: [],
+      hasMore: false,
+    });
+    scope.membershipExists.mockResolvedValue(false);
+
+    const failure = useCase.execute(membershipId, {});
+
+    await expect(failure).rejects.toThrow(NotFoundException);
+    await expect(failure).rejects.toMatchObject({
+      response: {
+        statusCode: 404,
+        error: 'NOT_FOUND',
+        message: expect.stringMatching(/[\u0600-\u06FF]/) as unknown,
+      },
+    });
+    // Still scoped to exactly the guard-verified id (TS §15.2 step 4).
+    expect(repository.findHistoryByMembershipId).toHaveBeenCalledWith(
+      expect.objectContaining({ membershipId }),
+    );
   });
 });

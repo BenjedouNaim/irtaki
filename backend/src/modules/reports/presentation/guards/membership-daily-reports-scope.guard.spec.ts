@@ -34,7 +34,10 @@ describe('MembershipDailyReportsScopeGuard (API-032, TS §15.2)', () => {
   }
 
   beforeEach(() => {
-    scope = { isActiveMembershipOfTeacher: jest.fn() };
+    scope = {
+      isActiveMembershipOfTeacher: jest.fn(),
+      membershipExists: jest.fn(),
+    };
     guard = new MembershipDailyReportsScopeGuard(scope);
   });
 

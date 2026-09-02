@@ -34,4 +34,17 @@ export class MembershipReportScope implements IMembershipReportScope {
     );
     return Array.isArray(rows) && rows.length > 0;
   }
+
+  async membershipExists(membershipId: string): Promise<boolean> {
+    // Primary-key lookup, any state (a Terminated membership still exists —
+    // APIS §10.6 accepts either state on the recovery route, APIQ-NEW-10).
+    const rows = await this.dataSource.query<Array<{ ok: number }>>(
+      `SELECT 1 AS ok
+         FROM memberships m
+        WHERE m.id = $1
+        LIMIT 1`,
+      [membershipId],
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
 }

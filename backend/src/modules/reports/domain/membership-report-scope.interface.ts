@@ -17,4 +17,13 @@ export interface IMembershipReportScope {
     membershipId: string,
     teacherId: string,
   ): Promise<boolean>;
+
+  /**
+   * True iff a membership row with this id exists, whatever its state.
+   * Serves the Admin path only in practice: the Admin bypasses the
+   * ScopeGuard (DEC-C07), so "genuinely doesn't exist" (APIS §9.6 `404`,
+   * APIQ-NEW-09) has to be established after the guard — the same way
+   * API-042's use case answers 404 for a missing coverage row.
+   */
+  membershipExists(membershipId: string): Promise<boolean>;
 }
