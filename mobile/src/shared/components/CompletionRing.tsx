@@ -20,6 +20,15 @@ export interface CompletionRingProps {
 
 const TICK_WIDTH = 4;
 const TICK_HEIGHT = 14;
+/** Gap between the tick ring and the centre text block. */
+const CENTRE_INSET = 6;
+
+/**
+ * Cap on OS text scaling for metric values that live inside fixed-size geometry
+ * (UF §32 "layouts tolerate OS text-scale increases without clipping — especially
+ * metric rows"). Body copy elsewhere scales freely; only metrics are capped.
+ */
+export const METRIC_MAX_FONT_SIZE_MULTIPLIER = 1.5;
 
 /**
  * Completion ring (UF §29 component inventory — "Progress tab (ahzab completed)").
@@ -102,10 +111,21 @@ export function CompletionRing({
         );
       })}
 
-      <View className="items-center px-6" pointerEvents="none">
+      {/*
+        The centre block is bounded to the ring's inner diameter so the value can
+        shrink-to-fit under large OS text scales instead of overflowing the ticks.
+      */}
+      <View
+        className="items-center px-1"
+        pointerEvents="none"
+        style={{ width: size - 2 * (TICK_HEIGHT + CENTRE_INSET) }}
+      >
         <Text
           testID={`${testID}-value`}
-          className="text-3xl font-bold text-gray-900 dark:text-gray-100"
+          className="text-3xl font-bold text-gray-900 dark:text-gray-100 text-center"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
         >
           {valueText}
         </Text>
@@ -113,6 +133,8 @@ export function CompletionRing({
           <Text
             testID={`${testID}-label`}
             className="text-xs text-gray-500 dark:text-gray-400 text-center"
+            numberOfLines={2}
+            maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
           >
             {label}
           </Text>

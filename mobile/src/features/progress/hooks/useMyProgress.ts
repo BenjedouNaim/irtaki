@@ -1,8 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  getMyProgress,
-  ProgressDto,
-} from '../../../shared/api/progress.client';
+import { getMyProgress, ProgressDto } from '@/shared/api/progress.client';
 
 /**
  * Query key for the caller's own progress (API-041).

@@ -21,4 +21,15 @@ describe('SkeletonLoader', () => {
 
     expect(screen.getByTestId('dashboard-skeleton')).toBeTruthy();
   });
+
+  it('renders ring variant as a circular placeholder plus text lines (UF §22)', async () => {
+    await render(<SkeletonLoader variant="ring" testID="ring-skeleton" />);
+
+    expect(screen.getByTestId('ring-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-ring-title')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-ring-circle')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-ring-line-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-ring-line-1')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
+  });
 });

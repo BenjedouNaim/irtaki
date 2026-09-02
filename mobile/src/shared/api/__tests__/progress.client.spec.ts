@@ -22,8 +22,8 @@ describe('progress.client', () => {
   });
 
   describe('getMyProgress', () => {
-    it('should call apiClient.get with /me/progress and return the bare body', async () => {
-      (apiClient.get as jest.Mock).mockResolvedValue(mockProgress);
+    it('should call apiClient.get with /me/progress and unwrap the APIS §9.1 envelope { data: {...} }', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockProgress });
 
       const result = await getMyProgress();
 
@@ -32,20 +32,14 @@ describe('progress.client', () => {
       expect(result.is_activity_pointer_only).toBe(true);
     });
 
-    it('should unwrap the APIS §9.1 single-resource envelope { data: {...} }', async () => {
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockProgress });
-
-      const result = await getMyProgress();
-
-      expect(result).toEqual(mockProgress);
-    });
-
     it('should pass through a null last_memorized_position untouched', async () => {
       (apiClient.get as jest.Mock).mockResolvedValue({
-        ...mockProgress,
-        ahzab_completed: 0,
-        coverage_percent: 0,
-        last_memorized_position: null,
+        data: {
+          ...mockProgress,
+          ahzab_completed: 0,
+          coverage_percent: 0,
+          last_memorized_position: null,
+        },
       });
 
       const result = await getMyProgress();

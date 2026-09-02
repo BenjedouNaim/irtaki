@@ -1,6 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
-import { CompletionRing, TOTAL_AHZAB } from '../CompletionRing';
+import {
+  CompletionRing,
+  TOTAL_AHZAB,
+  METRIC_MAX_FONT_SIZE_MULTIPLIER,
+} from '../CompletionRing';
 
 // Ticks are decorative and deliberately hidden from assistive technology
 // (the ring exposes one progressbar with a numeric value instead), so tick
@@ -49,6 +53,23 @@ describe('CompletionRing', () => {
       '23 / 60',
     );
     expect(screen.getByText('حزباً مكتملاً')).toBeTruthy();
+  });
+
+  it('keeps the centre value inside the ring under large OS text scales (UF §32)', () => {
+    render(<CompletionRing completed={23} label="حزباً مكتملاً" />);
+
+    const value = screen.getByTestId('completion-ring-value');
+    expect(value.props.numberOfLines).toBe(1);
+    expect(value.props.adjustsFontSizeToFit).toBe(true);
+    expect(value.props.maxFontSizeMultiplier).toBe(
+      METRIC_MAX_FONT_SIZE_MULTIPLIER,
+    );
+
+    const label = screen.getByTestId('completion-ring-label');
+    expect(label.props.numberOfLines).toBe(2);
+    expect(label.props.maxFontSizeMultiplier).toBe(
+      METRIC_MAX_FONT_SIZE_MULTIPLIER,
+    );
   });
 
   it('exposes a single accessible progressbar with a numeric value and Arabic label', () => {
