@@ -60,7 +60,7 @@ export class UpdateCoverageUseCase {
     const hizbBoundaries = await this.hizbBoundaryRepository.findAll();
 
     const merge = await this.dataSource.transaction(async (manager) => {
-      const record = await this.coverageRepository.findByMembershipIdForUpdate(
+      const record = await this.coverageRepository.findByMembershipId(
         event.membershipId,
         manager,
       );

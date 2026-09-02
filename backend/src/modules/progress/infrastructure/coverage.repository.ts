@@ -59,15 +59,14 @@ export class CoverageRepository implements ICoverageRepository {
     }
   }
 
-  async findByMembershipIdForUpdate(
+  async findByMembershipId(
     membershipId: string,
     manager: EntityManager,
   ): Promise<CoverageRecord | null> {
     const rows = await manager.query<RawCoverageRow[]>(
       `SELECT id, membership_id, ahzab_completed, last_memorized_ordinal
          FROM memorization_coverage
-        WHERE membership_id = $1 AND deleted_at IS NULL
-        FOR UPDATE`,
+        WHERE membership_id = $1 AND deleted_at IS NULL`,
       [membershipId],
     );
 

@@ -67,7 +67,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   beforeEach(() => {
     coverageRepository = {
       seedFromHizbSelection: jest.fn(),
-      findByMembershipIdForUpdate: jest.fn(),
+      findByMembershipId: jest.fn(),
       applyMerge: jest.fn(),
     };
     hizbBoundaryRepository = {
@@ -98,15 +98,13 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   });
 
   it('merges the range inside one transaction, persists the derived figures and emits DE-06', async () => {
-    coverageRepository.findByMembershipIdForUpdate.mockResolvedValue(
-      seededRecord,
-    );
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
 
     const outcome = await useCase.execute(
       event({ fromOrdinal: 101, toOrdinal: 200 }),
     );
 
-    expect(coverageRepository.findByMembershipIdForUpdate).toHaveBeenCalledWith(
+    expect(coverageRepository.findByMembershipId).toHaveBeenCalledWith(
       membershipId,
       manager,
     );
@@ -137,9 +135,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   });
 
   it('never shrinks coverage: a re-memorised sub-range keeps the existing block (INV-18)', async () => {
-    coverageRepository.findByMembershipIdForUpdate.mockResolvedValue(
-      seededRecord,
-    );
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
 
     const outcome = await useCase.execute(
       event({ fromOrdinal: 10, toOrdinal: 20 }),
@@ -161,7 +157,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   });
 
   it('skips without writing when the membership has no live coverage row', async () => {
-    coverageRepository.findByMembershipIdForUpdate.mockResolvedValue(null);
+    coverageRepository.findByMembershipId.mockResolvedValue(null);
 
     const outcome = await useCase.execute(
       event({ fromOrdinal: 1, toOrdinal: 10 }),
@@ -176,9 +172,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   });
 
   it('does not emit DE-06 when the transaction fails', async () => {
-    coverageRepository.findByMembershipIdForUpdate.mockResolvedValue(
-      seededRecord,
-    );
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
     coverageRepository.applyMerge.mockRejectedValue(new Error('db down'));
 
     await expect(
@@ -188,9 +182,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
   });
 
   it('still returns the outcome if DE-06 emission throws', async () => {
-    coverageRepository.findByMembershipIdForUpdate.mockResolvedValue(
-      seededRecord,
-    );
+    coverageRepository.findByMembershipId.mockResolvedValue(seededRecord);
     eventEmitter.emit.mockImplementation(() => {
       throw new Error('emitter broken');
     });

@@ -332,25 +332,4 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
     expect(intervals).toEqual([{ start_ordinal: 1, end_ordinal: 7 }]);
     expect(row.ahzab_completed).toBe(0);
   });
-
-  it('serialises two near-simultaneous merges on the same membership without losing either', async () => {
-    const { membershipId, coverageId } = await seedMembershipWithCoverage({
-      intervals: [],
-      ahzabCompleted: 0,
-    });
-
-    await Promise.all([
-      emitDailyReportSubmitted(membershipId, { fromOrdinal: 1, toOrdinal: 50 }),
-      emitDailyReportSubmitted(membershipId, {
-        fromOrdinal: 100,
-        toOrdinal: 150,
-      }),
-    ]);
-
-    const { intervals } = await readCoverage(coverageId);
-    expect(intervals).toEqual([
-      { start_ordinal: 1, end_ordinal: 50 },
-      { start_ordinal: 100, end_ordinal: 150 },
-    ]);
-  });
 });

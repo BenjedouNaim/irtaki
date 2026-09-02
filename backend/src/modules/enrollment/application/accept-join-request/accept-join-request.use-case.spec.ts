@@ -82,7 +82,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
 
     mockCoverageRepo = {
       seedFromHizbSelection: jest.fn(),
-      findByMembershipIdForUpdate: jest.fn(),
+      findByMembershipId: jest.fn(),
       applyMerge: jest.fn(),
     };
 
