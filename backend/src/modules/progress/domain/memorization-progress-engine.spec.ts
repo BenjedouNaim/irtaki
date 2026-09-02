@@ -179,20 +179,20 @@ describe('MemorizationProgressEngine (DS-05)', () => {
       ).toBe(3);
     });
 
-    it('computes coverage_percent as covered / T × 100 rounded to 2 decimals', () => {
-      const coverage = CoverageSet.fromRanges([r(1, 3)]);
+    it('computes coverage_percent as covered / T × 100, unrounded', () => {
       expect(
         MemorizationProgressEngine.computeCoveragePercent(
-          coverage,
+          CoverageSet.fromRanges([r(1, 125)]),
           TOTAL_AYAHS,
         ),
-      ).toBe(0.6);
+      ).toBe(25);
+      // The spec defines no rounding: the raw quotient is returned as-is.
       expect(
         MemorizationProgressEngine.computeCoveragePercent(
           CoverageSet.fromRanges([r(1, 1)]),
           6214,
         ),
-      ).toBe(0.02);
+      ).toBe((1 / 6214) * 100);
       expect(
         MemorizationProgressEngine.computeCoveragePercent(
           CoverageSet.empty(),

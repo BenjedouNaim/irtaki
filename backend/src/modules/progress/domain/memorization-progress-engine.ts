@@ -65,7 +65,10 @@ export class MemorizationProgressEngine {
     );
   }
 
-  /** SAS §17.6: ( Σ interval lengths ) / T × 100, rounded to 2 decimals. */
+  /**
+   * SAS §17.6: ( Σ interval lengths ) / T × 100 — returned exactly as the
+   * formula yields it; the spec defines no rounding.
+   */
   static computeCoveragePercent(
     coverage: CoverageSet,
     totalAyahCount: number,
@@ -73,8 +76,7 @@ export class MemorizationProgressEngine {
     if (totalAyahCount <= 0) {
       return 0;
     }
-    const raw = (coverage.coveredAyahCount / totalAyahCount) * 100;
-    return Math.round(raw * 100) / 100;
+    return (coverage.coveredAyahCount / totalAyahCount) * 100;
   }
 
   /** INV-18 guard: every interval of `before` must survive inside `after`. */
