@@ -1,8 +1,11 @@
 import {
   getTodayReportStatus,
+  submitDailyReport,
+  SubmitDailyReportPayload,
   TodayReportStatusDto,
 } from '../dailyReports.client';
 import { apiClient } from '../client';
+import { ApiError } from '../types';
 
 jest.mock('../client', () => ({
   apiClient: {
@@ -70,6 +73,54 @@ describe('dailyReports.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(getTodayReportStatus()).rejects.toBe(error);
+    });
+  });
+
+  describe('submitDailyReport', () => {
+    const payload: SubmitDailyReportPayload = {
+      type: 'Normal',
+      report_date: '2026-09-02',
+      memo_range: { from: { surah: 2, ayah: 1 }, to: { surah: 2, ayah: 20 } },
+      memo_time: { from: '18:00', to: '18:45' },
+      completed_50_repetitions: true,
+      repetitions_in_single_session: true,
+      read_tafsir: false,
+    };
+
+    it('should POST /daily-reports with the payload and unwrap the APIS §9.1 envelope', async () => {
+      (apiClient.post as jest.Mock).mockResolvedValue({
+        data: {
+          id: 'report-1',
+          report_date: '2026-09-02',
+          type: 'Normal',
+          ahzab_completed: 4,
+          coverage_updated: true,
+        },
+      });
+
+      const result = await submitDailyReport(payload);
+
+      expect(apiClient.post).toHaveBeenCalledWith('/daily-reports', payload);
+      expect(result).toEqual({
+        id: 'report-1',
+        report_date: '2026-09-02',
+        type: 'Normal',
+        ahzab_completed: 4,
+        coverage_updated: true,
+      });
+    });
+
+    it('should propagate a 409 DUPLICATE_REPORT ApiError unchanged, carrying existingReport (APIQ-09)', async () => {
+      const error = new ApiError({
+        statusCode: 409,
+        error: 'DUPLICATE_REPORT',
+        message: 'لقد قمت بإرسال تقرير اليوم مسبقاً',
+        existing_report: mockStatus.existing_report,
+      });
+      (apiClient.post as jest.Mock).mockRejectedValue(error);
+
+      await expect(submitDailyReport(payload)).rejects.toBe(error);
+      expect(error.existingReport).toEqual(mockStatus.existing_report);
     });
   });
 });
