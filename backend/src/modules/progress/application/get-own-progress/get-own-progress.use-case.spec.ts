@@ -44,6 +44,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
       membershipId: 'membership-1',
       ahzabCompleted: 3,
       lastMemorizedOrdinal: 150,
+      updatedAt: new Date(),
       intervals: [
         { startOrdinal: 1, endOrdinal: 200 },
         { startOrdinal: 601, endOrdinal: 650 },
@@ -70,6 +71,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
       membershipId: 'membership-1',
       ahzabCompleted: 0,
       lastMemorizedOrdinal: null,
+      updatedAt: new Date(),
       intervals: [],
     });
 
@@ -89,6 +91,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
       membershipId: 'membership-1',
       ahzabCompleted: 0,
       lastMemorizedOrdinal: null,
+      updatedAt: new Date(),
       intervals: [{ startOrdinal: 1, endOrdinal: 1 }],
     });
 

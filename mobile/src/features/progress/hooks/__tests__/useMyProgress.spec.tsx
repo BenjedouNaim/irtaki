@@ -1,9 +1,10 @@
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as progressApi from '@/shared/api/progress.client';
 import { ApiError } from '@/shared/api/types';
 import { useMyProgress, MY_PROGRESS_QUERY_KEY } from '../useMyProgress';
+import { useAuthStore } from '@/shared/auth';
 
 jest.mock('@/shared/api/progress.client');
 
@@ -51,11 +52,13 @@ describe('useMyProgress (F-PRG-02 / API-041)', () => {
 
     expect(progressApi.getMyProgress).toHaveBeenCalledTimes(1);
     expect(result.current.data).toEqual(mockProgress);
-    expect(queryClient.getQueryData(['progress', 'mine'])).toEqual(
+    expect(queryClient.getQueryData(['progress', 'mine', 'anonymous'])).toEqual(
       mockProgress,
     );
     expect(
-      queryClient.getQueryCache().find({ queryKey: MY_PROGRESS_QUERY_KEY }),
+      queryClient
+        .getQueryCache()
+        .find({ queryKey: MY_PROGRESS_QUERY_KEY, exact: false }),
     ).toBeTruthy();
 
     queryClient.clear();
@@ -90,5 +93,27 @@ describe('useMyProgress (F-PRG-02 / API-041)', () => {
     expect(progressApi.getMyProgress).toHaveBeenCalledTimes(2);
 
     queryClient.clear();
+  });
+
+  it('scopes query key to the authenticated user identity to prevent cross-account cache leaks', async () => {
+    jest.spyOn(progressApi, 'getMyProgress').mockResolvedValue(mockProgress);
+    act(() => {
+      useAuthStore.setState({ userId: 'student-user-123' });
+    });
+
+    const { result, queryClient } = renderUseMyProgress();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(
+      queryClient.getQueryData(['progress', 'mine', 'student-user-123']),
+    ).toEqual(mockProgress);
+    expect(
+      queryClient.getQueryData(['progress', 'mine', 'other-user-456']),
+    ).toBeUndefined();
+
+    queryClient.clear();
+    act(() => {
+      useAuthStore.getState().clearSession();
+    });
   });
 });

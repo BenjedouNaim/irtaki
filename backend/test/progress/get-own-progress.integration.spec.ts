@@ -10,6 +10,10 @@ import {
   IMailer,
   MAILER,
 } from '../../src/modules/identity/domain/mailer.interface';
+import {
+  IPasswordHasher,
+  PASSWORD_HASHER,
+} from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 
 interface HizbRow {
@@ -26,6 +30,8 @@ interface TestActor {
 }
 
 describe('GET /me/progress (F-PRG-02 / API-041 Integration)', () => {
+  jest.setTimeout(60000);
+
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
@@ -118,8 +124,38 @@ describe('GET /me/progress (F-PRG-02 / API-041 Integration)', () => {
   }
 
   async function registerAndLogin(role: UserRole): Promise<TestActor> {
-    const email = `${role.toLowerCase()}-${uuidv7()}${testEmailDomain}`;
     const password = 'Password123!';
+
+    // If role is Admin, respect DB-UQ-08 (single admin system-wide)
+    if (role === UserRole.Admin) {
+      const existingAdmins: Array<{ id: string; email: string }> =
+        await dataSource.query(
+          "SELECT id, email FROM users WHERE role = 'Admin' LIMIT 1",
+        );
+
+      if (existingAdmins.length > 0) {
+        const adminId = existingAdmins[0].id;
+        const adminEmail = existingAdmins[0].email;
+        const passwordHasher = app.get<IPasswordHasher>(PASSWORD_HASHER);
+        const hash = await passwordHasher.hash(password);
+        await dataSource.query(
+          'UPDATE users SET password_hash = $1 WHERE id = $2',
+          [hash, adminId],
+        );
+
+        const loginRes = await request(app.getHttpServer())
+          .post('/api/v1/auth/login')
+          .send({ email: adminEmail, password })
+          .expect(HttpStatus.OK);
+
+        return {
+          accessToken: loginRes.body.access_token as string,
+          userId: adminId,
+        };
+      }
+    }
+
+    const email = `${role.toLowerCase()}-${uuidv7()}${testEmailDomain}`;
     const registration = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({ email, password, timezone: 'Africa/Tunis' })
@@ -342,18 +378,20 @@ describe('GET /me/progress (F-PRG-02 / API-041 Integration)', () => {
       .expect(HttpStatus.UNAUTHORIZED);
   });
 
-  it.each([UserRole.User, UserRole.Teacher, UserRole.Assistant])(
-    'returns 403 SCOPE_DENIED for the %s role',
-    async (role) => {
-      const actor = await registerAndLogin(role);
+  it.each([
+    UserRole.User,
+    UserRole.Teacher,
+    UserRole.Assistant,
+    UserRole.Admin,
+  ])('returns 403 SCOPE_DENIED for the %s role', async (role) => {
+    const actor = await registerAndLogin(role);
 
-      const response = await request(app.getHttpServer())
-        .get('/api/v1/me/progress')
-        .set('Authorization', `Bearer ${actor.accessToken}`)
-        .expect(HttpStatus.FORBIDDEN);
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/me/progress')
+      .set('Authorization', `Bearer ${actor.accessToken}`)
+      .expect(HttpStatus.FORBIDDEN);
 
-      expect(response.body.statusCode).toBe(HttpStatus.FORBIDDEN);
-      expect(response.body.error).toBe('SCOPE_DENIED');
-    },
-  );
+    expect(response.body.statusCode).toBe(HttpStatus.FORBIDDEN);
+    expect(response.body.error).toBe('SCOPE_DENIED');
+  });
 });
