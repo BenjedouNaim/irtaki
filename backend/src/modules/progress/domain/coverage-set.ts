@@ -1,91 +1,67 @@
-import { InvalidCoverageIntervalError } from './coverage.errors';
-
-/**
- * One closed ordinal range [startOrdinal, endOrdinal] in the canonical
- * ayah-ordinal space (SAS §17.6: ordinal(s, a) = surah[s].ordinal_offset + a).
- * Mirrors a `coverage_intervals` row (DBT-10).
- */
-export interface CoverageInterval {
-  startOrdinal: number;
-  endOrdinal: number;
-}
+import { AyahRange } from './ayah-range';
 
 export interface CoverageInsertResult {
   /** The coverage after the insertion. */
   coverage: CoverageSet;
-  /** The single interval that now covers the inserted range. */
-  merged: CoverageInterval;
-  /** Prior intervals absorbed into `merged` (every one lies within it). */
-  absorbed: CoverageInterval[];
+  /** The single range that now covers the inserted one. */
+  merged: AyahRange;
+  /** Prior ranges absorbed into `merged` (every one lies within it). */
+  absorbed: AyahRange[];
 }
 
-function assertValidInterval(interval: CoverageInterval): void {
-  const { startOrdinal, endOrdinal } = interval;
-  if (
-    !Number.isInteger(startOrdinal) ||
-    !Number.isInteger(endOrdinal) ||
-    startOrdinal < 1
-  ) {
-    throw new InvalidCoverageIntervalError(
-      'Coverage interval ordinals must be positive integers',
-    );
-  }
-  if (endOrdinal < startOrdinal) {
-    throw new InvalidCoverageIntervalError(
-      'Coverage interval end ordinal must be >= start ordinal (BR-52)',
-    );
-  }
+function earlierStart(a: AyahRange, b: AyahRange): AyahRange {
+  return b.startOrdinal < a.startOrdinal ? b : a;
+}
+
+function laterEnd(a: AyahRange, b: AyahRange): AyahRange {
+  return b.endOrdinal > a.endOrdinal ? b : a;
+}
+
+/** The smallest range spanning every range given (all must touch in a chain). */
+function span(ranges: readonly AyahRange[]): AyahRange {
+  const first = ranges.reduce(earlierStart);
+  const last = ranges.reduce(laterEnd);
+  return AyahRange.of(first.start, last.end);
 }
 
 /**
  * VO-07 CoverageSet (DMS §8, SAS §17.6).
  *
- * An ordered set of disjoint, non-adjacent ordinal intervals. Closed under
- * union: `insert` merges every overlapping or adjacent interval into one, so a
+ * An ordered set of disjoint, non-adjacent AyahRanges (VO-02). Closed under
+ * union: `insert` merges every overlapping or adjacent range into one, so a
  * set can only ever grow (INV-18). Immutable — every operation returns a new
- * instance.
+ * instance. Range validity (BR-52) is AyahRange's responsibility, never
+ * re-checked here.
  */
 export class CoverageSet {
-  private constructor(
-    private readonly _intervals: readonly CoverageInterval[],
-  ) {}
+  private constructor(private readonly _intervals: readonly AyahRange[]) {}
 
   static empty(): CoverageSet {
     return new CoverageSet([]);
   }
 
   /**
-   * Builds a set from arbitrary intervals, normalising them into disjoint,
+   * Builds a set from arbitrary ranges, normalising them into disjoint,
    * non-adjacent, ascending order. Persisted intervals are always already
    * normalised; the fold is idempotent on such input.
    */
-  static fromIntervals(intervals: readonly CoverageInterval[]): CoverageSet {
-    intervals.forEach(assertValidInterval);
+  static fromRanges(ranges: readonly AyahRange[]): CoverageSet {
+    const sorted = [...ranges].sort((a, b) => a.startOrdinal - b.startOrdinal);
 
-    const sorted = [...intervals].sort(
-      (a, b) => a.startOrdinal - b.startOrdinal,
-    );
-
-    const normalised: CoverageInterval[] = [];
-    for (const interval of sorted) {
+    const normalised: AyahRange[] = [];
+    for (const range of sorted) {
       const last = normalised[normalised.length - 1];
-      if (last && interval.startOrdinal <= last.endOrdinal + 1) {
-        normalised[normalised.length - 1] = {
-          startOrdinal: last.startOrdinal,
-          endOrdinal: Math.max(last.endOrdinal, interval.endOrdinal),
-        };
+      if (last && last.touches(range)) {
+        normalised[normalised.length - 1] = span([last, range]);
       } else {
-        normalised.push({
-          startOrdinal: interval.startOrdinal,
-          endOrdinal: interval.endOrdinal,
-        });
+        normalised.push(range);
       }
     }
 
     return new CoverageSet(normalised);
   }
 
-  get intervals(): readonly CoverageInterval[] {
+  get intervals(): readonly AyahRange[] {
     return this._intervals;
   }
 
@@ -95,10 +71,7 @@ export class CoverageSet {
 
   /** Σ interval lengths — the numerator of `coverage_percent` (SAS §17.6). */
   get coveredAyahCount(): number {
-    return this._intervals.reduce(
-      (sum, i) => sum + (i.endOrdinal - i.startOrdinal + 1),
-      0,
-    );
+    return this._intervals.reduce((sum, i) => sum + i.ayahCount, 0);
   }
 
   /**
@@ -111,30 +84,21 @@ export class CoverageSet {
    * O(log n + k): binary search for the first candidate, then a scan over the
    * k merged neighbours.
    */
-  insert(range: CoverageInterval): CoverageInsertResult {
-    assertValidInterval(range);
-
-    const lo = range.startOrdinal;
-    const hi = range.endOrdinal;
-
+  insert(range: AyahRange): CoverageInsertResult {
     // First interval whose end reaches lo - 1 (ends are ascending because the
     // intervals are disjoint and sorted by start).
-    const first = this.lowerBoundByEnd(lo - 1);
+    const first = this.lowerBoundByEnd(range.startOrdinal - 1);
 
     let last = first;
     while (
       last < this._intervals.length &&
-      this._intervals[last].startOrdinal <= hi + 1
+      this._intervals[last].startOrdinal <= range.endOrdinal + 1
     ) {
       last++;
     }
 
     const absorbed = this._intervals.slice(first, last);
-
-    const merged: CoverageInterval = {
-      startOrdinal: Math.min(lo, ...absorbed.map((i) => i.startOrdinal)),
-      endOrdinal: Math.max(hi, ...absorbed.map((i) => i.endOrdinal)),
-    };
+    const merged = span([range, ...absorbed]);
 
     const next = [
       ...this._intervals.slice(0, first),
@@ -142,26 +106,16 @@ export class CoverageSet {
       ...this._intervals.slice(last),
     ];
 
-    return {
-      coverage: new CoverageSet(next),
-      merged,
-      absorbed: absorbed.map((i) => ({ ...i })),
-    };
+    return { coverage: new CoverageSet(next), merged, absorbed };
   }
 
-  /** True when the whole closed range [lo, hi] lies inside one interval. */
-  contains(range: CoverageInterval): boolean {
-    assertValidInterval(range);
-
+  /** True when the whole range lies inside one interval. */
+  contains(range: AyahRange): boolean {
     const idx = this.lowerBoundByEnd(range.startOrdinal);
     if (idx >= this._intervals.length) {
       return false;
     }
-    const candidate = this._intervals[idx];
-    return (
-      candidate.startOrdinal <= range.startOrdinal &&
-      candidate.endOrdinal >= range.endOrdinal
-    );
+    return this._intervals[idx].contains(range);
   }
 
   /** True when every interval of `other` is contained in this set. */
@@ -173,11 +127,7 @@ export class CoverageSet {
     if (this._intervals.length !== other._intervals.length) {
       return false;
     }
-    return this._intervals.every(
-      (i, idx) =>
-        i.startOrdinal === other._intervals[idx].startOrdinal &&
-        i.endOrdinal === other._intervals[idx].endOrdinal,
-    );
+    return this._intervals.every((i, idx) => i.equals(other._intervals[idx]));
   }
 
   /** Index of the first interval with endOrdinal >= value. */

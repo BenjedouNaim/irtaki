@@ -9,11 +9,23 @@
  * Nothing emits this event until EPIC-05 lands; the Progress listener is
  * registered ahead of time and stays dormant.
  */
+
+/** VO-01 AyahPosition as carried on the event: (surah, ayah) + ordinal. */
+export interface DailyReportAyahPosition {
+  surah: number;
+  ayah: number;
+  /** Canonical ordinal, `surahs[s].ordinal_offset + a` (SAS §17.6). */
+  ordinal: number;
+}
+
+/**
+ * VO-02 AyahRange as carried on the event (DMS §8, §19.2): a `start` and an
+ * `end` position, `end.ordinal >= start.ordinal` (BR-52). The producer builds
+ * it from a validated AyahRange; the consumer rebuilds the AyahRange from it.
+ */
 export interface DailyReportMemoRange {
-  /** Canonical ordinal of the range start (daily_reports.memo_from_ordinal). */
-  fromOrdinal: number;
-  /** Canonical ordinal of the range end (daily_reports.memo_to_ordinal). */
-  toOrdinal: number;
+  start: DailyReportAyahPosition;
+  end: DailyReportAyahPosition;
 }
 
 export type DailyReportType = 'Normal' | 'Absent' | 'Revision';

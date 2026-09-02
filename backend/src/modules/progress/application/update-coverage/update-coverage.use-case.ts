@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { DailyReportSubmittedEvent } from '../../../reports/domain/events/daily-report-submitted.event';
-import { CoverageInterval, CoverageSet } from '../../domain/coverage-set';
+import { AyahRange } from '../../domain/ayah-range';
 import {
   COVERAGE_REPOSITORY,
   type ICoverageRepository,
@@ -13,6 +13,11 @@ import {
   type IHizbBoundaryRepository,
 } from '../../domain/hizb-boundary.repository.interface';
 import { MemorizationProgressEngine } from '../../domain/memorization-progress-engine';
+import {
+  SURAH_REPOSITORY,
+  type ISurahRepository,
+} from '../../domain/surah.repository.interface';
+import { toCoverageSet } from '../coverage-set.mapper';
 
 export type UpdateCoverageOutcome =
   | { status: 'skipped'; reason: 'NO_MEMO_RANGE' | 'COVERAGE_NOT_FOUND' }
@@ -21,7 +26,7 @@ export type UpdateCoverageOutcome =
       membershipId: string;
       ahzabCompleted: number;
       lastMemorizedOrdinal: number;
-      intervals: readonly CoverageInterval[];
+      intervals: readonly AyahRange[];
     };
 
 /**
@@ -40,6 +45,8 @@ export class UpdateCoverageUseCase {
     private readonly coverageRepository: ICoverageRepository,
     @Inject(HIZB_BOUNDARY_REPOSITORY)
     private readonly hizbBoundaryRepository: IHizbBoundaryRepository,
+    @Inject(SURAH_REPOSITORY)
+    private readonly surahRepository: ISurahRepository,
     private readonly dataSource: DataSource,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -52,12 +59,18 @@ export class UpdateCoverageUseCase {
       return { status: 'skipped', reason: 'NO_MEMO_RANGE' };
     }
 
-    const range: CoverageInterval = {
-      startOrdinal: event.memoRange.fromOrdinal,
-      endOrdinal: event.memoRange.toOrdinal,
-    };
+    const surahs = await this.surahRepository.findAll();
 
-    const hizbBoundaries = await this.hizbBoundaryRepository.findAll();
+    // VO-02: the one place BR-52 and the ordinal derivation are enforced.
+    const range = AyahRange.fromSurahAyah(
+      event.memoRange.start,
+      event.memoRange.end,
+      surahs,
+    );
+
+    const hizbRanges = (await this.hizbBoundaryRepository.findAll()).map((h) =>
+      AyahRange.fromOrdinals(h.startOrdinal, h.endOrdinal, surahs),
+    );
 
     const merge = await this.dataSource.transaction(async (manager) => {
       const record = await this.coverageRepository.findByMembershipId(
@@ -68,17 +81,20 @@ export class UpdateCoverageUseCase {
         return null;
       }
 
-      const current = CoverageSet.fromIntervals(record.intervals);
+      const current = toCoverageSet(record.intervals, surahs);
       const result = MemorizationProgressEngine.merge(
         current,
         range,
-        hizbBoundaries,
+        hizbRanges,
       );
 
       await this.coverageRepository.applyMerge(
         record.id,
         {
-          merged: result.merged,
+          merged: {
+            startOrdinal: result.merged.startOrdinal,
+            endOrdinal: result.merged.endOrdinal,
+          },
           ahzabCompleted: result.ahzabCompleted,
           lastMemorizedOrdinal: result.lastMemorizedOrdinal,
         },

@@ -14,7 +14,10 @@ describe('DailyReportSubmittedListener (DE-05 subscription)', () => {
     'membership-1',
     '2026-09-02',
     'Normal',
-    { fromOrdinal: 1, toOrdinal: 7 },
+    {
+      start: { surah: 1, ayah: 1, ordinal: 1 },
+      end: { surah: 1, ayah: 7, ordinal: 7 },
+    },
   );
 
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import { CoverageInterval } from '../coverage-set';
+import { AyahRange } from '../ayah-range';
 
 /**
  * DE-06 CoverageUpdated (DMS §17) — effect of DE-05 when a memorisation range
@@ -10,7 +10,8 @@ export class CoverageUpdatedEvent {
 
   constructor(
     public readonly membershipId: string,
-    public readonly intervals: readonly CoverageInterval[],
+    /** The new interval set (VO-07): disjoint, non-adjacent AyahRanges. */
+    public readonly intervals: readonly AyahRange[],
     public readonly ahzabCompleted: number,
   ) {}
 }

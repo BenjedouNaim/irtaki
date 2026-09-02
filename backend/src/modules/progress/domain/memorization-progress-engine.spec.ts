@@ -1,27 +1,39 @@
-import { CoverageInterval, CoverageSet } from './coverage-set';
+import { SurahOrdinalInfo } from './ayah-position';
+import { AyahRange } from './ayah-range';
+import { CoverageSet } from './coverage-set';
 import { CoverageShrinkError } from './coverage.errors';
-import {
-  HizbOrdinalRange,
-  MemorizationProgressEngine,
-} from './memorization-progress-engine';
+import { MemorizationProgressEngine } from './memorization-progress-engine';
 
 /**
- * Fixture hizb boundaries in a tiny synthetic ordinal space: five ahzab of
- * 100 ayat each (T = 500). The algorithm is riwaya-agnostic (TS §23), so the
- * real 60-hizb / 6214-ayah dataset is only exercised by the integration test.
+ * Fixture in a tiny synthetic ordinal space: five surahs of 100 ayat and five
+ * ahzab of 100 ayat each (T = 500). The algorithm is riwaya-agnostic (TS §23),
+ * so the real 60-hizb / 6214-ayah dataset is only exercised by the
+ * integration test.
  */
-const HIZB_FIXTURE: HizbOrdinalRange[] = [
-  { hizbNumber: 1, startOrdinal: 1, endOrdinal: 100 },
-  { hizbNumber: 2, startOrdinal: 101, endOrdinal: 200 },
-  { hizbNumber: 3, startOrdinal: 201, endOrdinal: 300 },
-  { hizbNumber: 4, startOrdinal: 301, endOrdinal: 400 },
-  { hizbNumber: 5, startOrdinal: 401, endOrdinal: 500 },
-];
+const SURAHS: SurahOrdinalInfo[] = Array.from({ length: 5 }, (_, i) => ({
+  number: i + 1,
+  ayahCount: 100,
+  ordinalOffset: i * 100,
+}));
 const TOTAL_AYAHS = 500;
+
+const r = (lo: number, hi: number): AyahRange =>
+  AyahRange.fromOrdinals(lo, hi, SURAHS);
+
+const HIZB_FIXTURE: AyahRange[] = [
+  r(1, 100),
+  r(101, 200),
+  r(201, 300),
+  r(301, 400),
+  r(401, 500),
+];
+
+const ords = (ranges: readonly AyahRange[]): Array<[number, number]> =>
+  ranges.map((i) => [i.startOrdinal, i.endOrdinal]);
 
 function applyAll(
   start: CoverageSet,
-  submissions: CoverageInterval[],
+  submissions: AyahRange[],
 ): { coverage: CoverageSet; ahzabCompleted: number; last: number } {
   let coverage = start;
   let ahzabCompleted = 0;
@@ -49,28 +61,24 @@ describe('MemorizationProgressEngine (DS-05)', () => {
   describe('ADR-008 memorisation patterns', () => {
     it('forward: consecutive ranges extend rightward into one block', () => {
       const { coverage, ahzabCompleted, last } = applyAll(CoverageSet.empty(), [
-        { startOrdinal: 1, endOrdinal: 40 },
-        { startOrdinal: 41, endOrdinal: 100 },
-        { startOrdinal: 101, endOrdinal: 150 },
+        r(1, 40),
+        r(41, 100),
+        r(101, 150),
       ]);
 
-      expect(coverage.intervals).toEqual([
-        { startOrdinal: 1, endOrdinal: 150 },
-      ]);
+      expect(ords(coverage.intervals)).toEqual([[1, 150]]);
       expect(ahzabCompleted).toBe(1);
       expect(last).toBe(150);
     });
 
     it('backward: consecutive ranges extend leftward into one block', () => {
       const { coverage, ahzabCompleted, last } = applyAll(CoverageSet.empty(), [
-        { startOrdinal: 451, endOrdinal: 500 },
-        { startOrdinal: 401, endOrdinal: 450 },
-        { startOrdinal: 351, endOrdinal: 400 },
+        r(451, 500),
+        r(401, 450),
+        r(351, 400),
       ]);
 
-      expect(coverage.intervals).toEqual([
-        { startOrdinal: 351, endOrdinal: 500 },
-      ]);
+      expect(ords(coverage.intervals)).toEqual([[351, 500]]);
       expect(ahzabCompleted).toBe(1);
       // Activity pointer follows the most recent submission, not the frontier.
       expect(last).toBe(400);
@@ -78,62 +86,53 @@ describe('MemorizationProgressEngine (DS-05)', () => {
 
     it('middle start, both directions: direction is never stored', () => {
       const { coverage, ahzabCompleted } = applyAll(CoverageSet.empty(), [
-        { startOrdinal: 250, endOrdinal: 260 },
-        { startOrdinal: 261, endOrdinal: 300 },
-        { startOrdinal: 201, endOrdinal: 249 },
+        r(250, 260),
+        r(261, 300),
+        r(201, 249),
       ]);
 
-      expect(coverage.intervals).toEqual([
-        { startOrdinal: 201, endOrdinal: 300 },
-      ]);
+      expect(ords(coverage.intervals)).toEqual([[201, 300]]);
       expect(ahzabCompleted).toBe(1);
     });
 
     it('skip and resume: a second disjoint interval simply appears, no error', () => {
       const { coverage, ahzabCompleted } = applyAll(CoverageSet.empty(), [
-        { startOrdinal: 1, endOrdinal: 50 },
-        { startOrdinal: 301, endOrdinal: 400 },
+        r(1, 50),
+        r(301, 400),
       ]);
 
-      expect(coverage.intervals).toEqual([
-        { startOrdinal: 1, endOrdinal: 50 },
-        { startOrdinal: 301, endOrdinal: 400 },
+      expect(ords(coverage.intervals)).toEqual([
+        [1, 50],
+        [301, 400],
       ]);
       expect(ahzabCompleted).toBe(1);
     });
 
     it('overlapping range: the union absorbs it, nothing is double-counted', () => {
       const { coverage, ahzabCompleted } = applyAll(CoverageSet.empty(), [
-        { startOrdinal: 1, endOrdinal: 60 },
-        { startOrdinal: 40, endOrdinal: 100 },
-        { startOrdinal: 10, endOrdinal: 20 },
+        r(1, 60),
+        r(40, 100),
+        r(10, 20),
       ]);
 
-      expect(coverage.intervals).toEqual([
-        { startOrdinal: 1, endOrdinal: 100 },
-      ]);
+      expect(ords(coverage.intervals)).toEqual([[1, 100]]);
       expect(coverage.coveredAyahCount).toBe(100);
       expect(ahzabCompleted).toBe(1);
     });
 
     it('adjacent range: touching intervals merge into one', () => {
-      const seeded = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 100 },
-        { startOrdinal: 201, endOrdinal: 300 },
-      ]);
+      const seeded = CoverageSet.fromRanges([r(1, 100), r(201, 300)]);
       const result = MemorizationProgressEngine.merge(
         seeded,
-        { startOrdinal: 101, endOrdinal: 200 },
+        r(101, 200),
         HIZB_FIXTURE,
       );
 
-      expect(result.coverage.intervals).toEqual([
-        { startOrdinal: 1, endOrdinal: 300 },
-      ]);
-      expect(result.merged).toEqual({ startOrdinal: 1, endOrdinal: 300 });
-      expect(result.absorbed).toEqual([
-        { startOrdinal: 1, endOrdinal: 100 },
-        { startOrdinal: 201, endOrdinal: 300 },
+      expect(ords(result.coverage.intervals)).toEqual([[1, 300]]);
+      expect(result.merged.equals(r(1, 300))).toBe(true);
+      expect(ords(result.absorbed)).toEqual([
+        [1, 100],
+        [201, 300],
       ]);
       expect(result.ahzabCompleted).toBe(3);
     });
@@ -141,12 +140,10 @@ describe('MemorizationProgressEngine (DS-05)', () => {
 
   describe('INV-18 — coverage never shrinks', () => {
     it('a fully-covered resubmission leaves coverage unchanged', () => {
-      const seeded = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 200 },
-      ]);
+      const seeded = CoverageSet.fromRanges([r(1, 200)]);
       const result = MemorizationProgressEngine.merge(
         seeded,
-        { startOrdinal: 50, endOrdinal: 60 },
+        r(50, 60),
         HIZB_FIXTURE,
       );
 
@@ -156,12 +153,8 @@ describe('MemorizationProgressEngine (DS-05)', () => {
     });
 
     it('assertNeverShrinks throws when the after-state loses coverage', () => {
-      const before = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 100 },
-      ]);
-      const after = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 50 },
-      ]);
+      const before = CoverageSet.fromRanges([r(1, 100)]);
+      const after = CoverageSet.fromRanges([r(1, 50)]);
       expect(() =>
         MemorizationProgressEngine.assertNeverShrinks(before, after),
       ).toThrow(CoverageShrinkError);
@@ -173,10 +166,10 @@ describe('MemorizationProgressEngine (DS-05)', () => {
 
   describe('derived figures (SAS §17.6)', () => {
     it('counts a hizb only when its entire span is covered (BR-51)', () => {
-      const coverage = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 100 },
-        { startOrdinal: 101, endOrdinal: 199 },
-        { startOrdinal: 301, endOrdinal: 500 },
+      const coverage = CoverageSet.fromRanges([
+        r(1, 100),
+        r(101, 199),
+        r(301, 500),
       ]);
       expect(
         MemorizationProgressEngine.computeAhzabCompleted(
@@ -187,9 +180,7 @@ describe('MemorizationProgressEngine (DS-05)', () => {
     });
 
     it('computes coverage_percent as covered / T × 100 rounded to 2 decimals', () => {
-      const coverage = CoverageSet.fromIntervals([
-        { startOrdinal: 1, endOrdinal: 3 },
-      ]);
+      const coverage = CoverageSet.fromRanges([r(1, 3)]);
       expect(
         MemorizationProgressEngine.computeCoveragePercent(
           coverage,
@@ -198,7 +189,7 @@ describe('MemorizationProgressEngine (DS-05)', () => {
       ).toBe(0.6);
       expect(
         MemorizationProgressEngine.computeCoveragePercent(
-          CoverageSet.fromIntervals([{ startOrdinal: 1, endOrdinal: 1 }]),
+          CoverageSet.fromRanges([r(1, 1)]),
           6214,
         ),
       ).toBe(0.02);
@@ -212,8 +203,8 @@ describe('MemorizationProgressEngine (DS-05)', () => {
 
     it('records the end of the most recent submission as the activity pointer', () => {
       const result = MemorizationProgressEngine.merge(
-        CoverageSet.fromIntervals([{ startOrdinal: 400, endOrdinal: 500 }]),
-        { startOrdinal: 10, endOrdinal: 20 },
+        CoverageSet.fromRanges([r(400, 500)]),
+        r(10, 20),
         HIZB_FIXTURE,
       );
       expect(result.lastMemorizedOrdinal).toBe(20);

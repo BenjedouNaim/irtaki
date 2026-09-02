@@ -12,7 +12,10 @@ import {
   MAILER,
 } from '../../src/modules/identity/domain/mailer.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { DailyReportSubmittedEvent } from '../../src/modules/reports/domain/events/daily-report-submitted.event';
+import {
+  DailyReportAyahPosition,
+  DailyReportSubmittedEvent,
+} from '../../src/modules/reports/domain/events/daily-report-submitted.event';
 import { CoverageUpdatedEvent } from '../../src/modules/progress/domain/events/coverage-updated.event';
 
 interface IntervalRow {
@@ -31,6 +34,12 @@ interface HizbRow {
   end_ordinal: number;
 }
 
+interface SurahRow {
+  number: number;
+  ayah_count: number;
+  ordinal_offset: number;
+}
+
 describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
@@ -43,6 +52,7 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
   };
 
   let hizb: Map<number, HizbRow>;
+  let surahs: SurahRow[];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -64,6 +74,15 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
       'SELECT hizb_number, start_ordinal, end_ordinal FROM hizb_boundaries ORDER BY hizb_number',
     );
     hizb = new Map(rows.map((r) => [Number(r.hizb_number), r]));
+
+    const surahRows: SurahRow[] = await dataSource.query(
+      'SELECT number, ayah_count, ordinal_offset FROM surahs ORDER BY number',
+    );
+    surahs = surahRows.map((s) => ({
+      number: Number(s.number),
+      ayah_count: Number(s.ayah_count),
+      ordinal_offset: Number(s.ordinal_offset),
+    }));
   });
 
   afterAll(async () => {
@@ -208,6 +227,20 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
     };
   }
 
+  /** VO-01 shape for an ordinal, resolved against the real `surahs` table. */
+  function position(ordinal: number): DailyReportAyahPosition {
+    const surah = surahs.find(
+      (s) =>
+        ordinal > s.ordinal_offset &&
+        ordinal <= s.ordinal_offset + s.ayah_count,
+    )!;
+    return {
+      surah: surah.number,
+      ayah: ordinal - surah.ordinal_offset,
+      ordinal,
+    };
+  }
+
   async function emitDailyReportSubmitted(
     membershipId: string,
     memoRange: { fromOrdinal: number; toOrdinal: number } | null,
@@ -219,7 +252,12 @@ describe('DE-05 → DS-05 coverage engine (F-PRG-01 Integration)', () => {
         membershipId,
         '2026-09-02',
         type,
-        memoRange,
+        memoRange
+          ? {
+              start: position(memoRange.fromOrdinal),
+              end: position(memoRange.toOrdinal),
+            }
+          : null,
       ),
     );
   }

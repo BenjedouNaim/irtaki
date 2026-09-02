@@ -1,20 +1,14 @@
-import { CoverageInterval, CoverageSet } from './coverage-set';
+import { AyahRange } from './ayah-range';
+import { CoverageSet } from './coverage-set';
 import { CoverageShrinkError } from './coverage.errors';
-
-/** A hizb's ordinal span, from the `hizb_boundaries` reference data (DBT-12). */
-export interface HizbOrdinalRange {
-  hizbNumber: number;
-  startOrdinal: number;
-  endOrdinal: number;
-}
 
 export interface CoverageMergeResult {
   /** The updated coverage (INV-18: a superset of the input coverage). */
   coverage: CoverageSet;
-  /** The interval now covering the submitted range (see CoverageSet.insert). */
-  merged: CoverageInterval;
-  /** Prior intervals absorbed into `merged`. */
-  absorbed: CoverageInterval[];
+  /** The range now covering the submitted one (see CoverageSet.insert). */
+  merged: AyahRange;
+  /** Prior ranges absorbed into `merged`. */
+  absorbed: AyahRange[];
   /** BR-51 / FR-PROG-02: count of ahzab whose full span lies in coverage. */
   ahzabCompleted: number;
   /**
@@ -27,7 +21,7 @@ export interface CoverageMergeResult {
 /**
  * DS-05 MemorizationProgressEngine (DMS §16, SAS §17.6, ADR-008).
  *
- * Pure interval-merge algorithm: existing CoverageSet + a submitted ayah range
+ * Pure interval-merge algorithm: existing CoverageSet + a submitted AyahRange
  * → updated CoverageSet + recomputed `ahzab_completed`. No I/O. Handles
  * forward, backward, middle-start, skip-and-resume, overlapping and adjacent
  * memorisation uniformly, because direction is never stored (BR-50).
@@ -38,8 +32,8 @@ export interface CoverageMergeResult {
 export class MemorizationProgressEngine {
   static merge(
     current: CoverageSet,
-    range: CoverageInterval,
-    hizbBoundaries: readonly HizbOrdinalRange[],
+    range: AyahRange,
+    hizbRanges: readonly AyahRange[],
   ): CoverageMergeResult {
     const { coverage, merged, absorbed } = current.insert(range);
 
@@ -51,25 +45,22 @@ export class MemorizationProgressEngine {
       absorbed,
       ahzabCompleted: MemorizationProgressEngine.computeAhzabCompleted(
         coverage,
-        hizbBoundaries,
+        hizbRanges,
       ),
       lastMemorizedOrdinal: range.endOrdinal,
     };
   }
 
-  /** SAS §17.6: |{ h ∈ 1..60 : [h.start_ordinal, h.end_ordinal] ⊆ coverage }| */
+  /**
+   * SAS §17.6: |{ h ∈ 1..60 : [h.start_ordinal, h.end_ordinal] ⊆ coverage }|
+   * — `hizbRanges` are the `hizb_boundaries` spans (DBT-12) as AyahRanges.
+   */
   static computeAhzabCompleted(
     coverage: CoverageSet,
-    hizbBoundaries: readonly HizbOrdinalRange[],
+    hizbRanges: readonly AyahRange[],
   ): number {
-    return hizbBoundaries.reduce(
-      (count, hizb) =>
-        coverage.contains({
-          startOrdinal: hizb.startOrdinal,
-          endOrdinal: hizb.endOrdinal,
-        })
-          ? count + 1
-          : count,
+    return hizbRanges.reduce(
+      (count, hizb) => (coverage.contains(hizb) ? count + 1 : count),
       0,
     );
   }
