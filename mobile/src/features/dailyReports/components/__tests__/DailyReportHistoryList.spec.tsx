@@ -257,4 +257,56 @@ describe('DailyReportHistoryList (SCR-14 Daily sub-tab, F-DR-05)', () => {
     expect(await screen.findByTestId('daily-report-row-r1')).toBeTruthy();
     expect(screen.queryByTestId('daily-report-history-page-error')).toBeNull();
   });
+
+  it('reads API-032 for the given membership — and never API-031 — under the caller-chosen testID (SCR-25 reuse, F-DR-06)', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'listMembershipDailyReports')
+      .mockResolvedValueOnce(page1)
+      .mockResolvedValueOnce(page2);
+    const onOpenReport = jest.fn();
+
+    renderList({
+      membershipId: 'membership-1',
+      onOpenReport,
+      testID: 'raw-daily-reports',
+    });
+
+    const list = await screen.findByTestId('raw-daily-reports-list');
+    expect(dailyReportsApi.listMembershipDailyReports).toHaveBeenCalledWith(
+      'membership-1',
+      { limit: 20 },
+    );
+    expect(dailyReportsApi.listOwnDailyReports).not.toHaveBeenCalled();
+
+    fireEvent(list, 'onEndReached');
+    expect(await screen.findByTestId('daily-report-row-r1')).toBeTruthy();
+    expect(dailyReportsApi.listMembershipDailyReports).toHaveBeenLastCalledWith(
+      'membership-1',
+      {
+        limit: 20,
+        cursor: 'cursor-2',
+      },
+    );
+
+    fireEvent.press(screen.getByTestId('daily-report-row-r3'));
+    expect(onOpenReport).toHaveBeenCalledWith(page1.data[0]);
+  });
+
+  it('shows the filter Arabic message verbatim on the uniform 403 of an out-of-scope membership (UF §24)', async () => {
+    jest.spyOn(dailyReportsApi, 'listMembershipDailyReports').mockRejectedValue(
+      new ApiError({
+        statusCode: 403,
+        error: 'SCOPE_DENIED',
+        message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+      }),
+    );
+
+    renderList({ membershipId: 'membership-1', testID: 'raw-daily-reports' });
+
+    expect(await screen.findByTestId('raw-daily-reports-error')).toBeTruthy();
+    expect(
+      screen.getByText('ليس لديك صلاحية للوصول إلى هذا المورد'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('raw-daily-reports-list')).toBeNull();
+  });
 });

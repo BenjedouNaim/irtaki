@@ -166,4 +166,32 @@ describe('RosterScreen (F-MEM-02)', () => {
     ).toBeTruthy();
     expect(getByTestId('roster-error')).toBeTruthy();
   });
+
+  it('hands an Active row to onActiveMemberPress and keeps Terminated rows inert when recovery is off (Teacher roster → SCR-25)', async () => {
+    jest
+      .spyOn(membershipsApi, 'getGroupMemberships')
+      .mockResolvedValueOnce({ data: mockRoster });
+    const onActiveMemberPress = jest.fn();
+
+    const { getByTestId, findByText } = render(
+      <RosterScreen
+        groupId={mockGroupId}
+        onActiveMemberPress={onActiveMemberPress}
+        canOpenRecovery={false}
+      />,
+    );
+
+    expect(await findByText('محمد بن علي')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('roster-row-membership-1'));
+    });
+    expect(onActiveMemberPress).toHaveBeenCalledWith(mockRoster[0]);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('roster-row-membership-2'));
+    });
+    expect(onActiveMemberPress).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });
