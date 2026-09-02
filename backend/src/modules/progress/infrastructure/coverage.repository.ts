@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { EntityManager, In } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   ApplyCoverageMergeParams,
@@ -27,6 +28,11 @@ interface RawIntervalRow {
 
 @Injectable()
 export class CoverageRepository implements ICoverageRepository {
+  constructor(
+    @InjectRepository(MemorizationCoverageTypeOrmEntity)
+    private readonly coverageRepo: Repository<MemorizationCoverageTypeOrmEntity>,
+  ) {}
+
   async seedFromHizbSelection(
     membershipId: string,
     hizbNumbers: number[],
@@ -64,7 +70,7 @@ export class CoverageRepository implements ICoverageRepository {
 
   async findByMembershipId(
     membershipId: string,
-    manager: EntityManager,
+    manager: EntityManager = this.coverageRepo.manager,
   ): Promise<CoverageRecord | null> {
     const rows = await manager.query<RawCoverageRow[]>(
       `SELECT id, membership_id, ahzab_completed, last_memorized_ordinal, updated_at::text AS updated_at
