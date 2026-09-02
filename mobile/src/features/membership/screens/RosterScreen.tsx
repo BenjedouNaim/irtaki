@@ -10,7 +10,27 @@ import {
 } from '@/shared/api/memberships.client';
 import { ApiError } from '@/shared/api/types';
 
-export default function RosterScreen({ groupId }: { groupId: string }) {
+export interface RosterScreenProps {
+  groupId: string;
+  /**
+   * Active row tap. The Teacher's student list (SCR-23 roster portion)
+   * passes the way into that student's raw daily reports (SCR-25, F-DR-06);
+   * without it Active rows are not tappable (Admin's SCR-30).
+   */
+  onActiveMemberPress?: (entry: RosterEntry) => void;
+  /**
+   * Whether a Terminated row opens the Admin recovery view (SCR-31). Roles
+   * without that route must pass `false` — navigation never offers an
+   * out-of-scope screen (UF §8).
+   */
+  canOpenRecovery?: boolean;
+}
+
+export default function RosterScreen({
+  groupId,
+  onActiveMemberPress,
+  canOpenRecovery = true,
+}: RosterScreenProps) {
   const router = useRouter();
   const [entries, setEntries] = useState<RosterEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,21 +57,31 @@ export default function RosterScreen({ groupId }: { groupId: string }) {
     fetchRoster();
   }, [fetchRoster]);
 
+  const isRowPressable = (item: RosterEntry) =>
+    item.state === 'Terminated'
+      ? canOpenRecovery
+      : Boolean(onActiveMemberPress);
+
   const handleRowPress = (item: RosterEntry) => {
     if (item.state === 'Terminated') {
-      router.push({
-        pathname: '/(app)/admin/memberships/[id]/recovery' as any,
-        params: { id: item.id },
-      });
+      if (canOpenRecovery) {
+        router.push({
+          pathname: '/(app)/admin/memberships/[id]/recovery' as any,
+          params: { id: item.id },
+        });
+      }
+      return;
     }
+    onActiveMemberPress?.(item);
   };
 
   const renderItem = ({ item }: { item: RosterEntry }) => {
-    const isTerminated = item.state === 'Terminated';
     return (
       <Pressable
         testID={`roster-row-${item.id}`}
-        disabled={!isTerminated}
+        accessibilityRole="button"
+        accessibilityLabel={item.user.full_name || 'غير محدد'}
+        disabled={!isRowPressable(item)}
         onPress={() => handleRowPress(item)}
         className="p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex-row-reverse items-center justify-between gap-3 active:opacity-70"
         style={{ borderCurve: 'continuous' }}

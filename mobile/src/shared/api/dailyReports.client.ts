@@ -151,12 +151,14 @@ export async function submitDailyReport(
 }
 
 /**
- * API-031 `GET /daily-reports?from=&to=` query (APIS §9.2 cursor params,
- * §9.3 `from`/`to` as `YYYY-MM-DD`). SCR-14 sends no date filter (UF §15:
- * "no date-range filter control despite API support") — the fields exist
- * so the client mirrors the contract, not because a screen uses them.
+ * Query of both daily-report history lists — API-031 `GET /daily-reports`
+ * and API-032 `GET /memberships/{id}/daily-reports` share it (APIS §10.7
+ * "same shape"): APIS §9.2 cursor params, §9.3 `from`/`to` as `YYYY-MM-DD`.
+ * Neither SCR-14 nor SCR-25 sends a date filter (UF §15: "no date-range
+ * filter control despite API support") — the fields exist so the client
+ * mirrors the contract, not because a screen uses them.
  */
-export interface ListOwnDailyReportsParams {
+export interface DailyReportListParams {
   from?: string;
   to?: string;
   cursor?: string;
@@ -164,11 +166,26 @@ export interface ListOwnDailyReportsParams {
 }
 
 /** APIS §9.1 collection envelope — cursor block, no totals. */
-export interface ListOwnDailyReportsResponse {
+export interface DailyReportListResponse {
   data: DailyReportDto[];
   pagination: {
     next_cursor: string | null;
     has_more: boolean;
+  };
+}
+
+/** API-031 names kept for the own-history callers; same shapes as above. */
+export type ListOwnDailyReportsParams = DailyReportListParams;
+export type ListOwnDailyReportsResponse = DailyReportListResponse;
+
+function toListQuery(
+  params: DailyReportListParams,
+): Record<string, string | number> {
+  return {
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.to ? { to: params.to } : {}),
+    ...(params.cursor ? { cursor: params.cursor } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
   };
 }
 
@@ -179,14 +196,25 @@ export interface ListOwnDailyReportsResponse {
  * screen consumes (APIS §9.2).
  */
 export async function listOwnDailyReports(
-  params: ListOwnDailyReportsParams = {},
-): Promise<ListOwnDailyReportsResponse> {
-  return apiClient.get<ListOwnDailyReportsResponse>('/daily-reports', {
-    params: {
-      ...(params.from ? { from: params.from } : {}),
-      ...(params.to ? { to: params.to } : {}),
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.limit !== undefined ? { limit: params.limit } : {}),
-    },
+  params: DailyReportListParams = {},
+): Promise<DailyReportListResponse> {
+  return apiClient.get<DailyReportListResponse>('/daily-reports', {
+    params: toListQuery(params),
   });
+}
+
+/**
+ * Fetches one page of ONE student's raw daily report list as staff
+ * (Teacher of the assigned group / Admin, API-032) — the same page shape
+ * as API-031. An out-of-scope, non-existent or terminated membership is a
+ * uniform `403 SCOPE_DENIED` (SA §14), surfaced unchanged as `ApiError`.
+ */
+export async function listMembershipDailyReports(
+  membershipId: string,
+  params: DailyReportListParams = {},
+): Promise<DailyReportListResponse> {
+  return apiClient.get<DailyReportListResponse>(
+    `/memberships/${encodeURIComponent(membershipId)}/daily-reports`,
+    { params: toListQuery(params) },
+  );
 }
