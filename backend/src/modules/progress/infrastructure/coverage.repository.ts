@@ -140,6 +140,29 @@ export class CoverageRepository implements ICoverageRepository {
     return this.hydrate(rows[0]);
   }
 
+  async findByMembershipIdForStaff(
+    membershipId: string,
+    scope: { callerId: string; isAdmin: boolean },
+  ): Promise<CoverageRecord | null> {
+    const manager = this.coverageRepo.manager;
+    const rows = await manager.query<RawCoverageRow[]>(
+      `SELECT c.id, c.membership_id, c.ahzab_completed, c.last_memorized_ordinal
+         FROM memorization_coverage c
+         JOIN memberships m ON m.id = c.membership_id
+         JOIN groups g ON g.id = m.group_id
+        WHERE c.membership_id = $1
+          AND c.deleted_at IS NULL
+          AND ($3::boolean OR g.teacher_id = $2)`,
+      [membershipId, scope.callerId, scope.isAdmin],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.hydrate(rows[0], manager);
+  }
+
   async applyMerge(
     coverageId: string,
     params: ApplyCoverageMergeParams,

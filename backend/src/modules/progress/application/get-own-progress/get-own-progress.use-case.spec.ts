@@ -29,6 +29,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findByMembershipIdForStaff: jest.fn(),
       applyMerge: jest.fn(),
     };
     surahRepository = {

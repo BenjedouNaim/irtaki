@@ -18,8 +18,6 @@ import { GetStudentProgressUseCase } from './application/get-student-progress/ge
 import { QuranController } from './presentation/quran.controller';
 import { ProgressController } from './presentation/progress.controller';
 import { MembershipProgressController } from './presentation/membership-progress.controller';
-import { MembershipsModule } from '../memberships/memberships.module';
-import { GroupsModule } from '../groups/groups.module';
 
 @Module({
   imports: [
@@ -29,8 +27,6 @@ import { GroupsModule } from '../groups/groups.module';
       HizbBoundaryTypeOrmEntity,
       SurahTypeOrmEntity,
     ]),
-    MembershipsModule,
-    GroupsModule,
   ],
   controllers: [
     QuranController,

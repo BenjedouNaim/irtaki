@@ -69,7 +69,6 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findStateAndUserById: jest.fn(),
       terminateConditionally: jest.fn(),
       softDeleteMembershipRecords: jest.fn(),
-      findScopeById: jest.fn(),
     };
 
     mockUserRepo = {
@@ -85,6 +84,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findByMembershipIdForStaff: jest.fn(),
       applyMerge: jest.fn(),
     };
 

@@ -118,7 +118,6 @@ describe('GetRecoveryUseCase', () => {
       findStateAndUserById: jest.fn(),
       terminateConditionally: jest.fn(),
       softDeleteMembershipRecords: jest.fn(),
-      findScopeById: jest.fn(),
     };
     useCase = new GetRecoveryUseCase(membershipRepository);
   });

@@ -1,18 +1,5 @@
-import {
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  GROUP_REPOSITORY,
-  type IGroupRepository,
-} from '../../../groups/domain/group.repository.interface';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { UserRole } from '../../../identity/domain/user-role.enum';
-import {
-  MEMBERSHIP_REPOSITORY,
-  type IMembershipRepository,
-} from '../../../memberships/domain/membership.repository.interface';
 import {
   COVERAGE_REPOSITORY,
   type ICoverageRepository,
@@ -31,16 +18,15 @@ const MEMBERSHIP_ID_SHAPE =
  * F-PRG-03 / API-042 `GET /memberships/{id}/progress`.
  *
  * Scope (APIS §6.1): Admin — all; Teacher — memberships of an assigned group
- * only, with the uniform 403 for anything out of scope or non-existent
- * (NFR-20). Assistant never reaches here (DEC-B09, RolesGuard).
+ * only. Resolved by the Progress module's own repository in one indexed
+ * lookup with the caller's scope in the predicate (TS §15.2, SA §11).
+ * Out-of-scope, non-existent, malformed and no-longer-live ids all get the
+ * same 403 (SA §14, NFR-20). Assistant never reaches here (DEC-B09,
+ * RolesGuard).
  */
 @Injectable()
 export class GetStudentProgressUseCase {
   constructor(
-    @Inject(GROUP_REPOSITORY)
-    private readonly groupRepository: IGroupRepository,
-    @Inject(MEMBERSHIP_REPOSITORY)
-    private readonly membershipRepository: IMembershipRepository,
     @Inject(COVERAGE_REPOSITORY)
     private readonly coverageRepository: ICoverageRepository,
     @Inject(SURAH_REPOSITORY)
@@ -52,43 +38,24 @@ export class GetStudentProgressUseCase {
     callerRole: UserRole,
     membershipId: string,
   ): Promise<GetStudentProgressResponseDto> {
-    const membership = MEMBERSHIP_ID_SHAPE.test(membershipId)
-      ? await this.membershipRepository.findScopeById(membershipId)
-      : null;
-
-    if (callerRole === UserRole.Teacher) {
-      if (!membership) {
-        throw new ForbiddenException();
-      }
-      const assigned =
-        await this.groupRepository.findByStaffIdForList(callerId);
-      if (!assigned.some((group) => group.id === membership.groupId)) {
-        throw new ForbiddenException();
-      }
-    } else if (callerRole === UserRole.Admin) {
-      if (!membership) {
-        throw this.notFound();
-      }
-    } else {
+    if (callerRole !== UserRole.Admin && callerRole !== UserRole.Teacher) {
       throw new ForbiddenException();
     }
 
-    const coverage =
-      await this.coverageRepository.findByMembershipId(membershipId);
+    // A malformed id can match nothing; skip the lookup, keep the same 403.
+    const coverage = MEMBERSHIP_ID_SHAPE.test(membershipId)
+      ? await this.coverageRepository.findByMembershipIdForStaff(membershipId, {
+          callerId,
+          isAdmin: callerRole === UserRole.Admin,
+        })
+      : null;
+
     if (!coverage) {
-      throw this.notFound();
+      throw new ForbiddenException();
     }
 
     const surahs = await this.surahRepository.findAll();
 
     return { data: toProgressDto(coverage, surahs) };
-  }
-
-  private notFound(): NotFoundException {
-    return new NotFoundException({
-      statusCode: 404,
-      error: 'NOT_FOUND',
-      message: 'المورد المطلوب غير موجود',
-    });
   }
 }

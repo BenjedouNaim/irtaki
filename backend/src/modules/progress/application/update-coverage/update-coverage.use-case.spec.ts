@@ -101,6 +101,7 @@ describe('UpdateCoverageUseCase (DS-05 application wiring)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findByMembershipIdForStaff: jest.fn(),
       applyMerge: jest.fn(),
     };
     hizbBoundaryRepository = {

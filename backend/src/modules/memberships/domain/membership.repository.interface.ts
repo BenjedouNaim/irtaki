@@ -109,16 +109,7 @@ export interface MembershipRecoveryData {
   paymentRecords: PaymentRecordRecoveryRecord[];
 }
 
-export interface MembershipScopeRecord {
-  id: string;
-  groupId: string;
-  userId: string;
-  state: 'Active' | 'Terminated';
-}
-
 export interface IMembershipRepository {
-  /** Minimal lookup for instance-level scope checks (NFR-19/20). */
-  findScopeById(membershipId: string): Promise<MembershipScopeRecord | null>;
   create(
     props: CreateMembershipRecordProps,
     manager: EntityManager,

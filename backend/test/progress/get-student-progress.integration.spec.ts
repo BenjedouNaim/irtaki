@@ -349,30 +349,31 @@ describe('GET /memberships/{id}/progress (F-PRG-03 / API-042 Integration)', () =
     });
   });
 
-  describe('Admin not-found paths', () => {
-    it('returns 404 NOT_FOUND for a non-existent membership', async () => {
+  describe('Admin gets the same uniform 403 (SA §14: out-of-scope and not-found are identical)', () => {
+    it('returns 403 SCOPE_DENIED for a non-existent membership', async () => {
       const admin = await registerAndLogin(UserRole.Admin);
 
       const response = await request(app.getHttpServer())
         .get(`/api/v1/memberships/${uuidv7()}/progress`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
-        .expect(HttpStatus.NOT_FOUND);
+        .expect(HttpStatus.FORBIDDEN);
 
-      expect(response.body.error).toBe('NOT_FOUND');
+      expect(response.body.error).toBe('SCOPE_DENIED');
+      expect(response.body).not.toHaveProperty('data');
     });
 
-    it('returns 404 NOT_FOUND (not 422) for a malformed id', async () => {
+    it('returns 403 SCOPE_DENIED for a malformed id', async () => {
       const admin = await registerAndLogin(UserRole.Admin);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/memberships/not-a-uuid/progress')
         .set('Authorization', `Bearer ${admin.accessToken}`)
-        .expect(HttpStatus.NOT_FOUND);
+        .expect(HttpStatus.FORBIDDEN);
 
-      expect(response.body.error).toBe('NOT_FOUND');
+      expect(response.body.error).toBe('SCOPE_DENIED');
     });
 
-    it('returns 404 NOT_FOUND for a terminated membership whose coverage is soft-deleted', async () => {
+    it('returns 403 SCOPE_DENIED for a terminated membership whose coverage is soft-deleted', async () => {
       const fx = await seedFixture({
         state: 'Terminated',
         coverageDeleted: true,
@@ -382,9 +383,23 @@ describe('GET /memberships/{id}/progress (F-PRG-03 / API-042 Integration)', () =
       const response = await request(app.getHttpServer())
         .get(`/api/v1/memberships/${fx.membershipId}/progress`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
-        .expect(HttpStatus.NOT_FOUND);
+        .expect(HttpStatus.FORBIDDEN);
 
-      expect(response.body.error).toBe('NOT_FOUND');
+      expect(response.body.error).toBe('SCOPE_DENIED');
+    });
+
+    it('returns the same 403 to the Teacher of that terminated membership group', async () => {
+      const fx = await seedFixture({
+        state: 'Terminated',
+        coverageDeleted: true,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/memberships/${fx.membershipId}/progress`)
+        .set('Authorization', `Bearer ${fx.teacher.accessToken}`)
+        .expect(HttpStatus.FORBIDDEN);
+
+      expect(response.body.error).toBe('SCOPE_DENIED');
     });
   });
 
