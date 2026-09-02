@@ -50,13 +50,15 @@ const DUPLICATE_REPORT_MESSAGE = 'لقد قمت بإرسال تقرير اليو
  *     else `422 RECITATION_DAY` (VR-12).
  *  4. `report_date`, when sent, equals today → else `422 BACKDATED`
  *     (VR-10, no grace period).
- *  5. Domain construction: AyahRange (VO-02, BR-52/VR-13/VR-14a — the
+ *  5. Existing-report pre-check → `409 DUPLICATE_REPORT` with the full
+ *     existing report (APIQ-09). An application precondition, so it runs
+ *     before any domain logic (TS §21; UC-05 step 2 precedes step 6). This
+ *     is only the fast path — the real guarantee is DB-UQ-04, whose
+ *     violation is translated to the same 409 after re-reading the winner
+ *     (TS §20, API-X05).
+ *  6. Domain construction: AyahRange (VO-02, BR-52/VR-13/VR-14a — the
  *     Progress module's VO, never duplicated), TimeWindow (VO-03, VR-15),
  *     DailyReport (E-05 type/field rules) → `422` field-level `details`.
- *  6. Existing-report pre-check → `409 DUPLICATE_REPORT` with the full
- *     existing report (APIQ-09). This is only the fast path — the real
- *     guarantee is DB-UQ-04, whose violation is translated to the same 409
- *     after re-reading the winner (TS §20, API-X05).
  *  7. Single auto-committed INSERT (TS §19).
  *  8. DS-05: when a memorisation range is present, `UpdateCoverageUseCase`
  *     (the Progress module's exported application service) is called
@@ -133,7 +135,17 @@ export class SubmitDailyReportUseCase {
       });
     }
 
-    // 5. Domain construction (FR-PROG-05: every ayah position validated
+    // 5. Fast-path duplicate pre-check (VR-11) — an application precondition,
+    //    evaluated before domain logic (TS §21); DB-UQ-04 remains the guarantee.
+    const existing = await this.dailyReportRepository.findByMembershipAndDate(
+      context.membershipId,
+      today,
+    );
+    if (existing) {
+      throw this.duplicate(existing);
+    }
+
+    // 6. Domain construction (FR-PROG-05: every ayah position validated
     //    against the reference dataset before anything is stored — UC-05 E1).
     const surahs = await this.surahRepository.findAll();
     const report = this.buildReport(dto, {
@@ -143,15 +155,6 @@ export class SubmitDailyReportUseCase {
       submittedTimezone: context.timezone,
       surahs,
     });
-
-    // 6. Fast-path duplicate check (VR-11); DB-UQ-04 remains the guarantee.
-    const existing = await this.dailyReportRepository.findByMembershipAndDate(
-      context.membershipId,
-      today,
-    );
-    if (existing) {
-      throw this.duplicate(existing);
-    }
 
     // 7. Single insert.
     let id: string;
