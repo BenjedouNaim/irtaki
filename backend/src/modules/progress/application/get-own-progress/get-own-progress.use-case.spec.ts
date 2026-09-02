@@ -1,10 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { NotFoundException } from '@nestjs/common';
 import {
-  IMembershipRepository,
-  OwnActiveMembershipRecord,
-} from '../../../memberships/domain/membership.repository.interface';
-import {
   CoverageRecord,
   ICoverageRepository,
 } from '../../domain/coverage.repository.interface';
@@ -16,23 +12,10 @@ import { GetOwnProgressUseCase } from './get-own-progress.use-case';
 
 describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
   let useCase: GetOwnProgressUseCase;
-  let membershipRepository: jest.Mocked<IMembershipRepository>;
   let coverageRepository: jest.Mocked<ICoverageRepository>;
   let surahRepository: jest.Mocked<ISurahRepository>;
 
   const userId = 'student-1';
-
-  const activeMembership: OwnActiveMembershipRecord = {
-    id: 'membership-1',
-    group: {
-      id: 'group-1',
-      name: 'حلقة الإمام قالون',
-      recitationDay: 4,
-      enrollmentStatus: 'Closed',
-    },
-    startedAt: '2026-08-01',
-    state: 'Active',
-  };
 
   // Synthetic reference data: T = 1000 ayat across three surahs.
   const surahs: SurahRecord[] = [
@@ -42,33 +25,20 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
   ];
 
   beforeEach(() => {
-    membershipRepository = {
-      create: jest.fn(),
-      findActiveByUserId: jest.fn(),
-      findRosterByGroupId: jest.fn(),
-      findByIdForRecovery: jest.fn(),
-      findStateAndUserById: jest.fn(),
-      terminateConditionally: jest.fn(),
-      softDeleteMembershipRecords: jest.fn(),
-    };
     coverageRepository = {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
+      findActiveByUserId: jest.fn(),
       applyMerge: jest.fn(),
     };
     surahRepository = {
       findAll: jest.fn().mockResolvedValue(surahs),
     };
 
-    useCase = new GetOwnProgressUseCase(
-      membershipRepository,
-      coverageRepository,
-      surahRepository,
-    );
+    useCase = new GetOwnProgressUseCase(coverageRepository, surahRepository);
   });
 
   it('returns the API-041 envelope with derived figures and the DEC-D02 flag', async () => {
-    membershipRepository.findActiveByUserId.mockResolvedValue(activeMembership);
     const record: CoverageRecord = {
       id: 'coverage-1',
       membershipId: 'membership-1',
@@ -79,16 +49,11 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
         { startOrdinal: 601, endOrdinal: 650 },
       ],
     };
-    coverageRepository.findByMembershipId.mockResolvedValue(record);
+    coverageRepository.findActiveByUserId.mockResolvedValue(record);
 
     const result = await useCase.execute(userId);
 
-    expect(membershipRepository.findActiveByUserId).toHaveBeenCalledWith(
-      userId,
-    );
-    expect(coverageRepository.findByMembershipId).toHaveBeenCalledWith(
-      'membership-1',
-    );
+    expect(coverageRepository.findActiveByUserId).toHaveBeenCalledWith(userId);
     expect(result).toEqual({
       data: {
         ahzab_completed: 3,
@@ -100,8 +65,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
   });
 
   it('returns a null activity pointer for a freshly seeded coverage', async () => {
-    membershipRepository.findActiveByUserId.mockResolvedValue(activeMembership);
-    coverageRepository.findByMembershipId.mockResolvedValue({
+    coverageRepository.findActiveByUserId.mockResolvedValue({
       id: 'coverage-1',
       membershipId: 'membership-1',
       ahzabCompleted: 0,
@@ -120,8 +84,7 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
   });
 
   it('rounds coverage_percent to two decimals', async () => {
-    membershipRepository.findActiveByUserId.mockResolvedValue(activeMembership);
-    coverageRepository.findByMembershipId.mockResolvedValue({
+    coverageRepository.findActiveByUserId.mockResolvedValue({
       id: 'coverage-1',
       membershipId: 'membership-1',
       ahzabCompleted: 0,
@@ -134,17 +97,10 @@ describe('GetOwnProgressUseCase (F-PRG-02 / API-041)', () => {
     expect(result.data.coverage_percent).toBe(0.1);
   });
 
-  it('throws 404 NOT_FOUND when the caller has no active membership', async () => {
-    membershipRepository.findActiveByUserId.mockResolvedValue(null);
+  it('throws 404 NOT_FOUND when the caller has no active membership with live coverage', async () => {
+    coverageRepository.findActiveByUserId.mockResolvedValue(null);
 
     await expect(useCase.execute(userId)).rejects.toThrow(NotFoundException);
-    expect(coverageRepository.findByMembershipId).not.toHaveBeenCalled();
-  });
-
-  it('throws 404 NOT_FOUND when the membership has no live coverage row', async () => {
-    membershipRepository.findActiveByUserId.mockResolvedValue(activeMembership);
-    coverageRepository.findByMembershipId.mockResolvedValue(null);
-
-    await expect(useCase.execute(userId)).rejects.toThrow(NotFoundException);
+    expect(surahRepository.findAll).not.toHaveBeenCalled();
   });
 });

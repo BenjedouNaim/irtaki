@@ -86,6 +86,25 @@ export class CoverageRepository implements ICoverageRepository {
     return this.hydrate(rows[0], manager);
   }
 
+  async findActiveByUserId(userId: string): Promise<CoverageRecord | null> {
+    const manager = this.coverageRepo.manager;
+    const rows = await manager.query<RawCoverageRow[]>(
+      `SELECT c.id, c.membership_id, c.ahzab_completed, c.last_memorized_ordinal
+         FROM memorization_coverage c
+         JOIN memberships m ON m.id = c.membership_id
+        WHERE m.user_id = $1
+          AND m.state = 'Active'
+          AND c.deleted_at IS NULL`,
+      [userId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.hydrate(rows[0], manager);
+  }
+
   async applyMerge(
     coverageId: string,
     params: ApplyCoverageMergeParams,

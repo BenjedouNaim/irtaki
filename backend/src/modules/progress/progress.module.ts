@@ -16,7 +16,6 @@ import { UpdateCoverageUseCase } from './application/update-coverage/update-cove
 import { GetOwnProgressUseCase } from './application/get-own-progress/get-own-progress.use-case';
 import { QuranController } from './presentation/quran.controller';
 import { MeProgressController } from './presentation/me-progress.controller';
-import { MembershipsModule } from '../memberships/memberships.module';
 
 @Module({
   imports: [
@@ -26,7 +25,6 @@ import { MembershipsModule } from '../memberships/memberships.module';
       HizbBoundaryTypeOrmEntity,
       SurahTypeOrmEntity,
     ]),
-    MembershipsModule,
   ],
   controllers: [QuranController, MeProgressController],
   providers: [

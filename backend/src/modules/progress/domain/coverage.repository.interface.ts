@@ -50,6 +50,15 @@ export interface ICoverageRepository {
     manager?: EntityManager,
   ): Promise<CoverageRecord | null>;
 
+  /**
+   * Own-scope read (API-041): the live coverage of the caller's Active
+   * membership, resolved by one indexed lookup joined on `memberships` with
+   * `user_id = :caller` (TS §15.2 — scope applied in the query, never
+   * post-filtered). Null when the caller has no Active membership or its
+   * coverage is not live.
+   */
+  findActiveByUserId(userId: string): Promise<CoverageRecord | null>;
+
   /** Persists one DS-05 merge result inside the caller's transaction. */
   applyMerge(
     coverageId: string,
