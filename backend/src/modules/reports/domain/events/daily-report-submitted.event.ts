@@ -1,13 +1,15 @@
 /**
  * DE-05 DailyReportSubmitted (DMS §17).
  *
- * Producer: DailyReport creation in the Reports module (EPIC-05,
- * SubmitDailyReportUseCase) — emitted post-commit, fire-and-forget (ADR-026,
- * ADR-032). Consumers: DS-05 coverage update when a memorisation range is
- * present (Progress module); day classification.
+ * Producer: `SubmitDailyReportUseCase` (F-DR-02) — emitted post-commit,
+ * fire-and-forget (ADR-026, ADR-032), after the report row has been inserted.
  *
- * Nothing emits this event until EPIC-05 lands; the Progress listener is
- * registered ahead of time and stays dormant.
+ * Consumers: day classification / reminder suppression (FR-NOTIF-03) in later
+ * epics. NOT the coverage merge: DS-05 is invoked synchronously by the
+ * producer through the Progress module's `UpdateCoverageUseCase` (so the
+ * API-030 `201` carries the post-submission `ahzab_completed`). A listener
+ * that merged `memoRange` on this event would double-merge — none exists and
+ * none must be added.
  */
 
 /** VO-01 AyahPosition as carried on the event: (surah, ayah) + ordinal. */

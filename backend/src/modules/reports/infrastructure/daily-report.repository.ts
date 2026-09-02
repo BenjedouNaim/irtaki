@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
+import { DailyReport } from '../domain/daily-report.entity';
 import {
   DailyReportAyahPositionRecord,
   DailyReportRecord,
@@ -101,6 +103,35 @@ export class DailyReportRepository implements IDailyReportRepository {
       recitationDay: Number(row.recitation_day),
       timezone: row.timezone,
     };
+  }
+
+  async create(report: DailyReport): Promise<string> {
+    const id = uuidv7();
+    // One INSERT, auto-committed (TS §19). Postgres accepts 'HH:MM' for TIME.
+    await this.dailyReportRepo.insert({
+      id,
+      membershipId: report.membershipId,
+      reportDate: report.reportDate,
+      type: report.type,
+      submittedAt: report.submittedAt,
+      submittedTimezone: report.submittedTimezone,
+      noMemorizationToday: report.noMemorizationToday,
+      memoFromOrdinal: report.memoRange?.startOrdinal ?? null,
+      memoToOrdinal: report.memoRange?.endOrdinal ?? null,
+      memoTimeFrom: report.memoTime?.from ?? null,
+      memoTimeTo: report.memoTime?.to ?? null,
+      completed50Repetitions: report.completed50Repetitions,
+      repetitionsInSingleSession: report.repetitionsInSingleSession,
+      noRevisionToday: report.noRevisionToday,
+      revFromOrdinal: report.revRange?.startOrdinal ?? null,
+      revToOrdinal: report.revRange?.endOrdinal ?? null,
+      revTimeFrom: report.revTime?.from ?? null,
+      revTimeTo: report.revTime?.to ?? null,
+      readTafsir: report.readTafsir,
+      absenceReason: report.absenceReason,
+      deletedAt: null,
+    });
+    return id;
   }
 
   async findByMembershipAndDate(

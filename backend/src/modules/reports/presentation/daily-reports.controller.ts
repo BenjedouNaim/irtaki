@@ -1,9 +1,20 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
 import { GetTodayReportStatusUseCase } from '../application/get-today-report-status/get-today-report-status.use-case';
 import { TodayReportStatusResponseDto } from '../application/get-today-report-status/today-report-status-response.dto';
+import { SubmitDailyReportUseCase } from '../application/submit-daily-report/submit-daily-report.use-case';
+import { SubmitDailyReportDto } from '../application/submit-daily-report/submit-daily-report.dto';
+import { SubmitDailyReportResponseDto } from '../application/submit-daily-report/submit-daily-report-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -21,6 +32,7 @@ interface AuthenticatedRequest extends Request {
 export class DailyReportsController {
   constructor(
     private readonly getTodayReportStatusUseCase: GetTodayReportStatusUseCase,
+    private readonly submitDailyReportUseCase: SubmitDailyReportUseCase,
   ) {}
 
   /**
@@ -35,5 +47,21 @@ export class DailyReportsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<TodayReportStatusResponseDto> {
     return this.getTodayReportStatusUseCase.execute(req.user.id);
+  }
+
+  /**
+   * API-030 `POST /daily-reports` — Student only (APIS §6.1, TS §15.1;
+   * Assistant absent from @Roles(), DEC-B09). `201` with
+   * `{ id, report_date, type, ahzab_completed, coverage_updated }`. Scope is
+   * the caller's own Active membership, resolved inside the use case.
+   */
+  @Roles(UserRole.Student)
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async submit(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: SubmitDailyReportDto,
+  ): Promise<SubmitDailyReportResponseDto> {
+    return this.submitDailyReportUseCase.execute(req.user.id, dto);
   }
 }
