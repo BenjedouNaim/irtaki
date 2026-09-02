@@ -19,6 +19,7 @@ import { GroupsModule } from './modules/groups/groups.module';
 import { EnrollmentModule } from './modules/enrollment/enrollment.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { ProgressModule } from './modules/progress/progress.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 @Module({
@@ -36,6 +37,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
     EnrollmentModule,
     MembershipsModule,
     ProgressModule,
+    ReportsModule,
   ],
 
   controllers: [AppController],
