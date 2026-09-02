@@ -14,16 +14,19 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * API-041 `GET /me/progress` — Student only (APIS §6.1: Assistant blocked by
- * DEC-B09 through RolesGuard alone; Teacher/Admin/User not allowed).
+ * Progress routes (TS §13 API implementation mapping — `ProgressController`).
  */
-@Controller('me')
-export class MeProgressController {
+@Controller()
+export class ProgressController {
   constructor(private readonly getOwnProgressUseCase: GetOwnProgressUseCase) {}
 
+  /**
+   * API-041 `GET /me/progress` — Student only (APIS §6.1: Assistant blocked by
+   * DEC-B09 through RolesGuard alone; Teacher/Admin/User not allowed).
+   */
   @Roles(UserRole.Student)
-  @Get('progress')
-  async progress(
+  @Get('me/progress')
+  async mine(
     @Req() req: AuthenticatedRequest,
   ): Promise<GetOwnProgressResponseDto> {
     return this.getOwnProgressUseCase.execute(req.user.id);

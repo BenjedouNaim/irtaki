@@ -15,7 +15,7 @@ import { GetHizbBoundariesUseCase } from './application/list-hizb-boundaries/get
 import { UpdateCoverageUseCase } from './application/update-coverage/update-coverage.use-case';
 import { GetOwnProgressUseCase } from './application/get-own-progress/get-own-progress.use-case';
 import { QuranController } from './presentation/quran.controller';
-import { MeProgressController } from './presentation/me-progress.controller';
+import { ProgressController } from './presentation/progress.controller';
 
 @Module({
   imports: [
@@ -26,7 +26,7 @@ import { MeProgressController } from './presentation/me-progress.controller';
       SurahTypeOrmEntity,
     ]),
   ],
-  controllers: [QuranController, MeProgressController],
+  controllers: [QuranController, ProgressController],
   providers: [
     {
       provide: COVERAGE_REPOSITORY,
