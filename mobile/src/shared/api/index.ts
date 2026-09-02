@@ -7,3 +7,4 @@ export * from './users.client';
 export * from './joinRequests.client';
 export * from './memberships.client';
 export * from './quran.client';
+export * from './progress.client';
