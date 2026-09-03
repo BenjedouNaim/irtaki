@@ -388,18 +388,20 @@ function StudentRow({
         >
           {name}
         </Text>
-        {/* Figma 37:228 "M": the badge and, beside it, the recency line —
-            the same expected-day counting as the predicate, so the two can
-            never disagree (SAS §18.4). An ordinary row has no recency line
-            at all: API-038 carries no day count and API-040 returns one only
-            for the students it flags, and a fabricated number is worse than
-            an absent one. */}
+        {/* Figma 37:228 "M": the recency line at the reading start and the
+            badge beside it, on the left — the frame puts the text at x=113
+            and the AtRiskBadge at x=0, and in a `rowStart` row the FIRST
+            child is the rightmost (UF §31), so the text is rendered first.
+            The count uses the same expected-day counting as the predicate,
+            so the two can never disagree (SAS §18.4). An ordinary row has no
+            recency line at all: API-038 carries no day count and API-040
+            returns one only for the students it flags, and a fabricated
+            number is worse than an absent one. */}
         {atRisk ? (
           <View
             testID={`${testID}-at-risk`}
             className={`${rowStart} items-center gap-2`}
           >
-            <AtRiskBadge testID={`${testID}-at-risk-badge`} />
             <Text
               testID={`${testID}-days`}
               className={`${typography.caption} text-right text-fg-error`}
@@ -411,6 +413,7 @@ function StudentRow({
                 DAY_COUNT_FORMS,
               )} منذ آخر تقرير`}
             </Text>
+            <AtRiskBadge testID={`${testID}-at-risk-badge`} />
           </View>
         ) : null}
       </View>

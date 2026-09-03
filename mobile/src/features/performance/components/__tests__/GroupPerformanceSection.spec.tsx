@@ -441,6 +441,32 @@ describe('GroupPerformanceSection (SCR-23, F-PERF-02, Figma 37:124)', () => {
       expect(screen.getAllByText('معرّض للخطر')).toHaveLength(2);
     });
 
+    it('puts the recency line at the reading start and the badge beside it (Figma 37:228)', async () => {
+      // The frame places the text at x=113 (right) and the AtRiskBadge at
+      // x=0 (left); in a `rowStart` row the FIRST child is the rightmost
+      // (UF §31), so the recency line must be rendered before the badge.
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      const row = await screen.findByTestId(
+        'group-performance-student-m-2-at-risk',
+      );
+      expect(
+        row.props.children.map(
+          (child: { props: { testID: string } }) => child.props.testID,
+        ),
+      ).toEqual([
+        'group-performance-student-m-2-days',
+        'group-performance-student-m-2-at-risk-badge',
+      ]);
+    });
+
     it('renders the recency line with Arabic number agreement', async () => {
       jest
         .spyOn(performanceApi, 'getGroupPerformance')
