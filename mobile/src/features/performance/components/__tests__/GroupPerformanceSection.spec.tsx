@@ -150,6 +150,24 @@ describe('GroupPerformanceSection (SCR-23, F-PERF-02, Figma 37:124)', () => {
       ).toBe('3 طلاب');
     });
 
+    it('leads with the commitment average — the reading-start tile (UF §31)', async () => {
+      // Figma 37:179 puts the average at x=184 (right) and the submission
+      // rate at x=0 (left); in a `rowStart` row the FIRST child is the
+      // rightmost, so the average must be rendered first.
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+
+      renderSection();
+
+      const tiles = await screen.findByTestId('group-performance-tiles');
+      expect(
+        tiles.props.children.map(
+          (tile: { props: { testID: string } }) => tile.props.testID,
+        ),
+      ).toEqual(['group-performance-average', 'group-performance-submission']);
+    });
+
     it('renders the absence reasons as the group donut (UF §17)', async () => {
       jest
         .spyOn(performanceApi, 'getGroupPerformance')

@@ -199,18 +199,26 @@ function GroupPerformanceContent({
 }) {
   return (
     <>
-      <View className={`${rowStart} items-start gap-2.5 w-full`}>
-        <MetricTile
-          label="نسبة الإرسال"
-          value={formatRate(data.submission_rate)}
-          caption={PERIOD_CAPTION[period]}
-          testID={`${testID}-submission`}
-        />
+      {/* Figma 37:179: the commitment average is the leading tile (37:184,
+          x=184) and the submission rate the trailing one (37:180, x=0) — in
+          a `rowStart` row the first child is the rightmost, the reading
+          start (UF §31 "Horizontal lists — first item rightmost"). UF §17
+          lists the group Commitment average first for the same reason. */}
+      <View
+        testID={`${testID}-tiles`}
+        className={`${rowStart} items-start gap-2.5 w-full`}
+      >
         <MetricTile
           label="متوسط الالتزام"
           value={formatRate(data.commitment_average)}
           caption={formatArabicCount(data.students.length, STUDENT_COUNT_FORMS)}
           testID={`${testID}-average`}
+        />
+        <MetricTile
+          label="نسبة الإرسال"
+          value={formatRate(data.submission_rate)}
+          caption={PERIOD_CAPTION[period]}
+          testID={`${testID}-submission`}
         />
       </View>
 
