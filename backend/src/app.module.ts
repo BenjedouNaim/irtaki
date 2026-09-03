@@ -20,6 +20,7 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { EnrollmentModule } from './modules/enrollment/enrollment.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { PerformanceModule } from './modules/performance/performance.module';
@@ -80,6 +81,7 @@ function flattenValidationErrors(
     MembershipsModule,
     ProgressModule,
     ReportsModule,
+    PaymentsModule,
     PerformanceModule,
   ],
 

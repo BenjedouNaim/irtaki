@@ -97,6 +97,13 @@ export function formatArabicDayMonth(iso: string): string {
   return `${date.day} ${ARABIC_MONTHS[date.month]}`;
 }
 
+/** "30 سبتمبر 2026" — a full calendar date, year included. */
+export function formatArabicFullDate(iso: string): string {
+  const date = parseIsoDate(iso);
+  if (!date) return iso;
+  return `${date.day} ${ARABIC_MONTHS[date.month]} ${date.year}`;
+}
+
 /**
  * "أسبوع 28 أوت — 3 سبتمبر", collapsing the month when both ends share it
  * ("أسبوع 21 — 27 أوت").
