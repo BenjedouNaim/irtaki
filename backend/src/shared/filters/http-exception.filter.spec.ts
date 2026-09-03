@@ -111,6 +111,43 @@ describe('HttpExceptionFilter', () => {
     assertCleanErrorEnvelope(responseJson!);
   });
 
+  it('passes existing_report through on a 409 DUPLICATE_REPORT (APIS §12, APIQ-09)', () => {
+    const existingReport = {
+      id: 'report-1',
+      report_date: '2026-09-02',
+      type: 'Absent',
+      absence_reason: 'Sick',
+    };
+    const exception = new ConflictException({
+      statusCode: 409,
+      error: 'DUPLICATE_REPORT',
+      message: 'لقد قمت بإرسال تقرير اليوم مسبقاً',
+      existing_report: existingReport,
+    });
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(responseStatusCode).toBe(HttpStatus.CONFLICT);
+    expect(responseJson?.error).toBe('DUPLICATE_REPORT');
+    expect(responseJson?.existing_report).toEqual(existingReport);
+    expect(responseJson?.details).toBeUndefined();
+    assertCleanErrorEnvelope(responseJson!);
+  });
+
+  it('never attaches existing_report on a non-409 status', () => {
+    const exception = new UnprocessableEntityException({
+      statusCode: 422,
+      error: 'VALIDATION_ERROR',
+      message: 'فشل التحقق',
+      existing_report: { id: 'report-1' },
+    });
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(responseStatusCode).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(responseJson?.existing_report).toBeUndefined();
+  });
+
   it('handles UnprocessableEntityException (422) with details array', () => {
     const details = [
       {

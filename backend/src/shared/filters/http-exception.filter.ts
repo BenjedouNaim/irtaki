@@ -20,6 +20,11 @@ export interface ErrorEnvelope {
   error: string;
   message: string;
   details?: ValidationErrorDetail[];
+  /**
+   * `409 DUPLICATE_REPORT` only (APIS §9.7 / §12, APIQ-09): the already
+   * persisted report, so a retried `POST /daily-reports` is a safe no-op.
+   */
+  existing_report?: Record<string, unknown>;
   correlationId: string;
 }
 
@@ -116,6 +121,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let errorMessage =
       DEFAULT_ERROR_MESSAGES[HttpStatus.INTERNAL_SERVER_ERROR].message;
     let details: ValidationErrorDetail[] | undefined;
+    let existingReport: Record<string, unknown> | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -162,6 +168,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         if (Array.isArray(responseObj.details)) {
           details = responseObj.details as ValidationErrorDetail[];
         }
+
+        if (
+          typeof responseObj.existing_report === 'object' &&
+          responseObj.existing_report !== null &&
+          !Array.isArray(responseObj.existing_report)
+        ) {
+          existingReport = responseObj.existing_report as Record<
+            string,
+            unknown
+          >;
+        }
       }
     } else {
       // Non-HttpException / unexpected error: Log full internal details with correlationId
@@ -191,6 +208,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       details.length > 0
     ) {
       envelope.details = details;
+    }
+
+    // The existing report rides only on a 409 (APIQ-09); never on any other status.
+    if (status === HttpStatus.CONFLICT && existingReport) {
+      envelope.existing_report = existingReport;
     }
 
     response.status(status).json(envelope);

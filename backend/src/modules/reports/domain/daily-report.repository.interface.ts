@@ -1,3 +1,5 @@
+import type { DailyReport } from './daily-report.entity';
+
 export const DAILY_REPORT_REPOSITORY = Symbol('DAILY_REPORT_REPOSITORY');
 
 /**
@@ -67,4 +69,13 @@ export interface IDailyReportRepository {
     membershipId: string,
     reportDate: string,
   ): Promise<DailyReportRecord | null>;
+
+  /**
+   * Persists one E-05 as a single auto-committing insert (TS §19: "single
+   * insert only — not combined with the coverage update"). Ranges are stored
+   * as ordinals (DBD DBT-06). A DB-UQ-04 violation is NOT translated here —
+   * it propagates to the use case, which owns the 409 (TS §20).
+   * Resolves with the new row's id.
+   */
+  create(report: DailyReport): Promise<string>;
 }

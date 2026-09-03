@@ -4,6 +4,7 @@ import {
   Module,
   NestModule,
   UnprocessableEntityException,
+  ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -21,6 +22,43 @@ import { MembershipsModule } from './modules/memberships/memberships.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
+
+interface ValidationDetail {
+  field: string;
+  rule: string;
+  message: string;
+}
+
+/**
+ * APIS §9.5 `details[]` from class-validator's error tree. Nested DTOs
+ * (e.g. `memo_range.from.surah`) report under their ROOT property so the
+ * client can attach the message to the originating form field (TS §29).
+ * The whitelist rejection (`forbidNonWhitelisted`) is re-worded in Arabic —
+ * every user-facing message is Arabic (API-X06).
+ */
+function flattenValidationErrors(
+  errors: ValidationError[],
+  root?: string,
+): ValidationDetail[] {
+  return errors.flatMap((error) => {
+    const field = root ?? error.property;
+    const own = Object.entries(error.constraints ?? {}).map(
+      ([rule, message]) => ({
+        field,
+        rule,
+        message:
+          rule === 'whitelistValidation'
+            ? `الحقل ${error.property} غير مسموح به`
+            : message,
+      }),
+    );
+    const nested =
+      error.children && error.children.length > 0
+        ? flattenValidationErrors(error.children, field)
+        : [];
+    return [...own, ...nested];
+  });
+}
 
 @Module({
   imports: [
@@ -51,14 +89,7 @@ import { CorrelationIdMiddleware, SharedModule } from './shared';
         transform: true,
         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
         exceptionFactory: (errors) => {
-          const details = errors.flatMap((error) => {
-            if (!error.constraints) return [];
-            return Object.entries(error.constraints).map(([rule, message]) => ({
-              field: error.property,
-              rule,
-              message,
-            }));
-          });
+          const details = flattenValidationErrors(errors);
           return new UnprocessableEntityException({
             statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
             error: 'VALIDATION_ERROR',
