@@ -42,4 +42,38 @@ describe('AppConfig Environment Validation', () => {
       /Production environment validation failed/,
     );
   });
+
+  describe('HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION (TS §32 Required)', () => {
+    const prodConfig = {
+      NODE_ENV: Environment.Production,
+      PORT: '3000',
+      DB_HOST: 'db',
+      JWT_ACCESS_SECRET: 'a-real-production-access-secret-32-chars-long',
+      JWT_REFRESH_PEPPER: 'a-real-production-refresh-pepper-32-chars-long',
+    };
+
+    it('fails fast in production when the ping URL is unset', () => {
+      expect(() => validate(prodConfig)).toThrow(
+        /HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION/,
+      );
+    });
+
+    it('boots in production once the ping URL is supplied', () => {
+      const result = validate({
+        ...prodConfig,
+        HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION:
+          'https://hc-ping.com/00000000-0000-0000-0000-000000000000',
+      });
+      expect(result.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION).toBe(
+        'https://hc-ping.com/00000000-0000-0000-0000-000000000000',
+      );
+    });
+
+    it('stays optional outside production (the ping is skipped with a WARN)', () => {
+      const result = validate({ NODE_ENV: Environment.Development });
+      expect(
+        result.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION,
+      ).toBeUndefined();
+    });
+  });
 });

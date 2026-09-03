@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WeeklyReportScreen } from '../WeeklyReportScreen';
 import * as weeklyReportsApi from '@/shared/api/weeklyReports.client';
 import { ApiError, NetworkError } from '@/shared/api/types';
+import { CONFIRM_WEEKLY_REPORT_INVALIDATES } from '../../hooks/useConfirmWeeklyReport';
 
 jest.mock('@/shared/api/weeklyReports.client');
 
@@ -51,19 +52,49 @@ const openRow: weeklyReportsApi.WeeklyReportLiveDto = {
   can_confirm: true,
 };
 
+const finalisedReport: weeklyReportsApi.WeeklyReportDto = {
+  id: 'weekly-1',
+  week_start: '2026-08-29',
+  week_end: '2026-09-04',
+  expected_days: 6,
+  missed_daily_reports: 6,
+  missed_daily_memorization: 6,
+  missed_daily_revision: 6,
+  missed_50_repetitions: 0,
+  missed_single_session: 0,
+  attended_recitation_call: true,
+  state: 'Finalised',
+  finalised_at: '2026-09-04T09:00:00.000Z',
+  finalised_by: 'Student',
+};
+
 let queryClient: QueryClient;
 
-function renderScreen(
-  props: React.ComponentProps<typeof WeeklyReportScreen> = {},
-) {
+function renderScreen() {
   queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false },
+    },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <WeeklyReportScreen {...props} />
+      <WeeklyReportScreen />
     </QueryClientProvider>,
   );
+}
+
+/** Answers the gate and taps Confirm (the CTA is disabled until answered). */
+async function answerAndConfirm(answer: 'yes' | 'no') {
+  await screen.findByTestId('weekly-report-confirm-section');
+  fireEvent.press(screen.getByTestId(`attended-toggle-${answer}`));
+  await waitFor(() =>
+    expect(
+      screen.getByTestId('confirm-weekly-report-button').props
+        .accessibilityState.disabled,
+    ).toBe(false),
+  );
+  fireEvent.press(screen.getByTestId('confirm-weekly-report-button'));
 }
 
 function mockReport(report: weeklyReportsApi.WeeklyReportLiveDto) {
@@ -72,7 +103,7 @@ function mockReport(report: weeklyReportsApi.WeeklyReportLiveDto) {
     .mockResolvedValue(report);
 }
 
-describe('WeeklyReportScreen (SCR-12, F-WR-01)', () => {
+describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -136,9 +167,11 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01)', () => {
 
   it('on the recitation day (can_confirm true): gate with no default, Confirm disabled until answered', async () => {
     mockReport(openRow);
-    const onConfirm = jest.fn();
+    const confirmSpy = jest
+      .spyOn(weeklyReportsApi, 'confirmWeeklyReport')
+      .mockResolvedValue(finalisedReport);
 
-    renderScreen({ onConfirm });
+    renderScreen();
 
     expect(
       await screen.findByTestId('weekly-report-confirm-section'),
@@ -159,55 +192,212 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01)', () => {
     const button = screen.getByTestId('confirm-weekly-report-button');
     expect(button.props.accessibilityState.disabled).toBe(true);
     fireEvent.press(button);
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('attended-toggle-yes'));
+    await answerAndConfirm('yes');
+
     await waitFor(() =>
-      expect(
-        screen.getByTestId('confirm-weekly-report-button').props
-          .accessibilityState.disabled,
-      ).toBe(false),
+      expect(confirmSpy).toHaveBeenCalledWith('weekly-1', {
+        attended_recitation_call: true,
+      }),
     );
-    fireEvent.press(screen.getByTestId('confirm-weekly-report-button'));
-    expect(onConfirm).toHaveBeenCalledWith({
-      reportId: 'weekly-1',
-      attended: true,
-    });
   });
 
-  it('keeps the CTA disabled while the confirm action is not wired (F-WR-02)', async () => {
+  it('success (200): posts the answer through the hook, invalidates the TS §26 keys and routes to Home (UF §16)', async () => {
     mockReport(openRow);
+    jest.spyOn(weeklyReportsApi, 'confirmWeeklyReport').mockResolvedValue({
+      ...finalisedReport,
+      attended_recitation_call: false,
+    });
 
     renderScreen();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await screen.findByTestId('weekly-report-confirm-section');
-    fireEvent.press(screen.getByTestId('attended-toggle-no'));
+    await answerAndConfirm('no');
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/student'),
+    );
+    expect(weeklyReportsApi.confirmWeeklyReport).toHaveBeenCalledWith(
+      'weekly-1',
+      { attended_recitation_call: false },
+    );
+    for (const key of CONFIRM_WEEKLY_REPORT_INVALIDATES) {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: [...key] });
+    }
+    expect(screen.queryByTestId('weekly-report-confirm-banner')).toBeNull();
+  });
+
+  it('locks the gate and spins the button while confirming (UF §16 Submitting)', async () => {
+    mockReport(openRow);
+    jest
+      .spyOn(weeklyReportsApi, 'confirmWeeklyReport')
+      .mockReturnValue(new Promise(() => {}));
+
+    renderScreen();
+    await answerAndConfirm('yes');
+
     await waitFor(() =>
       expect(
-        screen.getByTestId('attended-toggle-no').props.accessibilityState
-          .selected,
+        screen.getByTestId('attended-toggle-yes').props.accessibilityState
+          .disabled,
       ).toBe(true),
     );
     expect(
       screen.getByTestId('confirm-weekly-report-button').props
         .accessibilityState.disabled,
     ).toBe(true);
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('locks the gate and spins the button while confirming (UF §16 Submitting)', async () => {
+  it('409 ALREADY_FINALISED: re-reads the finalised row and shows it read-only with a quiet note, no error tone (UF §16)', async () => {
+    const getSpy = jest
+      .spyOn(weeklyReportsApi, 'getCurrentWeeklyReport')
+      .mockResolvedValueOnce(openRow)
+      .mockResolvedValue({
+        ...openRow,
+        state: 'Finalised',
+        attended_recitation_call: false,
+        can_confirm: false,
+      });
+    jest.spyOn(weeklyReportsApi, 'confirmWeeklyReport').mockRejectedValue(
+      new ApiError({
+        statusCode: 409,
+        error: 'ALREADY_FINALISED',
+        message: 'تم اعتماد هذا التقرير الأسبوعي مسبقاً ولا يمكن تعديله',
+      }),
+    );
+
+    renderScreen();
+    await answerAndConfirm('yes');
+
+    expect(
+      await screen.findByTestId('weekly-report-finalised-note'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('weekly-report-already-finalised-note'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('weekly-report-attended-line').props.children,
+    ).toBe('حضور جلسة التسميع: لا');
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('weekly-report-confirm-section')).toBeNull();
+    expect(screen.queryByTestId('weekly-report-confirm-banner')).toBeNull();
+    expect(
+      screen.queryByText(
+        'تم اعتماد هذا التقرير الأسبوعي مسبقاً ولا يمكن تعديله',
+      ),
+    ).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('422 NOT_RECITATION_DAY: generic error with icon and a Home action, never the server text (UF §16, §32)', async () => {
     mockReport(openRow);
+    jest.spyOn(weeklyReportsApi, 'confirmWeeklyReport').mockRejectedValue(
+      new ApiError({
+        statusCode: 422,
+        error: 'NOT_RECITATION_DAY',
+        message: 'server wording',
+      }),
+    );
 
-    renderScreen({ onConfirm: jest.fn(), confirming: true });
+    renderScreen();
+    await answerAndConfirm('yes');
 
-    await screen.findByTestId('weekly-report-confirm-section');
+    const banner = await screen.findByTestId('weekly-report-confirm-banner');
+    expect(banner.props.accessibilityRole).toBe('alert');
+    expect(
+      screen.getByTestId('weekly-report-confirm-banner-icon'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('weekly-report-confirm-banner-message').props.children,
+    ).toBe('تعذر تأكيد التقرير الأسبوعي؛ انتهى يوم التسميع.');
+    expect(screen.queryByText('server wording')).toBeNull();
+
+    fireEvent.press(
+      screen.getByTestId('weekly-report-confirm-banner-home-button'),
+    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
+  });
+
+  it('5xx on confirm: generic retry copy, the answer preserved and the CTA re-enabled (UF §24)', async () => {
+    mockReport(openRow);
+    const confirmSpy = jest
+      .spyOn(weeklyReportsApi, 'confirmWeeklyReport')
+      .mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 500,
+          error: 'INTERNAL_ERROR',
+          message: 'internal detail',
+        }),
+      )
+      .mockResolvedValueOnce(finalisedReport);
+
+    renderScreen();
+    await answerAndConfirm('yes');
+
+    expect(
+      (await screen.findByTestId('weekly-report-confirm-banner-message')).props
+        .children,
+    ).toBe('حدث خطأ أثناء تأكيد التقرير الأسبوعي');
+    expect(screen.queryByText('internal detail')).toBeNull();
+    expect(
+      screen.queryByTestId('weekly-report-confirm-banner-home-button'),
+    ).toBeNull();
     expect(
       screen.getByTestId('attended-toggle-yes').props.accessibilityState
-        .disabled,
+        .selected,
     ).toBe(true);
     expect(
       screen.getByTestId('confirm-weekly-report-button').props
         .accessibilityState.disabled,
-    ).toBe(true);
+    ).toBe(false);
+
+    fireEvent.press(screen.getByTestId('confirm-weekly-report-button'));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/student'),
+    );
+  });
+
+  it('network failure on confirm: the network copy, retry action', async () => {
+    mockReport(openRow);
+    jest
+      .spyOn(weeklyReportsApi, 'confirmWeeklyReport')
+      .mockRejectedValue(new NetworkError());
+
+    renderScreen();
+    await answerAndConfirm('no');
+
+    expect(
+      (await screen.findByTestId('weekly-report-confirm-banner-message')).props
+        .children,
+    ).toBe('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+    expect(
+      screen.queryByTestId('weekly-report-confirm-banner-home-button'),
+    ).toBeNull();
+  });
+
+  it('403 on confirm: the filter Arabic message with a Home action', async () => {
+    mockReport(openRow);
+    jest.spyOn(weeklyReportsApi, 'confirmWeeklyReport').mockRejectedValue(
+      new ApiError({
+        statusCode: 403,
+        error: 'SCOPE_DENIED',
+        message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+      }),
+    );
+
+    renderScreen();
+    await answerAndConfirm('yes');
+
+    expect(
+      (await screen.findByTestId('weekly-report-confirm-banner-message')).props
+        .children,
+    ).toBe('ليس لديك صلاحية للوصول إلى هذا المورد');
+    expect(
+      screen.getByTestId('weekly-report-confirm-banner-home-button'),
+    ).toBeTruthy();
   });
 
   it('renders a Finalised row read-only with a quiet note and the attendance answer (UF §16, EC-24)', async () => {
@@ -218,7 +408,7 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01)', () => {
       can_confirm: false,
     });
 
-    renderScreen({ onConfirm: jest.fn() });
+    renderScreen();
 
     expect(
       await screen.findByTestId('weekly-report-finalised-note'),
@@ -229,6 +419,9 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01)', () => {
     expect(screen.getByText('معتمد')).toBeTruthy();
     expect(screen.queryByTestId('weekly-report-confirm-section')).toBeNull();
     expect(screen.queryByTestId('weekly-report-live-note')).toBeNull();
+    expect(
+      screen.queryByTestId('weekly-report-already-finalised-note'),
+    ).toBeNull();
   });
 
   it('shows the generic retry copy for a 5xx, never the server message (UF §24)', async () => {

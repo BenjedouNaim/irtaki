@@ -17,6 +17,12 @@ import { WEEKLY_REPORT_REPOSITORY } from './domain/weekly-report.repository.inte
 import { WeeklyReportRepository } from './infrastructure/weekly-report.repository';
 import { GetCurrentWeeklyReportUseCase } from './application/get-current-weekly-report/get-current-weekly-report.use-case';
 import { WeeklyReportsController } from './presentation/weekly-reports.controller';
+import { ConfirmWeeklyReportUseCase } from './application/confirm-weekly-report/confirm-weekly-report.use-case';
+import { WeeklyReportFinalizationService } from './application/finalise-weekly-reports/weekly-report-finalization.service';
+import { WeeklyReportFinalizationJob } from './infrastructure/jobs/weekly-report-finalization.job';
+import { WEEKLY_REPORT_SCOPE } from './domain/weekly-report-scope.interface';
+import { WeeklyReportScope } from './infrastructure/weekly-report-scope';
+import { OwnWeeklyReportScopeGuard } from './presentation/guards/own-weekly-report-scope.guard';
 
 /**
  * Reports module (SA §11): owns `daily_reports` / `weekly_reports`. Scope is
@@ -27,6 +33,9 @@ import { WeeklyReportsController } from './presentation/weekly-reports.controlle
  * DS-05 synchronously through Progress's exported `UpdateCoverageUseCase`
  * (F-DR-02, APIS §10.7 post-submission `ahzab_completed`) — the structural
  * resolution adopted in EPIC-04 in place of an EventEmitter2 listener.
+ * It also hosts DS-02 and `WeeklyReportFinalizationJob`, the module's
+ * ADR-024 scheduled job (F-WR-02); `ScheduleModule` is registered once in
+ * AppModule.
  */
 @Module({
   imports: [
@@ -56,17 +65,29 @@ import { WeeklyReportsController } from './presentation/weekly-reports.controlle
       useClass: MembershipReportScope,
     },
     MembershipDailyReportsScopeGuard,
+    // F-WR-02: own-scope resolution for POST /weekly-reports/{id}/confirm
+    // (API-034), consumed by its route-specific ScopeGuard (SA §14).
+    {
+      provide: WEEKLY_REPORT_SCOPE,
+      useClass: WeeklyReportScope,
+    },
+    OwnWeeklyReportScopeGuard,
     GetTodayReportStatusUseCase,
     SubmitDailyReportUseCase,
     ListOwnDailyReportsUseCase,
     ListRosterDailyReportsUseCase,
     GetCurrentWeeklyReportUseCase,
+    ConfirmWeeklyReportUseCase,
+    // F-WR-02: DS-02 and its ADR-024 cron trigger (SA §19 background jobs).
+    WeeklyReportFinalizationService,
+    WeeklyReportFinalizationJob,
   ],
   exports: [
     DAILY_REPORT_REPOSITORY,
     DailyReportRepository,
     WEEKLY_REPORT_REPOSITORY,
     WeeklyReportRepository,
+    WeeklyReportFinalizationService,
   ],
 })
 export class ReportsModule {}

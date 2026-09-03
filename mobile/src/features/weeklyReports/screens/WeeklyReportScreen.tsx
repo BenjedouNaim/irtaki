@@ -15,29 +15,32 @@ import {
 } from '@/shared/api/weeklyReports.client';
 import { YesNoToggle } from '@/features/dailyReports/components/YesNoToggle';
 import { useCurrentWeeklyReport } from '../hooks/useCurrentWeeklyReport';
-
-export interface WeeklyReportConfirmInput {
-  /** The stored row's id — only ever non-null when `can_confirm` is true. */
-  reportId: string;
-  attended: boolean;
-}
-
-export interface WeeklyReportScreenProps {
-  /**
-   * F-WR-02 wires `POST /weekly-reports/{id}/confirm` (API-034) here. Until
-   * then the CTA renders disabled — "a CTA whose destination is not wired
-   * yet renders disabled" (ReportStatusCard precedent).
-   */
-  onConfirm?: (input: WeeklyReportConfirmInput) => void;
-  /** UF §16 "Submitting": button spinner, checkbox locked. */
-  confirming?: boolean;
-}
+import { useConfirmWeeklyReport } from '../hooks/useConfirmWeeklyReport';
 
 /** Network unavailable (UF §24) — same copy as every other screen. */
 const NETWORK_ERROR_MESSAGE =
   'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.';
 /** Server error 5xx (UF §24 / TS §29) — generic, never the server's own message. */
 const SERVER_ERROR_MESSAGE = 'حدث خطأ أثناء تحميل التقرير الأسبوعي';
+/** Confirmation failed for a 5xx / network cause — generic retry copy (UF §24). */
+const CONFIRM_SERVER_ERROR_MESSAGE = 'حدث خطأ أثناء تأكيد التقرير الأسبوعي';
+/**
+ * `422 NOT_RECITATION_DAY` — "Defensive only: generic error, returns to
+ * Home" (UF §16). The screen is unreachable off the recitation day, so the
+ * only way here is midnight crossing mid-entry; Home re-evaluates fresh.
+ */
+const NOT_RECITATION_DAY_MESSAGE =
+  'تعذر تأكيد التقرير الأسبوعي؛ انتهى يوم التسميع.';
+
+/**
+ * A non-field outcome of a confirmation (UF §16 state table): `retry`
+ * keeps the screen and the answer (UF §24 "form data always preserved");
+ * `home` sends the student back for Home to re-evaluate fresh.
+ */
+interface Banner {
+  message: string;
+  action: 'retry' | 'home';
+}
 
 /**
  * Maps a query error to the user-facing Arabic message per UF §24's table.
@@ -107,20 +110,72 @@ const MISSED_METRICS: ReadonlyArray<{
  *    read-only — the "this week" view — and a note that confirmation
  *    unlocks on the recitation day (UXQ-06).
  * A zero-activity week renders fully, every metric near its max (UF §16).
+ *
+ * Confirm (F-WR-02, API-034, UF §16 state table; no confirmation dialog,
+ * UF §25): Submitting → spinner, gate locked; `200` → Home (metrics now
+ * snapshotted, the week appears in History); `409 ALREADY_FINALISED` → the
+ * finalised result read-only with a quiet note, no error tone (the
+ * invalidated API-033 query re-reads the row); `422 NOT_RECITATION_DAY` →
+ * generic error, returns to Home; `5xx`/network → generic retry copy, the
+ * answer preserved (UF §24). Errors are icon + text (UF §32).
  */
-export function WeeklyReportScreen({
-  onConfirm,
-  confirming = false,
-}: WeeklyReportScreenProps) {
+export function WeeklyReportScreen() {
   const router = useRouter();
   const { data, isLoading, isError, error, refetch } = useCurrentWeeklyReport();
+  const confirmation = useConfirmWeeklyReport();
   const [attended, setAttended] = useState<boolean | null>(null);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [alreadyFinalised, setAlreadyFinalised] = useState(false);
+  const confirming = confirmation.isPending;
+
+  const goHome = () => {
+    router.replace('/(app)/student');
+  };
 
   const goBack = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(app)/student');
+      goHome();
+    }
+  };
+
+  const submitConfirmation = async (reportId: string, answer: boolean) => {
+    setBanner(null);
+    try {
+      const outcome = await confirmation.mutateAsync({
+        reportId,
+        attended_recitation_call: answer,
+      });
+      if (outcome.kind === 'finalised') {
+        // UF §16 Success: "Routes to Home, metrics now snapshotted".
+        goHome();
+        return;
+      }
+      // UF §16 409: scheduler beat the student — the invalidated query now
+      // serves the finalised row; only a quiet note is added.
+      setAlreadyFinalised(true);
+    } catch (err: unknown) {
+      if (!(err instanceof ApiError)) {
+        setBanner({ message: NETWORK_ERROR_MESSAGE, action: 'retry' });
+        return;
+      }
+      if (err.statusCode >= 500) {
+        setBanner({ message: CONFIRM_SERVER_ERROR_MESSAGE, action: 'retry' });
+        return;
+      }
+      if (err.statusCode === 422 && err.errorCode === 'NOT_RECITATION_DAY') {
+        setBanner({ message: NOT_RECITATION_DAY_MESSAGE, action: 'home' });
+        return;
+      }
+      if (err.statusCode === 403) {
+        setBanner({ message: err.message, action: 'home' });
+        return;
+      }
+      setBanner({
+        message: err.message || CONFIRM_SERVER_ERROR_MESSAGE,
+        action: 'retry',
+      });
     }
   };
 
@@ -243,14 +298,46 @@ export function WeeklyReportScreen({
               disabled={confirming}
               testID="attended-toggle"
             />
+            {banner ? (
+              <View
+                testID="weekly-report-confirm-banner"
+                accessibilityRole="alert"
+                className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-4 gap-3"
+                style={{ borderCurve: 'continuous' }}
+              >
+                <View className="flex-row-reverse items-center gap-2">
+                  <Text
+                    testID="weekly-report-confirm-banner-icon"
+                    accessibilityLabel="تنبيه"
+                    className="text-base"
+                  >
+                    ⚠️
+                  </Text>
+                  <Text
+                    className="flex-1 text-destructive-800 dark:text-destructive-200 text-sm text-right leading-relaxed"
+                    testID="weekly-report-confirm-banner-message"
+                  >
+                    {banner.message}
+                  </Text>
+                </View>
+                {banner.action === 'home' ? (
+                  <Button
+                    label="العودة إلى الرئيسية"
+                    variant="outline"
+                    onPress={goHome}
+                    testID="weekly-report-confirm-banner-home-button"
+                  />
+                ) : null}
+              </View>
+            ) : null}
             <Button
               label="تأكيد التقرير الأسبوعي"
               variant="primary"
               loading={confirming}
-              disabled={attended === null || !onConfirm || confirming}
+              disabled={attended === null || confirming}
               onPress={() => {
                 if (attended !== null) {
-                  onConfirm?.({ reportId, attended });
+                  void submitConfirmation(reportId, attended);
                 }
               }}
               testID="confirm-weekly-report-button"
@@ -274,6 +361,14 @@ export function WeeklyReportScreen({
                 data.attended_recitation_call ? 'نعم' : 'لا'
               }`}
             </Text>
+            {alreadyFinalised ? (
+              <Text
+                className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed"
+                testID="weekly-report-already-finalised-note"
+              >
+                اعتُمد هذا الأسبوع تلقائياً عند منتصف الليل قبل تأكيدك.
+              </Text>
+            ) : null}
           </View>
         ) : (
           <View
