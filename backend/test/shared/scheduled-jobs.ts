@@ -41,3 +41,23 @@ export async function purgeNotificationLog(
 ): Promise<void> {
   await dataSource.query('DELETE FROM notification_log');
 }
+
+/**
+ * Empties `audit_entries` (DBT-18).
+ *
+ * SAS §21 audits login, so every suite that logs anyone in appends rows
+ * that no suite's own `WHERE email LIKE` cleanup can reach — the seeded
+ * Admin is not one of its fixtures. They accumulate across runs until
+ * API-054's "walk to the last page" test can no longer reach the end of
+ * the log within its page budget, and the gate starts depending on how
+ * many times the database has been used rather than on the code.
+ *
+ * Like `notification_log`, the table carries no seed data and no fixture
+ * any other suite depends on (TDR-03 leaves it without a retention policy
+ * either), so a test database empties it with the rest.
+ */
+export async function purgeAuditEntries(
+  dataSource: DataSource,
+): Promise<void> {
+  await dataSource.query('DELETE FROM audit_entries');
+}
