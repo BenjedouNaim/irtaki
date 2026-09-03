@@ -10,6 +10,7 @@ import {
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validate } from './config/app.config';
@@ -67,6 +68,8 @@ function flattenValidationErrors(
       isGlobal: true,
     }),
     EventEmitterModule.forRoot(),
+    // ADR-024: in-process cron, registered once; jobs live in their modules.
+    ScheduleModule.forRoot(),
     SharedModule,
     DatabaseModule,
     HealthModule,

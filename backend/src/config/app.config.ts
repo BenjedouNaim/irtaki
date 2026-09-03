@@ -79,6 +79,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CENTER_TIMEZONE: string = 'Africa/Tunis';
+
+  /**
+   * TS §32 `HEALTHCHECKS_PING_URL_*` — one per scheduled job (TS §31).
+   * Optional at boot: an unset URL only disables that job's
+   * dead-man's-switch (logged at WARN by HealthchecksPingService).
+   */
+  @IsString()
+  @IsOptional()
+  HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION?: string;
 }
 
 /**

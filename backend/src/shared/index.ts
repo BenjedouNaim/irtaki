@@ -5,5 +5,6 @@ export * from './guards/scope.guard';
 export * from './filters/http-exception.filter';
 export * from './middleware/correlation-id.middleware';
 export * from './logging/logger.service';
+export * from './observability/healthchecks-ping.service';
 export * from './pagination/cursor.util';
 export * from './shared.module';
