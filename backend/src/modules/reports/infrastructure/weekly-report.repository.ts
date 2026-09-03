@@ -4,9 +4,12 @@ import { Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   CurrentWeekContextRecord,
+  FindOwnWeeklyReportsParams,
   IWeeklyReportRepository,
   NewWeeklyReport,
+  WeeklyReportPage,
   WeeklyReportRecord,
+  WeeklyReportsPageParams,
   WeeklyReportState,
   WeeklyReportWithTimezoneRecord,
 } from '../domain/weekly-report.repository.interface';
@@ -105,6 +108,37 @@ function toRecordWithTimezone(
   row: RawWeeklyReportWithTimezoneRow,
 ): WeeklyReportWithTimezoneRecord {
   return { ...toRecord(row), timezone: row.timezone };
+}
+
+/**
+ * The optional `from`/`to` bounds (APIS §9.3) and the keyset position
+ * (APIS §9.2) of both weekly history lists, expressed as nullable
+ * parameters so each statement stays ONE literal, parameterised query
+ * (TS §36). `id` is the tie-breaker of the cursor shape shared with the
+ * daily lists; DB-UQ-05 already makes `(membership_id, week_start)` unique.
+ */
+const HISTORY_PAGE_PREDICATE = `AND ($2::date IS NULL OR w.week_start >= $2::date)
+          AND ($3::date IS NULL OR w.week_start <= $3::date)
+          AND ($4::date IS NULL
+               OR w.week_start < $4::date
+               OR (w.week_start = $4::date AND w.id < $5::uuid))`;
+
+function pageParameters(
+  params: WeeklyReportsPageParams,
+): [string | null, string | null, string | null, string | null, number] {
+  return [
+    params.from,
+    params.to,
+    params.cursor?.sortKey.weekStart ?? null,
+    params.cursor?.id ?? null,
+    params.limit + 1,
+  ];
+}
+
+function toPage(rows: RawWeeklyReportRow[], limit: number): WeeklyReportPage {
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  return { rows: page.map(toRecord), hasMore };
 }
 
 @Injectable()
@@ -346,5 +380,36 @@ export class WeeklyReportRepository implements IWeeklyReportRepository {
     );
 
     return returnedRows<RawWeeklyReportRow>(raw).map(toRecord);
+  }
+
+  async findOwnHistoryByUserId(
+    params: FindOwnWeeklyReportsParams,
+  ): Promise<WeeklyReportPage> {
+    // Scope = the caller's Active membership, resolved by the join (DB-UQ-02
+    // partial index on Active memberships). The row scan is a backward
+    // range walk of DB-IDX-02 (membership_id, week_start), which serves
+    // both the optional `from`/`to` bounds and the `week_start DESC` order
+    // (APIS §9.4); `id DESC` is the keyset tie-breaker. Only `Finalised`
+    // rows are history (UF §16 "appears in History" on finalisation, UF §34
+    // "Finalised → read-only in History forever"); the Open recitation-day
+    // row is served by API-033. `LIMIT limit + 1` derives `hasMore` without
+    // a COUNT (APIS §9.1).
+    const rows = await this.weeklyReportRepo.manager.query<
+      RawWeeklyReportRow[]
+    >(
+      `SELECT ${WEEKLY_REPORT_COLUMNS}
+         FROM memberships m
+         JOIN weekly_reports w ON w.membership_id = m.id
+        WHERE m.user_id = $1
+          AND m.state = 'Active'
+          AND w.deleted_at IS NULL
+          AND w.state = 'Finalised'
+          ${HISTORY_PAGE_PREDICATE}
+        ORDER BY w.week_start DESC, w.id DESC
+        LIMIT $6`,
+      [params.userId, ...pageParameters(params)],
+    );
+
+    return toPage(rows ?? [], params.limit);
   }
 }

@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +18,9 @@ import { WeeklyReportLiveResponseDto } from '../application/get-current-weekly-r
 import { ConfirmWeeklyReportUseCase } from '../application/confirm-weekly-report/confirm-weekly-report.use-case';
 import { ConfirmWeeklyReportDto } from '../application/confirm-weekly-report/confirm-weekly-report.dto';
 import { ConfirmWeeklyReportResponseDto } from '../application/confirm-weekly-report/confirm-weekly-report-response.dto';
+import { ListOwnWeeklyReportsUseCase } from '../application/list-own-weekly-reports/list-own-weekly-reports.use-case';
+import { ListOwnWeeklyReportsQueryDto } from '../application/list-own-weekly-reports/list-own-weekly-reports-query.dto';
+import { ListOwnWeeklyReportsResponseDto } from '../application/list-own-weekly-reports/list-own-weekly-reports-response.dto';
 import { OwnWeeklyReportScopeGuard } from './guards/own-weekly-report-scope.guard';
 
 interface AuthenticatedRequest extends Request {
@@ -38,6 +42,7 @@ export class WeeklyReportsController {
   constructor(
     private readonly getCurrentWeeklyReportUseCase: GetCurrentWeeklyReportUseCase,
     private readonly confirmWeeklyReportUseCase: ConfirmWeeklyReportUseCase,
+    private readonly listOwnWeeklyReportsUseCase: ListOwnWeeklyReportsUseCase,
   ) {}
 
   /**
@@ -74,5 +79,22 @@ export class WeeklyReportsController {
     @Body() dto: ConfirmWeeklyReportDto,
   ): Promise<ConfirmWeeklyReportResponseDto> {
     return this.confirmWeeklyReportUseCase.execute(req.user.id, id, dto);
+  }
+
+  /**
+   * API-035 `GET /weekly-reports?from=&to=` — Student only (APIS §6.1;
+   * Assistant absent from @Roles(), DEC-B09). Own history, `week_start
+   * DESC`, cursor-paginated (APIS §9.2/§9.4) — "same pagination/scope
+   * pattern as daily reports" (APIS §10.8). Scope is the caller's own
+   * Active membership, applied inside the repository query — a list route
+   * has no path id to guard (TS §15.2 "repository scope filter").
+   */
+  @Roles(UserRole.Student)
+  @Get('weekly-reports')
+  async mine(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListOwnWeeklyReportsQueryDto,
+  ): Promise<ListOwnWeeklyReportsResponseDto> {
+    return this.listOwnWeeklyReportsUseCase.execute(req.user.id, query);
   }
 }

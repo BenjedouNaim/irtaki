@@ -1,7 +1,9 @@
 import {
   confirmWeeklyReport,
   getCurrentWeeklyReport,
+  listOwnWeeklyReports,
   WeeklyReportDto,
+  WeeklyReportListResponse,
   WeeklyReportLiveDto,
 } from '../weeklyReports.client';
 import { apiClient } from '../client';
@@ -30,7 +32,7 @@ const liveReport: WeeklyReportLiveDto = {
   can_confirm: false,
 };
 
-describe('weeklyReports.client (API-033 / API-034)', () => {
+describe('weeklyReports.client (API-033 / API-034 / API-035)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -126,6 +128,66 @@ describe('weeklyReports.client (API-033 / API-034)', () => {
       await expect(
         confirmWeeklyReport('weekly-1', { attended_recitation_call: true }),
       ).rejects.toBe(error);
+    });
+  });
+
+  describe('listOwnWeeklyReports (API-035)', () => {
+    const page: WeeklyReportListResponse = {
+      data: [
+        {
+          id: 'weekly-2',
+          week_start: '2026-08-22',
+          week_end: '2026-08-28',
+          expected_days: 6,
+          missed_daily_reports: 1,
+          missed_daily_memorization: 2,
+          missed_daily_revision: 3,
+          missed_50_repetitions: 4,
+          missed_single_session: 5,
+          attended_recitation_call: true,
+          state: 'Finalised',
+          finalised_at: '2026-08-28T09:00:00.000Z',
+          finalised_by: 'Student',
+        },
+      ],
+      pagination: { next_cursor: 'eyJ...', has_more: true },
+    };
+
+    it('calls GET /weekly-reports with no params by default and returns the whole APIS §9.1 collection envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      const result = await listOwnWeeklyReports();
+
+      expect(apiClient.get).toHaveBeenCalledWith('/weekly-reports', {
+        params: {},
+      });
+      expect(result).toEqual(page);
+      expect(result.pagination.next_cursor).toBe('eyJ...');
+    });
+
+    it('forwards the APIS §9.2 cursor params and §9.3 from/to, omitting unset ones', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      await listOwnWeeklyReports({ limit: 20, cursor: 'abc' });
+      expect(apiClient.get).toHaveBeenLastCalledWith('/weekly-reports', {
+        params: { limit: 20, cursor: 'abc' },
+      });
+
+      await listOwnWeeklyReports({ from: '2026-08-01', to: '2026-08-31' });
+      expect(apiClient.get).toHaveBeenLastCalledWith('/weekly-reports', {
+        params: { from: '2026-08-01', to: '2026-08-31' },
+      });
+    });
+
+    it('propagates apiClient errors unchanged', async () => {
+      const error = new ApiError({
+        statusCode: 500,
+        error: 'INTERNAL_ERROR',
+        message: 'boom',
+      });
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(listOwnWeeklyReports()).rejects.toBe(error);
     });
   });
 });

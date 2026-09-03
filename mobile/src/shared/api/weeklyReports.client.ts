@@ -97,3 +97,52 @@ export async function confirmWeeklyReport(
   );
   return response.data;
 }
+
+/**
+ * Query of the weekly history lists — API-035 `GET /weekly-reports` (and
+ * API-036 `GET /memberships/{id}/weekly-reports`, "same pagination/scope
+ * pattern", APIS §10.8): APIS §9.2 cursor params, §9.3 `from`/`to` as
+ * `YYYY-MM-DD` on `week_start`. SCR-14 sends no date filter (UF §15: "no
+ * date-range filter control despite API support") — the fields mirror the
+ * contract, not a screen.
+ */
+export interface WeeklyReportListParams {
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/** APIS §9.1 collection envelope — cursor block, no totals. */
+export interface WeeklyReportListResponse {
+  data: WeeklyReportDto[];
+  pagination: {
+    next_cursor: string | null;
+    has_more: boolean;
+  };
+}
+
+function toListQuery(
+  params: WeeklyReportListParams,
+): Record<string, string | number> {
+  return {
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.to ? { to: params.to } : {}),
+    ...(params.cursor ? { cursor: params.cursor } : {}),
+    ...(params.limit !== undefined ? { limit: params.limit } : {}),
+  };
+}
+
+/**
+ * Fetches one page of the caller's own weekly report history (Student
+ * only, API-035), `week_start DESC`. Returns the whole `{ data, pagination }`
+ * envelope because the cursor block is part of the resource the list
+ * screen consumes (APIS §9.2). Errors surface as `ApiError` unchanged.
+ */
+export async function listOwnWeeklyReports(
+  params: WeeklyReportListParams = {},
+): Promise<WeeklyReportListResponse> {
+  return apiClient.get<WeeklyReportListResponse>('/weekly-reports', {
+    params: toListQuery(params),
+  });
+}

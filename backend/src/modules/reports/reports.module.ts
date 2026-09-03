@@ -23,6 +23,7 @@ import { WeeklyReportFinalizationJob } from './infrastructure/jobs/weekly-report
 import { WEEKLY_REPORT_SCOPE } from './domain/weekly-report-scope.interface';
 import { WeeklyReportScope } from './infrastructure/weekly-report-scope';
 import { OwnWeeklyReportScopeGuard } from './presentation/guards/own-weekly-report-scope.guard';
+import { ListOwnWeeklyReportsUseCase } from './application/list-own-weekly-reports/list-own-weekly-reports.use-case';
 
 /**
  * Reports module (SA §11): owns `daily_reports` / `weekly_reports`. Scope is
@@ -78,6 +79,8 @@ import { OwnWeeklyReportScopeGuard } from './presentation/guards/own-weekly-repo
     ListRosterDailyReportsUseCase,
     GetCurrentWeeklyReportUseCase,
     ConfirmWeeklyReportUseCase,
+    // F-WR-03: own weekly history (API-035), scope inside the repository.
+    ListOwnWeeklyReportsUseCase,
     // F-WR-02: DS-02 and its ADR-024 cron trigger (SA §19 background jobs).
     WeeklyReportFinalizationService,
     WeeklyReportFinalizationJob,

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DailyReportDto } from '@/shared/api/dailyReports.client';
+import { WeeklyReportDto } from '@/shared/api/weeklyReports.client';
+import { WeeklyReportHistoryList } from '@/features/weeklyReports/components/WeeklyReportHistoryList';
 import { DailyReportHistoryList } from '../components/DailyReportHistoryList';
 
 export type ReportHistoryTab = 'daily' | 'weekly';
@@ -9,6 +11,8 @@ export type ReportHistoryTab = 'daily' | 'weekly';
 export interface ReportHistoryScreenProps {
   /** Daily row tap → SCR-15 rendered from that row (F-DR-07). */
   onOpenReport?: (report: DailyReportDto) => void;
+  /** Weekly row tap → the read-only weekly detail rendered from that row (F-WR-03). */
+  onOpenWeeklyReport?: (report: WeeklyReportDto) => void;
   /** Sub-tab shown on open; the Daily sub-tab is the default (UF §15). */
   initialTab?: ReportHistoryTab;
 }
@@ -19,25 +23,6 @@ const TABS: ReadonlyArray<{ key: ReportHistoryTab; label: string }> = [
   { key: 'weekly', label: 'التقارير الأسبوعية' },
 ];
 
-/**
- * Weekly sub-tab content until F-WR-03 lands (UF §23 "Weekly Reports
- * history — No weekly reports yet"). F-WR-03 replaces this single entry of
- * `TAB_CONTENT` with its own list; nothing else in the screen changes.
- */
-function WeeklyReportsPlaceholder() {
-  return (
-    <View
-      testID="weekly-reports-placeholder"
-      className="w-full p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 items-center gap-2"
-      style={{ borderCurve: 'continuous' }}
-    >
-      <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-center">
-        لا توجد تقارير أسبوعية بعد
-      </Text>
-    </View>
-  );
-}
-
 const TAB_CONTENT: Record<
   ReportHistoryTab,
   (props: ReportHistoryScreenProps) => React.ReactElement
@@ -45,17 +30,20 @@ const TAB_CONTENT: Record<
   daily: ({ onOpenReport }) => (
     <DailyReportHistoryList onOpenReport={onOpenReport} />
   ),
-  weekly: () => <WeeklyReportsPlaceholder />,
+  weekly: ({ onOpenWeeklyReport }) => (
+    <WeeklyReportHistoryList onOpenReport={onOpenWeeklyReport} />
+  ),
 };
 
 /**
- * SCR-14 Report History (F-DR-05, UF §15 / §28): "Two sub-tabs,
+ * SCR-14 Report History (F-DR-05 / F-WR-03, UF §15 / §28): "Two sub-tabs,
  * chronological list". Progress tab → History (UF §26). Tab selection is
  * UI-only state local to the screen (TS §26). Header layout mirrors SCR-10:
  * title on the reading side, back control top-right (UF §31).
  */
 export function ReportHistoryScreen({
   onOpenReport,
+  onOpenWeeklyReport,
   initialTab = 'daily',
 }: ReportHistoryScreenProps) {
   const router = useRouter();
@@ -134,7 +122,10 @@ export function ReportHistoryScreen({
       </View>
 
       <View className="flex-1" testID={`report-history-content-${tab}`}>
-        <Content onOpenReport={onOpenReport} />
+        <Content
+          onOpenReport={onOpenReport}
+          onOpenWeeklyReport={onOpenWeeklyReport}
+        />
       </View>
     </View>
   );
