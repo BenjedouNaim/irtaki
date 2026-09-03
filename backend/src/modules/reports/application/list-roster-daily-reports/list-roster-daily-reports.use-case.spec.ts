@@ -70,6 +70,7 @@ describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
       create: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
+      findDaySnapshotsByMembershipAndRange: jest.fn(),
     };
     scope = {
       isActiveMembershipOfTeacher: jest.fn(),

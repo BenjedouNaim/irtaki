@@ -7,12 +7,14 @@ import {
 } from '@/shared/api/dailyReports.client';
 import { ApiError } from '@/shared/api/types';
 import { MY_PROGRESS_QUERY_KEY } from '@/features/progress/hooks/useMyProgress';
+import { CURRENT_WEEKLY_REPORT_QUERY_KEY } from '@/features/weeklyReports/hooks/useCurrentWeeklyReport';
 import { TODAY_REPORT_STATUS_QUERY_KEY } from './useTodayReportStatus';
 import { OWN_DAILY_REPORTS_QUERY_KEY } from './useOwnDailyReports';
 
 /**
  * Query keys a successful submission invalidates (TS §26): today's status
- * (Home CTA flips to "View Today's Report"), own history, the live weekly /
+ * (Home CTA flips to "View Today's Report"), own history, the live weekly
+ * view (API-033 is computed on read, so a new report changes it) and the
  * performance view, and own progress (`ahzab_completed` changed, UF §15).
  * Declared once here — the single source of truth for "what this write
  * affects".
@@ -20,6 +22,7 @@ import { OWN_DAILY_REPORTS_QUERY_KEY } from './useOwnDailyReports';
 export const SUBMIT_DAILY_REPORT_INVALIDATES = [
   TODAY_REPORT_STATUS_QUERY_KEY,
   OWN_DAILY_REPORTS_QUERY_KEY,
+  CURRENT_WEEKLY_REPORT_QUERY_KEY,
   ['performance', 'mine'],
   MY_PROGRESS_QUERY_KEY,
 ] as const;

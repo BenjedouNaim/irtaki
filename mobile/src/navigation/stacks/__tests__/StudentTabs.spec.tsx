@@ -106,4 +106,16 @@ describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
     });
     expect(dailyReportsApi.getTodayReportStatus).toHaveBeenCalledTimes(1);
   });
+
+  it('routes "Complete Weekly Report" to SCR-12 on the recitation day (UF §10, F-WR-01)', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: false, block_reason: 'recitation_day' });
+
+    renderTabs();
+
+    fireEvent.press(await screen.findByTestId('weekly-report-button'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/student/weekly-report');
+    expect(screen.queryByTestId('submit-report-button')).toBeNull();
+  });
 });

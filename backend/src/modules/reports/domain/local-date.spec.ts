@@ -41,3 +41,19 @@ describe('local-date (SAS §19 timezone authority)', () => {
     });
   });
 });
+
+describe('addDays', () => {
+  const { addDays } =
+    jest.requireActual<typeof import('./local-date')>('./local-date');
+
+  it('shifts across month and year boundaries with UTC arithmetic', () => {
+    expect(addDays('2026-09-04', -6)).toBe('2026-08-29');
+    expect(addDays('2026-12-30', 3)).toBe('2027-01-02');
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(addDays('2026-09-02', 0)).toBe('2026-09-02');
+  });
+
+  it('rejects a malformed date string', () => {
+    expect(() => addDays('2026/09/02', 1)).toThrow(RangeError);
+  });
+});

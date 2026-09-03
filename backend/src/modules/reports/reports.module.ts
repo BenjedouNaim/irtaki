@@ -12,6 +12,11 @@ import { MEMBERSHIP_REPORT_SCOPE } from './domain/membership-report-scope.interf
 import { MembershipReportScope } from './infrastructure/membership-report-scope';
 import { MembershipDailyReportsScopeGuard } from './presentation/guards/membership-daily-reports-scope.guard';
 import { DailyReportsController } from './presentation/daily-reports.controller';
+import { WeeklyReportTypeOrmEntity } from './infrastructure/weekly-report.typeorm-entity';
+import { WEEKLY_REPORT_REPOSITORY } from './domain/weekly-report.repository.interface';
+import { WeeklyReportRepository } from './infrastructure/weekly-report.repository';
+import { GetCurrentWeeklyReportUseCase } from './application/get-current-weekly-report/get-current-weekly-report.use-case';
+import { WeeklyReportsController } from './presentation/weekly-reports.controller';
 
 /**
  * Reports module (SA §11): owns `daily_reports` / `weekly_reports`. Scope is
@@ -25,16 +30,25 @@ import { DailyReportsController } from './presentation/daily-reports.controller'
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DailyReportTypeOrmEntity]),
+    TypeOrmModule.forFeature([
+      DailyReportTypeOrmEntity,
+      WeeklyReportTypeOrmEntity,
+    ]),
     ProgressModule,
   ],
-  controllers: [DailyReportsController],
+  controllers: [DailyReportsController, WeeklyReportsController],
   providers: [
     {
       provide: DAILY_REPORT_REPOSITORY,
       useClass: DailyReportRepository,
     },
     DailyReportRepository,
+    // F-WR-01: E-06 rows and the own-scope context of API-033.
+    {
+      provide: WEEKLY_REPORT_REPOSITORY,
+      useClass: WeeklyReportRepository,
+    },
+    WeeklyReportRepository,
     // F-DR-06: staff-scope resolution for /memberships/{id}/daily-reports,
     // owned by Reports (SA §11) and consumed by its route-specific ScopeGuard.
     {
@@ -46,7 +60,13 @@ import { DailyReportsController } from './presentation/daily-reports.controller'
     SubmitDailyReportUseCase,
     ListOwnDailyReportsUseCase,
     ListRosterDailyReportsUseCase,
+    GetCurrentWeeklyReportUseCase,
   ],
-  exports: [DAILY_REPORT_REPOSITORY, DailyReportRepository],
+  exports: [
+    DAILY_REPORT_REPOSITORY,
+    DailyReportRepository,
+    WEEKLY_REPORT_REPOSITORY,
+    WeeklyReportRepository,
+  ],
 })
 export class ReportsModule {}

@@ -1,4 +1,5 @@
 import type { DailyReport } from './daily-report.entity';
+import type { DatedDailyReportSnapshot } from './weekly-metrics-calculator';
 
 export const DAILY_REPORT_REPOSITORY = Symbol('DAILY_REPORT_REPOSITORY');
 
@@ -134,6 +135,19 @@ export interface IDailyReportRepository {
   findHistoryByMembershipId(
     params: FindMembershipDailyReportsParams,
   ): Promise<DailyReportPage>;
+
+  /**
+   * The classification inputs (VO-09, SAS §18.2) of a membership's live
+   * reports dated within `[from, to]` inclusive — one DB-IDX-01 range walk.
+   * Ordinals never leave the query: a range is projected to its presence
+   * only. Feeds `WeeklyMetricsCalculator` for the live current-week view
+   * (API-033) and for the row created on the recitation day (DBD §14).
+   */
+  findDaySnapshotsByMembershipAndRange(
+    membershipId: string,
+    from: string,
+    to: string,
+  ): Promise<DatedDailyReportSnapshot[]>;
 
   /**
    * Persists one E-05 as a single auto-committing insert (TS §19: "single

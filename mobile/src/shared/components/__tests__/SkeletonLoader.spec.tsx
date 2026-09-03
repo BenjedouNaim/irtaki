@@ -59,4 +59,16 @@ describe('SkeletonLoader', () => {
     expect(screen.queryByTestId('skeleton-report-row-3')).toBeNull();
     expect(screen.queryByTestId('skeleton-row-0')).toBeNull();
   });
+
+  it('renders metricRow variant as N label/value rows matching the Weekly Report layout (UF §22, §29)', async () => {
+    await render(
+      <SkeletonLoader variant="metricRow" count={6} testID="weekly-skeleton" />,
+    );
+
+    expect(screen.getByTestId('weekly-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-metric-row-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-metric-row-5')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-metric-row-6')).toBeNull();
+    expect(screen.queryByTestId('skeleton-report-row-0')).toBeNull();
+  });
 });

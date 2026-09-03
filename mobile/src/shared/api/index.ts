@@ -9,3 +9,4 @@ export * from './memberships.client';
 export * from './quran.client';
 export * from './progress.client';
 export * from './dailyReports.client';
+export * from './weeklyReports.client';

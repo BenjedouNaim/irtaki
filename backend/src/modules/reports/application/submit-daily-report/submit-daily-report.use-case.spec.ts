@@ -99,6 +99,7 @@ describe('SubmitDailyReportUseCase (F-DR-02 / API-030)', () => {
       create: jest.fn().mockResolvedValue('report-new'),
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
+      findDaySnapshotsByMembershipAndRange: jest.fn(),
     };
     surahs = {
       findAll: jest.fn().mockResolvedValue([

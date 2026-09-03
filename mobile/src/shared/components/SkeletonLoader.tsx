@@ -18,9 +18,11 @@ import Animated, {
  * - `reportRow`: a history row (date line + summary line on the reading
  *   side, a type pill on the far side) — mirrors SCR-14's list rows
  *   (UF §22 "Report history (first page): skeleton rows").
+ * - `metricRow`: a label/value row (label on the reading side, a short bold
+ *   value on the far side) — mirrors the Metric row (UF §29) stack of SCR-12.
  */
 export type SkeletonVariant =
-  'row' | 'dashboard' | 'ring' | 'card' | 'reportRow';
+  'row' | 'dashboard' | 'ring' | 'card' | 'reportRow' | 'metricRow';
 
 export interface SkeletonLoaderProps {
   variant?: SkeletonVariant;
@@ -150,6 +152,34 @@ export function SkeletonLoader({
   }
 
   const items = Array.from({ length: count }, (_, i) => i);
+
+  if (variant === 'metricRow') {
+    return (
+      <View
+        testID={testID}
+        className={`w-full gap-3 ${className ?? ''}`}
+        style={style}
+      >
+        {items.map((key) => (
+          <View
+            key={key}
+            testID={`skeleton-metric-row-${key}`}
+            className="flex-row-reverse items-center justify-between min-h-[48px] px-4 py-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 gap-3"
+            style={{ borderCurve: 'continuous' }}
+          >
+            <Animated.View
+              style={[animatedStyle, { borderCurve: 'continuous' }]}
+              className="w-3/5 h-4 rounded bg-gray-200 dark:bg-gray-700"
+            />
+            <Animated.View
+              style={[animatedStyle, { borderCurve: 'continuous' }]}
+              className="w-10 h-7 rounded-md bg-gray-200 dark:bg-gray-700"
+            />
+          </View>
+        ))}
+      </View>
+    );
+  }
 
   if (variant === 'reportRow') {
     return (

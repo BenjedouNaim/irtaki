@@ -43,10 +43,11 @@ describe('useSubmitDailyReport (F-DR-02 / API-030)', () => {
     jest.clearAllMocks();
   });
 
-  it('declares the TS §26 invalidation keys once: today status, own history, own performance, own progress', () => {
+  it('declares the TS §26 invalidation keys once: today status, own history, live weekly view, own performance, own progress', () => {
     expect(SUBMIT_DAILY_REPORT_INVALIDATES).toEqual([
       ['daily-reports', 'today'],
       ['daily-reports', 'mine'],
+      ['weekly-reports', 'current'],
       ['performance', 'mine'],
       ['progress', 'mine'],
     ]);

@@ -42,3 +42,20 @@ export function isoDayOfWeek(isoDate: string): number {
   const jsDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
   return jsDay === 0 ? 7 : jsDay;
 }
+
+/**
+ * The `YYYY-MM-DD` calendar date `days` days after (negative: before)
+ * `isoDate`. UTC arithmetic on a date-only value — no DST or offset can
+ * interfere. Used for reporting-week boundaries (VO-04: `start = end − 6`).
+ */
+export function addDays(isoDate: string, days: number): string {
+  if (!ISO_DATE_REGEX.test(isoDate)) {
+    throw new RangeError(`Invalid ISO calendar date: ${isoDate}`);
+  }
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(
+    shifted.getUTCDate(),
+  )}`;
+}

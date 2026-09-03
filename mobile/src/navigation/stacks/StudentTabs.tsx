@@ -52,7 +52,8 @@ export function StudentTabs() {
         </Text>
 
         {/* SCR-08 Daily Report CTA (F-DR-01). Home → Type Selection (UF §26);
-            already_submitted → today's report, read-only (SCR-15, F-DR-07). */}
+            already_submitted → today's report, read-only (SCR-15, F-DR-07);
+            recitation_day → Weekly Report (SCR-12, F-WR-01). */}
         <ReportStatusCard
           onSubmitReport={() =>
             router.push('/(app)/student/daily-report/type-selection')
@@ -62,6 +63,9 @@ export function StudentTabs() {
               pathname: '/(app)/student/reports/[id]',
               params: { id: report.id },
             })
+          }
+          onCompleteWeeklyReport={() =>
+            router.push('/(app)/student/weekly-report')
           }
           className="mb-6"
         />
