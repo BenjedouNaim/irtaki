@@ -71,4 +71,52 @@ describe('SkeletonLoader', () => {
     expect(screen.queryByTestId('skeleton-metric-row-6')).toBeNull();
     expect(screen.queryByTestId('skeleton-report-row-0')).toBeNull();
   });
+
+  it('renders performanceScore variant as a label, display value and caption (UF §22)', async () => {
+    await render(
+      <SkeletonLoader variant="performanceScore" testID="score-skeleton" />,
+    );
+
+    expect(screen.getByTestId('score-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-score-label')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-score-value')).toBeTruthy();
+    expect(
+      screen.getByTestId('skeleton-performance-score-caption'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-performance-donut')).toBeNull();
+  });
+
+  it('renders performanceDetail variant as a donut card, two tiles and one row (UF §22)', async () => {
+    await render(
+      <SkeletonLoader variant="performanceDetail" testID="detail-skeleton" />,
+    );
+
+    expect(screen.getByTestId('detail-skeleton')).toBeTruthy();
+    expect(
+      screen.getByTestId('skeleton-performance-breakdown-title'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-donut')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-legend-4')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-tile-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-tile-1')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-days-since')).toBeTruthy();
+  });
+
+  it('renders groupPerformance variant as two tiles, a donut card and student rows (UF §22)', async () => {
+    await render(
+      <SkeletonLoader variant="groupPerformance" testID="group-skeleton" />,
+    );
+
+    expect(screen.getByTestId('group-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-group-tile-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-group-tile-1')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-group-absences-title')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-group-donut')).toBeTruthy();
+    // Three legend rows — the three VR-19 absence reasons API-038 returns.
+    expect(screen.getByTestId('skeleton-group-legend-2')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-group-legend-3')).toBeNull();
+    expect(screen.getByTestId('skeleton-group-list-head')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-group-student-2')).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-performance-days-since')).toBeNull();
+  });
 });

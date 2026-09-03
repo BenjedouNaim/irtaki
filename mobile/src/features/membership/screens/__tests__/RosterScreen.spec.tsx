@@ -1,12 +1,15 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import RosterScreen from '../RosterScreen';
 import * as membershipsApi from '@/shared/api/memberships.client';
 import * as groupsApi from '@/shared/api/groups.client';
+import * as performanceApi from '@/shared/api/performance.client';
 import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/memberships.client');
 jest.mock('@/shared/api/groups.client');
+jest.mock('@/shared/api/performance.client');
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -50,8 +53,48 @@ describe('RosterScreen (F-MEM-02)', () => {
     assistant: { id: 'assistant-1', full_name: 'سارة' },
   };
 
+  /** API-038's answer, already weakest-first (UF §17). */
+  const mockGroupPerformance: performanceApi.GroupPerformanceDto = {
+    commitment_average: 62,
+    students: [
+      {
+        membership_id: 'membership-1',
+        full_name: 'محمد بن علي',
+        commitment_score: 41,
+      },
+      {
+        membership_id: 'membership-3',
+        full_name: 'سلمى العياري',
+        commitment_score: 88,
+      },
+    ],
+    absence_breakdown: { sick: 2, studying: 1, other: 0 },
+    submission_rate: 83,
+  };
+
+  let queryClient: QueryClient;
+
+  /**
+   * SCR-23 composes the roster-backed header with F-PERF-02's own query, so
+   * the teacher variant needs a QueryClient around it.
+   */
+  function renderTeacher(props: Record<string, unknown> = {}) {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <RosterScreen groupId={mockGroupId} variant="teacher" {...props} />
+      </QueryClientProvider>,
+    );
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
   });
 
   describe('Admin roster (SCR-30, Figma 41:316)', () => {
@@ -199,27 +242,25 @@ describe('RosterScreen (F-MEM-02)', () => {
       jest
         .spyOn(groupsApi, 'getGroupDetail')
         .mockResolvedValue({ data: mockGroup });
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
     });
 
-    it('loads the group with the roster: title, meta, lifecycle badge, enrollment toggle and avatar-initial rows', async () => {
+    it('assembles the header, the enrollment toggle and the Group Performance content', async () => {
       jest
         .spyOn(membershipsApi, 'getGroupMemberships')
         .mockResolvedValueOnce({ data: mockRoster });
 
-      const { findByTestId, getByTestId, getByText, queryByTestId } = render(
-        <RosterScreen
-          groupId={mockGroupId}
-          variant="teacher"
-          canOpenRecovery={false}
-          onActiveMemberPress={jest.fn()}
-        />,
-      );
+      const { findByTestId, getByTestId, getByText, queryByTestId } =
+        renderTeacher({ canOpenRecovery: false });
 
-      expect(await findByTestId('roster-list')).toBeTruthy();
+      expect(await findByTestId('group-performance-students')).toBeTruthy();
       expect(groupsApi.getGroupDetail).toHaveBeenCalledWith(mockGroupId);
       expect(getByTestId('roster-top-bar-title').props.children).toBe(
         'حلقة الفجر',
       );
+      // The header count stays the group's Active roster, not the period's.
       expect(getByTestId('roster-group-meta').props.children).toBe(
         'السبت · طالب واحد',
       );
@@ -228,15 +269,36 @@ describe('RosterScreen (F-MEM-02)', () => {
       expect(getByTestId('enrollment-toggle-label').props.children).toBe(
         'التسجيل مفتوح',
       );
-      expect(getByText('الطلاب')).toBeTruthy();
-      // Avatar initials; no performance data is rendered.
-      expect(getByText('م')).toBeTruthy();
-      expect(getByText('ف')).toBeTruthy();
-      expect(getByTestId('roster-state-badge-membership-2')).toHaveTextContent(
-        'مُزال',
-      );
-      expect(queryByTestId('roster-state-badge-membership-1')).toBeNull();
+      // F-PERF-02's half of the screen.
+      expect(getByTestId('group-performance-period')).toBeTruthy();
+      expect(
+        getByTestId('group-performance-submission-value').props.children,
+      ).toBe('83%');
+      expect(
+        getByTestId('group-performance-average-value').props.children,
+      ).toBe('62%');
+      expect(getByText('أسباب الغياب')).toBeTruthy();
+      expect(getByText('الأضعف أولًا')).toBeTruthy();
+      // The Admin roster head never appears on the Teacher's screen.
       expect(queryByTestId('roster-head')).toBeNull();
+    });
+
+    it('lists the API-038 member set, not the roster (FR-PERF-09/10, UF §17)', async () => {
+      jest
+        .spyOn(membershipsApi, 'getGroupMemberships')
+        .mockResolvedValueOnce({ data: mockRoster });
+
+      const { findByTestId, getByText, queryByText } = renderTeacher();
+
+      expect(await findByTestId('group-performance-students')).toBeTruthy();
+      expect(performanceApi.getGroupPerformance).toHaveBeenCalledWith(
+        mockGroupId,
+        { period: 'week' },
+      );
+      // membership-3 is in the period's member set but not in the roster page;
+      // membership-2 is in the roster but not in the period's set.
+      expect(getByText('سلمى العياري')).toBeTruthy();
+      expect(queryByText('فاطمة بن صالح')).toBeNull();
     });
 
     it('flips the enrollment toggle through the existing behaviour', async () => {
@@ -247,9 +309,7 @@ describe('RosterScreen (F-MEM-02)', () => {
         data: { id: mockGroupId, enrollment_status: 'Closed' },
       });
 
-      const { findByTestId, getByTestId } = render(
-        <RosterScreen groupId={mockGroupId} variant="teacher" />,
-      );
+      const { findByTestId, getByTestId } = renderTeacher();
 
       const toggle = await findByTestId('enrollment-toggle-button');
       await act(async () => {
@@ -264,32 +324,31 @@ describe('RosterScreen (F-MEM-02)', () => {
       );
     });
 
-    it('hands an Active row to onActiveMemberPress and keeps Terminated rows inert when recovery is off (→ SCR-25)', async () => {
+    it('hands a tapped student, with the roster fields SCR-24 shows, to onStudentPress', async () => {
       jest
         .spyOn(membershipsApi, 'getGroupMemberships')
         .mockResolvedValueOnce({ data: mockRoster });
-      const onActiveMemberPress = jest.fn();
+      const onStudentPress = jest.fn();
 
-      const { getByTestId, findByText } = render(
-        <RosterScreen
-          groupId={mockGroupId}
-          variant="teacher"
-          onActiveMemberPress={onActiveMemberPress}
-          canOpenRecovery={false}
-        />,
+      const { findByTestId, getByTestId } = renderTeacher({
+        onStudentPress,
+        canOpenRecovery: false,
+      });
+
+      expect(await findByTestId('group-performance-students')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('group-performance-student-membership-1'));
+      });
+
+      expect(onStudentPress).toHaveBeenCalledWith(
+        mockGroupPerformance.students[0],
+        {
+          gender: mockRoster[0].user.gender,
+          startedAt: mockRoster[0].started_at,
+          groupName: mockGroup.name,
+        },
       );
-
-      expect(await findByText('محمد بن علي')).toBeTruthy();
-
-      await act(async () => {
-        fireEvent.press(getByTestId('roster-row-membership-1'));
-      });
-      expect(onActiveMemberPress).toHaveBeenCalledWith(mockRoster[0]);
-
-      await act(async () => {
-        fireEvent.press(getByTestId('roster-row-membership-2'));
-      });
-      expect(onActiveMemberPress).toHaveBeenCalledTimes(1);
       expect(mockPush).not.toHaveBeenCalled();
     });
 
@@ -305,14 +364,32 @@ describe('RosterScreen (F-MEM-02)', () => {
         }),
       );
 
-      const { findByTestId, getByText, queryByTestId } = render(
-        <RosterScreen groupId={mockGroupId} variant="teacher" />,
-      );
+      const { findByTestId, getByText, queryByTestId } = renderTeacher();
 
       expect(await findByTestId('roster-error')).toBeTruthy();
       expect(getByText('ليس لديك صلاحية للوصول إلى هذا المورد')).toBeTruthy();
       expect(queryByTestId('enrollment-toggle')).toBeNull();
-      expect(queryByTestId('roster-list')).toBeNull();
+      expect(queryByTestId('group-performance')).toBeNull();
+    });
+
+    it('keeps the header and the toggle when only the performance call fails (UF §24)', async () => {
+      jest
+        .spyOn(membershipsApi, 'getGroupMemberships')
+        .mockResolvedValueOnce({ data: mockRoster });
+      jest.spyOn(performanceApi, 'getGroupPerformance').mockRejectedValue(
+        new ApiError({
+          statusCode: 500,
+          error: 'INTERNAL_ERROR',
+          message: 'Internal server error detail',
+        }),
+      );
+
+      const { findByTestId, getByTestId, queryByText } = renderTeacher();
+
+      expect(await findByTestId('group-performance-error')).toBeTruthy();
+      expect(getByTestId('enrollment-toggle')).toBeTruthy();
+      expect(getByTestId('roster-lifecycle-badge')).toBeTruthy();
+      expect(queryByText('Internal server error detail')).toBeNull();
     });
   });
 });
