@@ -135,9 +135,9 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
         return;
       }
       if (err.statusCode === 422 && err.errorCode === 'RECITATION_DAY') {
-        // UF §15: routes to the Weekly Report; until SCR-12 exists, Home
-        // offers "Complete Weekly Report" from the re-evaluated status.
-        setBanner({ message: err.message, action: 'home' });
+        // UF §15: "Routes to Weekly Report, form discarded" — midnight
+        // crossed mid-entry, so SCR-12 (F-WR-01) replaces the form.
+        router.replace('/(app)/student/weekly-report');
         return;
       }
       if (err.statusCode === 422 && err.details && err.details.length > 0) {

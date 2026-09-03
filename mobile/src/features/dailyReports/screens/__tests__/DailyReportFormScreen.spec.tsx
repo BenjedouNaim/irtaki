@@ -338,7 +338,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
     });
 
-    it('422 RECITATION_DAY: informational, form discarded, back to Home', async () => {
+    it('422 RECITATION_DAY: routes to the Weekly Report (SCR-12), form discarded (UF §15)', async () => {
       jest.spyOn(dailyReportsApi, 'submitDailyReport').mockRejectedValue(
         new ApiError({
           statusCode: 422,
@@ -348,11 +348,15 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       );
       submitAbsent();
 
-      await screen.findByTestId('daily-report-form-banner');
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith(
+          '/(app)/student/weekly-report',
+        ),
+      );
+      expect(screen.queryByTestId('daily-report-form-banner')).toBeNull();
       expect(
-        screen.getByText('اليوم هو يوم التسميع، ولا يُرسل فيه تقرير يومي'),
-      ).toBeTruthy();
-      expect(screen.getByTestId('daily-report-form-home-button')).toBeTruthy();
+        screen.queryByText('اليوم هو يوم التسميع، ولا يُرسل فيه تقرير يومي'),
+      ).toBeNull();
     });
 
     it('422 field-level: inline verbatim Arabic under the field, form preserved', async () => {
