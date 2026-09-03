@@ -65,6 +65,7 @@ describe('WeeklyReportFinalizationService (DS-02, FR-WR-06)', () => {
       findOwnById: jest.fn(),
       finaliseByStudent: jest.fn(),
       findAllOpenWithTimezone: jest.fn(),
+      countAttendedFinalisedWeeks: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),

@@ -1,18 +1,16 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TabBar, TabBarItem, TAB_BAR_ITEMS } from '@/shared/components/TabBar';
+import { TabBar, TAB_BAR_ITEMS } from '@/shared/components/TabBar';
 
 export type AssistantTabKey = 'home' | 'join-requests' | 'payments';
 
 /**
- * Figma TabBar.Role=Assistant — Home · Join Requests · Payments. The
- * Payments tab (SCR-20/21) is not built yet, so it stays inert (UF §23
- * "Assistant with no groups — both tabs" still lists it).
+ * Figma TabBar.Role=Assistant — Home · Join Requests · Payments, every tab
+ * live now that SCR-20 exists (F-PAY-02). UF §23 keeps all three listed
+ * even for an Assistant with no groups assigned.
  */
-export const ASSISTANT_TAB_ITEMS: TabBarItem[] = TAB_BAR_ITEMS.assistant.map(
-  (item) => (item.key === 'payments' ? { ...item, disabled: true } : item),
-);
+export const ASSISTANT_TAB_ITEMS = TAB_BAR_ITEMS.assistant;
 
 export interface AssistantTabBarProps {
   activeKey: AssistantTabKey;
@@ -20,9 +18,10 @@ export interface AssistantTabBarProps {
 }
 
 /**
- * Bottom tabs shared by SCR-17 (Home) and SCR-18 (Join Requests Queue).
- * Home is the Assistant root route; the queue is pushed on top of it, so
- * returning "Home" pops when possible (UF §31 stack returns rightward).
+ * Bottom tabs shared by SCR-17 (Home), SCR-18 (Join Requests Queue) and
+ * SCR-20 (Payments Ledger). Home is the Assistant root route; the other two
+ * are pushed on top of it, so returning "Home" pops when possible (UF §31
+ * stack returns rightward).
  */
 export function AssistantTabBar({
   activeKey,
@@ -39,8 +38,19 @@ export function AssistantTabBar({
       } else {
         router.replace('/(app)/assistant');
       }
-    } else if (key === 'join-requests') {
-      router.push('/(app)/assistant/join-requests');
+      return;
+    }
+    const href =
+      key === 'payments'
+        ? '/(app)/assistant/payments'
+        : '/(app)/assistant/join-requests';
+    // Home is the stack root and the other two tabs sit exactly one level
+    // above it, so hopping between them replaces rather than deepens the
+    // stack — "Home" then still pops straight back (UF §31).
+    if (activeKey === 'home') {
+      router.push(href);
+    } else {
+      router.replace(href);
     }
   };
 

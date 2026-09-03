@@ -150,6 +150,17 @@ export interface IDailyReportRepository {
   ): Promise<DatedDailyReportSnapshot[]>;
 
   /**
+   * The `report_date` of the membership's most recent live report, or null
+   * when none exists — ONE descending walk of DB-IDX-01 stopped at the
+   * first row. Feeds the `days_since_last_report` figure of API-037, which
+   * counts EXPECTED days after that date, not raw calendar days (SAS §18.4,
+   * TS §24 "the same expected-day counting as AtRisk").
+   */
+  findLastReportDateByMembershipId(
+    membershipId: string,
+  ): Promise<string | null>;
+
+  /**
    * Persists one E-05 as a single auto-committing insert (TS §19: "single
    * insert only — not combined with the coverage update"). Ranges are stored
    * as ordinals (DBD DBT-06). A DB-UQ-04 violation is NOT translated here —

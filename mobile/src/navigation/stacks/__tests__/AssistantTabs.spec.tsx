@@ -178,7 +178,7 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     );
   });
 
-  it('exposes the Assistant tab bar: Home active, Join Requests pushes, Payments inert', async () => {
+  it('exposes the Assistant tab bar: Home active, Join Requests and Payments push', async () => {
     (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: groups });
 
     render(<AssistantTabs />);
@@ -191,13 +191,14 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     expect(
       screen.getByTestId('assistant-tab-bar-payments').props.accessibilityState
         .disabled,
-    ).toBe(true);
+    ).toBeUndefined();
 
     fireEvent.press(screen.getByTestId('assistant-tab-bar-join-requests'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/join-requests');
 
+    // SCR-20 is live since F-PAY-02 — the tab is no longer a placeholder.
     fireEvent.press(screen.getByTestId('assistant-tab-bar-payments'));
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/payments');
   });
 
   it('navigates to the profile from the trailing top-bar control', async () => {

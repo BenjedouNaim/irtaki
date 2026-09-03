@@ -4,9 +4,13 @@ import RosterScreen from '@/features/membership/screens/RosterScreen';
 
 /**
  * SCR-23 Group Detail · Teacher: the group header, the enrollment toggle
- * and the student list (UF §26 "Student row"). An Active row opens that
- * student's raw daily reports (SCR-25, F-DR-06). The Teacher has no
- * recovery view (SCR-31 is Admin's), so Terminated rows stay inert.
+ * (F-GRP-06) and the Group Performance content — period selector, tiles,
+ * absence-reason donut and the weakest-first student list (F-PERF-02).
+ *
+ * A student row opens that student's dashboard (SCR-24, F-PERF-03) — UF §27's
+ * "Group Detail row tap" — carrying the roster fields SCR-24's header shows.
+ * SCR-24 continues to the raw reports (SCR-25). The Teacher has no recovery
+ * view (SCR-31 is Admin's).
  */
 export default function TeacherGroupRosterRoute() {
   const router = useRouter();
@@ -17,10 +21,16 @@ export default function TeacherGroupRosterRoute() {
       groupId={id || ''}
       variant="teacher"
       canOpenRecovery={false}
-      onActiveMemberPress={(entry) =>
+      onStudentPress={(student, context) =>
         router.push({
-          pathname: '/(app)/teacher/memberships/[id]/daily-reports',
-          params: { id: entry.id, name: entry.user.full_name ?? '' },
+          pathname: '/(app)/teacher/memberships/[id]/performance',
+          params: {
+            id: student.membership_id,
+            name: student.full_name ?? '',
+            gender: context.gender ?? '',
+            groupName: context.groupName ?? '',
+            startedAt: context.startedAt ?? '',
+          },
         })
       }
     />
