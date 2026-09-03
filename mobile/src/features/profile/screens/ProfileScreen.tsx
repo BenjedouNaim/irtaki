@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
@@ -8,6 +9,7 @@ import { Toast } from '@/shared/components/Toast';
 import { TopBar } from '@/shared/components/TopBar';
 import { Icon } from '@/shared/components/Icon';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { ListRow } from '@/shared/components/ListRow';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { typography } from '@/shared/theme/typography';
 import { rowStart, itemsStart } from '@/shared/theme/rtl';
@@ -75,6 +77,7 @@ function InfoRow({ label, value, ltr = false, testID }: InfoRowProps) {
 
 /** SCR-34 Profile / Account — Figma 43:42. */
 export function ProfileScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<MeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -317,6 +320,19 @@ export function ProfileScreen() {
           الاسم والجنس والدور تُحدَّد عبر الانضمام والإدارة فقط — لا تُعدَّل
           هنا.
         </Text>
+
+        {/* Menu — Figma 43:91. SCR-35 is the shared destination every role
+            reaches from here (UF §26 "Profile/Account → Notification
+            Preferences"); it is the only menu row that has a screen. */}
+        <View className="w-full pt-1.5 gap-2">
+          <ListRow
+            title="تفضيلات الإشعارات"
+            subtitle="كتم فئات محددة"
+            leadingIcon="bell"
+            onPress={() => router.push('/(app)/notification-preferences')}
+            testID="profile-notification-preferences-row"
+          />
+        </View>
 
         {/* Timezone — the only editable field (UF SCR-34) */}
         <View className={`w-full pt-1.5 gap-4 ${itemsStart}`}>
