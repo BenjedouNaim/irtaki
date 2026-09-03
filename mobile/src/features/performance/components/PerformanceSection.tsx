@@ -254,7 +254,7 @@ function ScoreCard({
           —
         </Text>
       ) : (
-        <View className={`${rowStart} items-end gap-2`}>
+        <View className={`w-full ${rowStart} items-end gap-2`}>
           <Text
             testID={`${testID}-value`}
             className={`${typography.displayLg} text-fg dark:text-fg-dark`}
