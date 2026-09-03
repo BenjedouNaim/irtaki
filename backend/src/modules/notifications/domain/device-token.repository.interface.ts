@@ -1,5 +1,4 @@
-import type { DevicePlatform } from './device-token.entity';
-import type { DeviceToken } from './device-token.entity';
+import type { DeviceToken, DevicePlatform } from './device-token.entity';
 
 export const DEVICE_TOKEN_REPOSITORY = Symbol('DEVICE_TOKEN_REPOSITORY');
 
@@ -24,4 +23,11 @@ export interface IDeviceTokenRepository {
    * Returns the resulting row either way.
    */
   registerOrRefresh(deviceToken: DeviceToken): Promise<DeviceTokenRecord>;
+
+  /**
+   * DBD §25 / ADR-007: the one permitted PHYSICAL delete in this schema.
+   * Scoped to `userId` as the NFR-19 repository-level backstop behind the
+   * route's ScopeGuard. `false` when no row matched.
+   */
+  deletePhysically(deviceId: string, userId: string): Promise<boolean>;
 }

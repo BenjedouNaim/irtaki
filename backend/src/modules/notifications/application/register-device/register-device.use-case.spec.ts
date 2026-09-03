@@ -25,6 +25,7 @@ describe('RegisterDeviceUseCase (F-NOT-01 / API-048)', () => {
   beforeEach(() => {
     repository = {
       registerOrRefresh: jest.fn(),
+      deletePhysically: jest.fn(),
     };
     useCase = new RegisterDeviceUseCase(repository);
   });

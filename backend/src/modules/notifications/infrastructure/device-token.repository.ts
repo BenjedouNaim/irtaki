@@ -83,4 +83,17 @@ export class DeviceTokenRepository implements IDeviceTokenRepository {
 
     return toRecord(rows[0]);
   }
+
+  /**
+   * DBD §25 / ADR-007 — a real `DELETE`, the sole hard-delete exception in
+   * this schema. `user_id` is repeated in the predicate as the NFR-19
+   * repository-level backstop behind `OwnDeviceScopeGuard`.
+   */
+  async deletePhysically(deviceId: string, userId: string): Promise<boolean> {
+    const result = await this.deviceTokenRepo.delete({
+      id: deviceId,
+      userId,
+    });
+    return (result.affected ?? 0) > 0;
+  }
 }

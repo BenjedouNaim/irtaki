@@ -1,4 +1,8 @@
-import { DeviceTokenDto, registerDevice } from '../devices.client';
+import {
+  DeviceTokenDto,
+  registerDevice,
+  unregisterDevice,
+} from '../devices.client';
 import { apiClient } from '../client';
 import { ApiError, NetworkError } from '../types';
 
@@ -7,6 +11,7 @@ jest.mock('../client', () => ({
     get: jest.fn(),
     post: jest.fn(),
     patch: jest.fn(),
+    delete: jest.fn(),
   },
 }));
 
@@ -93,6 +98,35 @@ describe('devices.client (API-048 / API-049)', () => {
       await expect(
         registerDevice({ token: 'x', platform: 'iOS' }),
       ).rejects.toBe(error);
+    });
+  });
+
+  describe('unregisterDevice', () => {
+    it('calls DELETE /devices/{id} and resolves with no body (204)', async () => {
+      (apiClient.delete as jest.Mock).mockResolvedValue(undefined);
+
+      await expect(unregisterDevice(device.id)).resolves.toBeUndefined();
+
+      expect(apiClient.delete).toHaveBeenCalledWith(`/devices/${device.id}`);
+    });
+
+    it('encodes the id into the path', async () => {
+      (apiClient.delete as jest.Mock).mockResolvedValue(undefined);
+
+      await unregisterDevice('a b/c');
+
+      expect(apiClient.delete).toHaveBeenCalledWith('/devices/a%20b%2Fc');
+    });
+
+    it('propagates the 403 for a device that is not the caller’s', async () => {
+      const error = new ApiError({
+        statusCode: 403,
+        error: 'SCOPE_DENIED',
+        message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+      });
+      (apiClient.delete as jest.Mock).mockRejectedValue(error);
+
+      await expect(unregisterDevice(device.id)).rejects.toBe(error);
     });
   });
 });

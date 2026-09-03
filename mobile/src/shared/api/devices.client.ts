@@ -46,3 +46,15 @@ export async function registerDevice(
   );
   return response.data;
 }
+
+/**
+ * Removes this install's push token (API-049). `204 No Content`, no
+ * envelope, and the row is physically deleted server-side — the one
+ * hard-delete exception in the schema (DBD §25), so there is nothing to
+ * restore afterwards. Errors surface as `ApiError` unchanged:
+ * `403 SCOPE_DENIED` for a device that is not the caller's (or no longer
+ * exists), `404` for a malformed id.
+ */
+export async function unregisterDevice(deviceId: string): Promise<void> {
+  await apiClient.delete<void>(`/devices/${encodeURIComponent(deviceId)}`);
+}
