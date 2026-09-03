@@ -160,4 +160,125 @@ describe('JoinRequest Entity', () => {
       );
     }
   });
+  describe('VR-04a — the upper half of the 5..60 cardinality band', () => {
+    it('accepts the full 60 ahzab', () => {
+      const all = Array.from({ length: 60 }, (_, i) => i + 1);
+      const request = JoinRequest.submit({
+        ...validProps,
+        memorizedAhzab: all,
+      });
+
+      expect(request.memorizedHizbCount).toBe(60);
+      // (60/60)*50 + 15 + 10 + 15 = 90
+      expect(request.score).toBe(90);
+    });
+
+    it.each([
+      [[0, 1, 2, 3, 4], 'a hizb below 1'],
+      [[1, 2, 3, 4, 61], 'a hizb above 60'],
+      [[1, 2, 3, 4, -5], 'a negative hizb'],
+      [[1, 2, 3, 4, 5.5], 'a fractional hizb'],
+    ])('rejects %j — %s', (ahzab) => {
+      expect(() =>
+        JoinRequest.submit({ ...validProps, memorizedAhzab: ahzab }),
+      ).toThrow(JoinRequestValidationError);
+    });
+
+    it('normalises the declared set — distinct, ascending, defensively copied', () => {
+      const request = JoinRequest.submit({
+        ...validProps,
+        memorizedAhzab: [9, 3, 9, 1, 7, 3, 5],
+      });
+
+      expect(request.memorizedAhzab).toEqual([1, 3, 5, 7, 9]);
+      expect(request.memorizedHizbCount).toBe(5);
+
+      const handed = request.memorizedAhzab;
+      handed.push(60);
+      expect(request.memorizedAhzab).toEqual([1, 3, 5, 7, 9]);
+    });
+  });
+
+  describe('INV-09 — the score is immutable once computed (BR-38)', () => {
+    it('exposes a getter and no setter for the score', () => {
+      const request = JoinRequest.submit(validProps);
+      const descriptor = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(request),
+        'score',
+      );
+
+      expect(typeof descriptor?.get).toBe('function');
+      expect(typeof descriptor?.set).toBe('undefined');
+    });
+
+    it('offers no recompute or rescore transition on the surface', () => {
+      const request = JoinRequest.submit(validProps);
+      const surface = [
+        ...Object.getOwnPropertyNames(Object.getPrototypeOf(request)),
+        ...Object.getOwnPropertyNames(request),
+      ];
+
+      for (const forbidden of [
+        'setScore',
+        'recomputeScore',
+        'rescore',
+        'updateScore',
+      ]) {
+        expect(surface).not.toContain(forbidden);
+      }
+    });
+
+    it('ignores a client-supplied score — it is derived, never accepted', () => {
+      const request = JoinRequest.submit({
+        ...validProps,
+        score: 100,
+      } as unknown as Parameters<typeof JoinRequest.submit>[0]);
+
+      expect(request.score).toBe(44.17);
+    });
+
+    it('is a snapshot: the same declaration always yields the same number', () => {
+      expect(JoinRequest.submit(validProps).score).toBe(
+        JoinRequest.submit(validProps).score,
+      );
+    });
+  });
+
+  describe('ST-04 — a request is born Pending and unreviewed', () => {
+    it('starts Pending with no reviewer, no decision and no soft delete', () => {
+      const request = JoinRequest.submit(validProps);
+
+      expect(request.status).toBe('Pending');
+      expect(request.reviewedAt).toBeNull();
+      expect(request.reviewedBy).toBeNull();
+      expect(request.resolutionSource).toBeNull();
+      expect(request.deletedAt).toBeNull();
+    });
+
+    it('offers no accept/reject transition on the entity — DS-01 owns acceptance', () => {
+      const request = JoinRequest.submit(validProps);
+      const surface = Object.getOwnPropertyNames(
+        Object.getPrototypeOf(request),
+      );
+
+      for (const forbidden of ['accept', 'reject', 'reopen', 'setStatus']) {
+        expect(surface).not.toContain(forbidden);
+      }
+    });
+  });
+
+  it('trims the declared free-text fields', () => {
+    const request = JoinRequest.submit({
+      ...validProps,
+      fullName: '  أحمد التونسي  ',
+      phoneNumber: ' +21620123456 ',
+      occupation: ' مهندس ',
+      city: ' تونس ',
+    });
+
+    expect(request.fullName).toBe('أحمد التونسي');
+    expect(request.phoneNumber).toBe('+21620123456');
+    expect(request.occupation).toBe('مهندس');
+    expect(request.city).toBe('تونس');
+  });
 });

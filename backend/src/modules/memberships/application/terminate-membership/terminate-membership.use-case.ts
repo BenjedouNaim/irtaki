@@ -11,6 +11,7 @@ import { USER_REPOSITORY } from '../../../identity/domain/user.repository.interf
 import type { IUserRepository } from '../../../identity/domain/user.repository.interface';
 import { MEMBERSHIP_REPOSITORY } from '../../domain/membership.repository.interface';
 import type { IMembershipRepository } from '../../domain/membership.repository.interface';
+import { localDateInTimezone } from '../../../reports/domain/local-date';
 import { MembershipTerminatedEvent } from '../../domain/events/membership-terminated.event';
 import { TerminateMembershipResponseDto } from './terminate-membership-response.dto';
 
@@ -32,8 +33,6 @@ export class TerminateMembershipUseCase {
     callerId: string,
     membershipId: string,
   ): Promise<TerminateMembershipResponseDto> {
-    const today = new Date().toISOString().split('T')[0];
-
     if (!MEMBERSHIP_ID_SHAPE.test(membershipId)) {
       throw new NotFoundException({
         statusCode: 404,
@@ -41,6 +40,9 @@ export class TerminateMembershipUseCase {
         message: 'المورد المطلوب غير موجود',
       });
     }
+
+    // Hoisted so DE-09 carries the same date that was written (INV-27).
+    let endedAt = '';
 
     await this.dataSource.transaction(async (manager) => {
       const row = await this.membershipRepository.findStateAndUserById(
@@ -69,10 +71,15 @@ export class TerminateMembershipUseCase {
         });
       }
 
+      // `ended_at` is a calendar date (DBD `DATE`) and bounds every
+      // downstream EffectiveWindow, so it is dated in the removed member's
+      // own timezone, never the server's (INV-27 / T-01).
+      endedAt = localDateInTimezone(new Date(), row.timezone);
+
       const terminated = await this.membershipRepository.terminateConditionally(
         membershipId,
         callerId,
-        today,
+        endedAt,
         manager,
       );
       if (!terminated) {
@@ -98,7 +105,7 @@ export class TerminateMembershipUseCase {
     try {
       this.eventEmitter.emit(
         MembershipTerminatedEvent.EVENT_NAME,
-        new MembershipTerminatedEvent(membershipId, callerId, today),
+        new MembershipTerminatedEvent(membershipId, callerId, endedAt),
       );
     } catch {
       return response;

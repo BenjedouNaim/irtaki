@@ -69,13 +69,14 @@ export class AcceptJoinRequestUseCase {
       // 2b. Membership creation with unique index constraint mapping (DB-UQ-02 / DB-UQ-09)
       let membership: { id: string; startedAt: string };
       try {
-        const today = new Date().toISOString().split('T')[0];
+        // `started_at` is dated in the applicant's own timezone, not the
+        // server's — INV-27 / T-01. The entity derives it (DS-01).
         membership = await this.membershipRepo.create(
           {
             userId: acceptedRow.userId,
             groupId: acceptedRow.groupId,
             joinRequestId,
-            startedAt: today,
+            timezone: acceptedRow.timezone,
           },
           manager,
         );

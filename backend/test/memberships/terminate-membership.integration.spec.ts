@@ -19,6 +19,7 @@ import {
   purgeNotificationLog,
   stopScheduledJobs,
 } from '../shared/scheduled-jobs';
+import { localDateInTimezone } from '../../src/modules/reports/domain/local-date';
 
 interface TestActor {
   accessToken: string;
@@ -33,7 +34,12 @@ describe('DELETE /memberships/:id (F-MEM-03 / API-027 Integration)', () => {
   const testGroupPrefix = 'F-MEM-03 test group';
 
   const STARTED = '2026-01-01';
-  const TODAY = new Date().toISOString().split('T')[0];
+  // `ended_at` is dated in the removed member's own timezone (INV-27 /
+  // T-01), not the server's — the students this suite registers all declare
+  // Africa/Tunis, so that is the calendar the assertion must use. Deriving
+  // it from UTC would disagree for the last hour of every Tunisian day.
+  const MEMBER_TIMEZONE = 'Africa/Tunis';
+  const TODAY = localDateInTimezone(new Date(), MEMBER_TIMEZONE);
 
   const mockMailer: IMailer = {
     sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),

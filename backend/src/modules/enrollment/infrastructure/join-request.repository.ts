@@ -326,14 +326,26 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     reviewerId: string,
     manager: EntityManager,
   ): Promise<JoinRequestAcceptRow | null> {
+    // One parameterised statement (TS §36): the guarded UPDATE and the
+    // applicant's timezone lookup travel together, so DS-01 never has to
+    // fall back on a server-clock date (INV-27).
     const updateResult: unknown = await manager.query(
-      `UPDATE join_requests
-       SET status = 'Accepted',
-           reviewed_at = now(),
-           reviewed_by = $2,
-           resolution_source = 'manual'
-       WHERE id = $1 AND status = 'Pending' AND deleted_at IS NULL
-       RETURNING user_id, group_id, full_name, gender`,
+      `WITH accepted AS (
+         UPDATE join_requests
+         SET status = 'Accepted',
+             reviewed_at = now(),
+             reviewed_by = $2,
+             resolution_source = 'manual'
+         WHERE id = $1 AND status = 'Pending' AND deleted_at IS NULL
+         RETURNING user_id, group_id, full_name, gender
+       )
+       SELECT accepted.user_id,
+              accepted.group_id,
+              accepted.full_name,
+              accepted.gender,
+              u.timezone
+       FROM accepted
+       JOIN users u ON u.id = accepted.user_id`,
       [id, reviewerId],
     );
 
@@ -348,6 +360,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       group_id: string;
       full_name: string;
       gender: 'Male' | 'Female';
+      timezone: string;
     }>;
 
     if (!rows || rows.length === 0) {
@@ -367,6 +380,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       fullName: row.full_name,
       gender: row.gender,
       memorizedAhzab: ahzabRows.map((a) => Number(a.hizbNumber)),
+      timezone: row.timezone,
     };
   }
 

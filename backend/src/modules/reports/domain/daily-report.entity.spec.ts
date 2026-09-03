@@ -271,4 +271,81 @@ describe('DailyReport (E-05) constructor rules', () => {
       [expect.objectContaining({ field: 'type' })],
     );
   });
+  describe('INV-12 — a submitted report is never modified or deleted (BR-22)', () => {
+    const report = DailyReport.submit({
+      ...base,
+      type: 'Normal',
+      memoRange,
+      memoTime,
+      completed50Repetitions: true,
+      repetitionsInSingleSession: true,
+      revRange,
+      revTime,
+      readTafsir: true,
+    });
+
+    it('is frozen — ST-05 is terminal on creation', () => {
+      expect(Object.isFrozen(report)).toBe(true);
+    });
+
+    it.each([
+      'membershipId',
+      'reportDate',
+      'type',
+      'memoRange',
+      'memoTime',
+      'completed50Repetitions',
+      'repetitionsInSingleSession',
+      'revRange',
+      'revTime',
+      'readTafsir',
+      'absenceReason',
+      'noMemorizationToday',
+      'noRevisionToday',
+      'submittedAt',
+      'submittedTimezone',
+    ])('throws on a write to %s and leaves the value intact', (field) => {
+      const before = (report as unknown as Record<string, unknown>)[field];
+
+      expect(() => {
+        (report as unknown as Record<string, unknown>)[field] = 'tampered';
+      }).toThrow(TypeError);
+
+      expect((report as unknown as Record<string, unknown>)[field]).toBe(
+        before,
+      );
+    });
+
+    it('accepts no new property either — the shape is sealed', () => {
+      expect(() => {
+        (report as unknown as Record<string, unknown>).amended = true;
+      }).toThrow(TypeError);
+      expect(
+        (report as unknown as Record<string, unknown>).amended,
+      ).toBeUndefined();
+    });
+
+    it('offers no amend, correct or delete transition on the surface', () => {
+      const surface = [
+        ...Object.getOwnPropertyNames(Object.getPrototypeOf(report)),
+        ...Object.getOwnPropertyNames(report),
+      ];
+
+      for (const forbidden of [
+        'amend',
+        'correct',
+        'edit',
+        'update',
+        'delete',
+        'softDelete',
+      ]) {
+        expect(surface).not.toContain(forbidden);
+      }
+    });
+
+    it('carries the submitting timezone with the row, so the date is auditable (INV-27)', () => {
+      expect(report.submittedTimezone).toBe('Africa/Tunis');
+      expect(report.reportDate).toBe('2026-09-02');
+    });
+  });
 });
