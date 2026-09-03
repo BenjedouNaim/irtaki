@@ -1,0 +1,55 @@
+/**
+ * Icon registry — the 44 stroke icons of the Figma "🔷 Icons" page (24px,
+ * 1.75 weight), exported to `assets/icons/<name>.svg`. Metro needs static
+ * `require` calls, hence the explicit map; the key union is the `Icon` name type.
+ */
+export const ICONS = {
+  home: require('../../../assets/icons/home.svg'),
+  chart: require('../../../assets/icons/chart.svg'),
+  wallet: require('../../../assets/icons/wallet.svg'),
+  inbox: require('../../../assets/icons/inbox.svg'),
+  users: require('../../../assets/icons/users.svg'),
+  user: require('../../../assets/icons/user.svg'),
+  'chevron-left': require('../../../assets/icons/chevron-left.svg'),
+  'chevron-right': require('../../../assets/icons/chevron-right.svg'),
+  'chevron-down': require('../../../assets/icons/chevron-down.svg'),
+  'arrow-left': require('../../../assets/icons/arrow-left.svg'),
+  check: require('../../../assets/icons/check.svg'),
+  x: require('../../../assets/icons/x.svg'),
+  plus: require('../../../assets/icons/plus.svg'),
+  search: require('../../../assets/icons/search.svg'),
+  bell: require('../../../assets/icons/bell.svg'),
+  book: require('../../../assets/icons/book.svg'),
+  clock: require('../../../assets/icons/clock.svg'),
+  calendar: require('../../../assets/icons/calendar.svg'),
+  alert: require('../../../assets/icons/alert.svg'),
+  info: require('../../../assets/icons/info.svg'),
+  layers: require('../../../assets/icons/layers.svg'),
+  list: require('../../../assets/icons/list.svg'),
+  'log-out': require('../../../assets/icons/log-out.svg'),
+  shield: require('../../../assets/icons/shield.svg'),
+  eye: require('../../../assets/icons/eye.svg'),
+  'eye-off': require('../../../assets/icons/eye-off.svg'),
+  mail: require('../../../assets/icons/mail.svg'),
+  lock: require('../../../assets/icons/lock.svg'),
+  refresh: require('../../../assets/icons/refresh.svg'),
+  'file-text': require('../../../assets/icons/file-text.svg'),
+  more: require('../../../assets/icons/more.svg'),
+  archive: require('../../../assets/icons/archive.svg'),
+  trash: require('../../../assets/icons/trash.svg'),
+  repeat: require('../../../assets/icons/repeat.svg'),
+  'user-x': require('../../../assets/icons/user-x.svg'),
+  pen: require('../../../assets/icons/pen.svg'),
+  settings: require('../../../assets/icons/settings.svg'),
+  graduation: require('../../../assets/icons/graduation.svg'),
+  'circle-check': require('../../../assets/icons/circle-check.svg'),
+  'circle-x': require('../../../assets/icons/circle-x.svg'),
+  'wifi-off': require('../../../assets/icons/wifi-off.svg'),
+  sparkle: require('../../../assets/icons/sparkle.svg'),
+  coins: require('../../../assets/icons/coins.svg'),
+  history: require('../../../assets/icons/history.svg'),
+} as const;
+
+export type IconName = keyof typeof ICONS;
+
+export const ICON_NAMES = Object.keys(ICONS) as IconName[];
