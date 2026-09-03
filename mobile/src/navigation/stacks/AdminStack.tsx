@@ -1,23 +1,44 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TopBar, Button, ListRow } from '@/shared/components';
+import { TopBar, Button, Icon, ListRow } from '@/shared/components';
 import { typography } from '@/shared/theme/typography';
+import { itemsStart } from '@/shared/theme/rtl';
 import { logoutUser } from '@/shared/api/auth.client';
+import { useMe } from '@/features/dashboard/hooks/useMe';
+import { AdminSummaryTiles } from '@/features/admin/components/AdminSummaryTiles';
 import {
   useAuthStore,
   getStoredRefreshToken,
   deleteStoredRefreshToken,
 } from '@/shared/auth/authStore';
 
+/** Figma 39:35 — the role line under the greeting. */
+const ROLE_LINE = 'مدير · قراءة كاملة، وإعدادات هيكلية فقط';
+
+function firstName(fullName: string | null | undefined): string | null {
+  const trimmed = fullName?.trim();
+  if (!trimmed) return null;
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
 /**
- * SCR-26 Admin Home (Figma 39:2, UF §10 "Menu hub"). The four MetricTiles
- * of the frame (staff, groups, pending recoveries, students) are dashboard
- * aggregates the app does not fetch yet, so they are left out rather than
- * faked (UF §8: never offer an out-of-scope screen).
+ * SCR-26 Admin Home (Figma 39:2, UF §10 / §28 "Menu hub"): a greeting, the
+ * four dashboard tiles and the three menu rows that are Admin's real
+ * workflow — Groups (F-GRP-10), Staff & Users (F-ADM-02) and the Audit Log
+ * (F-ADM-03). Nothing here aggregates cross-module data; the tiles read
+ * `GET /me/dashboard` (API-009), which has no client yet, so they render
+ * MetricTile's Null state (see AdminSummaryTiles).
+ *
+ * The frame's greeting headline is the centre's name, which no endpoint
+ * exposes; the caller's own name from `GET /me` fills that line instead, as
+ * on SCR-17. The frame's TopBar trailing slot holds a bell — there is no
+ * notification screen in UF's 35 — so, as on SCR-17, the slot carries the
+ * SCR-34 Profile entry point.
  */
 export function AdminStack() {
   const router = useRouter();
+  const me = useMe();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -36,9 +57,27 @@ export function AdminStack() {
     }
   };
 
+  const name = firstName(me.data?.full_name);
+
   return (
     <View className="flex-1 bg-canvas dark:bg-canvas-dark" testID="admin-stack">
-      <TopBar title="الإدارة" back={false} testID="admin-top-bar" />
+      <TopBar
+        title="الإدارة"
+        back={false}
+        testID="admin-top-bar"
+        trailing={
+          <Pressable
+            testID="profile-button"
+            onPress={() => router.push('/(app)/profile')}
+            accessibilityRole="button"
+            accessibilityLabel="الملف الشخصي"
+            hitSlop={4}
+            className="w-10 h-10 rounded-full items-center justify-center active:opacity-80"
+          >
+            <Icon name="user" size={22} tone="primary" />
+          </Pressable>
+        }
+      />
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -49,12 +88,24 @@ export function AdminStack() {
         }}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Text
-          className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
-          testID="admin-greeting"
-        >
-          مدير · قراءة كاملة، وإعدادات هيكلية فقط
-        </Text>
+        <View className={`w-full gap-0.5 ${itemsStart}`}>
+          <Text
+            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+            accessibilityRole="header"
+            numberOfLines={1}
+            testID="admin-greeting"
+          >
+            {name ? `مرحبًا، ${name}` : 'مرحبًا'}
+          </Text>
+          <Text
+            className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+            testID="admin-role-line"
+          >
+            {ROLE_LINE}
+          </Text>
+        </View>
+
+        <AdminSummaryTiles />
 
         <View className="w-full gap-2.5 pt-1.5" testID="admin-menu">
           <ListRow
@@ -77,12 +128,6 @@ export function AdminStack() {
             leadingIcon="file-text"
             onPress={() => router.push('/(app)/admin/audit' as any)}
             testID="admin-audit-button"
-          />
-          <ListRow
-            title="الملف الشخصي"
-            leadingIcon="user"
-            onPress={() => router.push('/(app)/profile')}
-            testID="profile-button"
           />
         </View>
 
