@@ -22,6 +22,14 @@ interface TestActor {
 }
 
 describe('GET /groups/:id/memberships (F-MEM-02 / API-026 Integration)', () => {
+  // A roster case registers up to six accounts, and every register/login
+  // pair costs two argon2id passes (64 MB, t=3) before a single row is
+  // read. That does not fit jest's 5 s default once the rest of the suite
+  // is competing for the machine — `orders entries by full_name ASC` timed
+  // out there while passing on its own. 60 s is the ceiling the sibling
+  // membership suite and twenty-three other e2e suites already declare.
+  jest.setTimeout(60000);
+
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
