@@ -81,9 +81,11 @@ export class EnvironmentVariables {
   CENTER_TIMEZONE: string = 'Africa/Tunis';
 
   /**
-   * TS §32 `HEALTHCHECKS_PING_URL_*` — one per scheduled job (TS §31).
-   * Optional at boot: an unset URL only disables that job's
-   * dead-man's-switch (logged at WARN by HealthchecksPingService).
+   * TS §32 `HEALTHCHECKS_PING_URL_*` — one per scheduled job, Required
+   * (TS §31 dead-man's-switch, SA §32 "scheduled job silently fails →
+   * Healthchecks.io"). Enforced in production below, like the other
+   * Required keys; in development/test an unset URL only disables that
+   * job's ping (logged once at WARN by HealthchecksPingService).
    */
   @IsString()
   @IsOptional()
@@ -136,6 +138,14 @@ export function validate(
         'dev-pepper-key-must-be-changed-in-prod-min-32-chars'
     ) {
       missingProdKeys.push('JWT_REFRESH_PEPPER (production value required)');
+    }
+    // TS §32: one Healthchecks.io ping URL per scheduled job is Required —
+    // without it the WeeklyReportFinalizationJob's silent failure (SAS
+    // ISS-01) would go undetected (TS §31, SA §32).
+    if (!validatedConfig.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION) {
+      missingProdKeys.push(
+        "HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION (dead-man's-switch for WeeklyReportFinalizationJob, TS §31/§32)",
+      );
     }
 
     if (missingProdKeys.length > 0) {

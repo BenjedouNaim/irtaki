@@ -11,11 +11,13 @@ const PING_TIMEOUT_MS = 5_000;
  * scheduled job pings on success; a missed ping alerts"; SA §32 "Scheduled
  * job silently fails → Healthchecks.io"). Closes SAS ISS-01.
  *
- * One ping URL per job, read from `HEALTHCHECKS_PING_URL_<JOB>` (TS §32).
- * Best-effort by design: an unset variable or an unreachable Healthchecks.io
- * is logged at WARN (TS §30 "recoverable anomaly") and never surfaces to
- * the caller — the job's own outcome is what matters; the missed ping is
- * itself the alert on the Healthchecks.io side.
+ * One ping URL per job, read from `HEALTHCHECKS_PING_URL_<JOB>` (TS §32,
+ * Required — production boot fails without it, see `config/app.config.ts`).
+ * Best-effort at run time: an unset variable (development/test) or an
+ * unreachable Healthchecks.io is logged at WARN (TS §30 "recoverable
+ * anomaly") and never surfaces to the caller — the job's own outcome is
+ * what matters; the missed ping is itself the alert on the Healthchecks.io
+ * side.
  */
 @Injectable()
 export class HealthchecksPingService {
