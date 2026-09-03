@@ -24,7 +24,10 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AdministrationModule } from './modules/administration/administration.module';
+<<<<<<< HEAD
 import { NotificationsModule } from './modules/notifications/notifications.module';
+=======
+>>>>>>> origin/feat/epic-adm
 import { PerformanceModule } from './modules/performance/performance.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
