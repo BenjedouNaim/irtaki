@@ -12,6 +12,7 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { MeResponseDto } from '../../src/modules/identity/application/me/me-response.dto';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('Global Guard Chain (AuthGuard -> RolesGuard -> ScopeGuard)', () => {
   let app: INestApplication<App>;
@@ -41,6 +42,10 @@ describe('Global Guard Chain (AuthGuard -> RolesGuard -> ScopeGuard)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
   });
 

@@ -7,6 +7,7 @@ import { AppModule } from '../../src/app.module';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { RegisterResponseDto } from '../../src/modules/identity/application/register/register-response.dto';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface DbAuthTokenRow {
   id: string;
@@ -42,6 +43,10 @@ describe('POST /auth/login (API-002 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
   });
 

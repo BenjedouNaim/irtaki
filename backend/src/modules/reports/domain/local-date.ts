@@ -103,3 +103,51 @@ export function daysBetween(from: string, to: string): number {
   };
   return Math.round((utc(to) - utc(from)) / 86_400_000);
 }
+
+/**
+ * Minutes since local midnight (0..1439) of `now` in the given IANA
+ * timezone — the wall-clock half of `localDateInTimezone`, kept in the same
+ * file so `Intl`'s timezone conversion has exactly one home in the codebase.
+ *
+ * ADR-030's scheduler filters on this: a single 15-minute tick decides, per
+ * row, whether THAT user's local clock has just reached the job's boundary
+ * (student-local 20:00 for FR-NOTIF-02's reminder, local midnight for a day
+ * boundary). Throws a RangeError for an unrecognised timezone identifier,
+ * exactly as `localDateInTimezone` does.
+ */
+export function localMinutesInTimezone(now: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+
+  const pick = (type: 'hour' | 'minute'): number =>
+    Number(parts.find((p) => p.type === type)?.value ?? NaN);
+
+  const hour = pick('hour');
+  const minute = pick('minute');
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    throw new RangeError(`Invalid IANA timezone: ${timeZone}`);
+  }
+  return hour * 60 + minute;
+}
+
+/**
+ * True when `now`, in `timeZone`, falls inside the `[boundaryMinutes,
+ * boundaryMinutes + windowMinutes)` bucket of the local day — the ADR-030
+ * "filtered to local HH:MM" predicate, with the window set to the tick's
+ * own period so every local boundary is caught exactly once per local day.
+ */
+export function isWithinLocalWindow(
+  now: Date,
+  timeZone: string,
+  boundaryMinutes: number,
+  windowMinutes: number,
+): boolean {
+  const minutes = localMinutesInTimezone(now, timeZone);
+  return (
+    minutes >= boundaryMinutes && minutes < boundaryMinutes + windowMinutes
+  );
+}

@@ -17,6 +17,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -87,6 +91,10 @@ describe('GET /memberships/{id}/performance (F-PERF-03 / API-039 Integration)', 
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     // DS-02's cron must not finalise a fixture week mid-suite (ADR-024).
     void app
       .get(SchedulerRegistry)
@@ -105,6 +113,7 @@ describe('GET /memberships/{id}/performance (F-PERF-03 / API-039 Integration)', 
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     for (const table of ['weekly_reports', 'daily_reports']) {
       await dataSource.query(
         `DELETE FROM ${table}

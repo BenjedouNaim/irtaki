@@ -17,6 +17,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { JoinRequestSubmittedEvent } from '../../src/modules/enrollment/domain/events/join-request-submitted.event';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('POST /join-requests (API-019 Integration)', () => {
   let app: INestApplication<App>;
@@ -47,6 +51,10 @@ describe('POST /join-requests (API-019 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
     eventEmitter = app.get(EventEmitter2);
 
@@ -61,6 +69,7 @@ describe('POST /join-requests (API-019 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(`
       DELETE FROM join_request_ahzab WHERE join_request_id IN (
         SELECT id FROM join_requests WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-submit-join-request.com')

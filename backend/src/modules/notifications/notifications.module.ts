@@ -13,6 +13,24 @@ import { GetNotificationPreferencesUseCase } from './application/get-notificatio
 import { SetNotificationPreferenceUseCase } from './application/set-notification-preference/set-notification-preference.use-case';
 import { OwnDeviceScopeGuard } from './presentation/guards/own-device-scope.guard';
 import { NotificationsController } from './presentation/notifications.controller';
+import { NOTIFICATION_LOG_REPOSITORY } from './domain/notification-log.repository.interface';
+import { NOTIFICATION_DISPATCH_CONTEXT_REPOSITORY } from './domain/notification-dispatch-context.repository.interface';
+import { PUSH_SENDER } from './domain/push-sender.interface';
+import { NotificationLogRepository } from './infrastructure/notification-log.repository';
+import { NotificationDispatchContextRepository } from './infrastructure/notification-dispatch-context.repository';
+import { ExpoPushSender } from './infrastructure/expo-push.sender';
+import { NotificationService } from './application/dispatch/notification.service';
+import { NOTIFICATION_EVALUATION_REPOSITORY } from './domain/notification-evaluation.repository.interface';
+import { NotificationEvaluationRepository } from './infrastructure/notification-evaluation.repository';
+import { EnrollmentNotificationListener } from './application/listeners/enrollment-notification.listener';
+import { MembershipNotificationListener } from './application/listeners/membership-notification.listener';
+import { DailyReminderEvaluator } from './application/evaluators/daily-reminder.evaluator';
+import { WeeklyReportAvailableEvaluator } from './application/evaluators/weekly-report-available.evaluator';
+import { AtRiskEvaluator } from './application/evaluators/at-risk.evaluator';
+import { PaymentDueSoonEvaluator } from './application/evaluators/payment-due-soon.evaluator';
+import { DailyReminderEvaluationJob } from './infrastructure/jobs/daily-reminder-evaluation.job';
+import { AtRiskEvaluationJob } from './infrastructure/jobs/at-risk-evaluation.job';
+import { PaymentDueSoonEvaluationJob } from './infrastructure/jobs/payment-due-soon-evaluation.job';
 
 /**
  * Notifications module (SA §11): owns `device_tokens`,
@@ -25,6 +43,12 @@ import { NotificationsController } from './presentation/notifications.controller
  * the two use cases TS §13 names. F-NOT-03/F-NOT-04 add the E-10
  * `notification_preferences` half (API-050/051), which needs no ScopeGuard —
  * both routes address the caller's own collection with no path id.
+ *
+ * F-NOT-05 adds the dispatch half: `NotificationService`, the single path
+ * every one of SAS §22.2's eight events takes (ADR-009, SA §21), the E-11
+ * `notification_log` writer behind it and the EXT-03 push adapter
+ * (ADR-020). None of it is exported — SA §11 keeps this module a
+ * subscriber, so the only way in is an event or a tick of its own.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([DeviceTokenTypeOrmEntity])],
@@ -51,6 +75,41 @@ import { NotificationsController } from './presentation/notifications.controller
     },
     GetNotificationPreferencesUseCase,
     SetNotificationPreferenceUseCase,
+    // F-NOT-05: the SA §21 dispatch path — E-11 logging, the §22.3
+    // re-check reads and the ADR-020 transport behind one service.
+    {
+      provide: NOTIFICATION_LOG_REPOSITORY,
+      useClass: NotificationLogRepository,
+    },
+    {
+      provide: NOTIFICATION_DISPATCH_CONTEXT_REPOSITORY,
+      useClass: NotificationDispatchContextRepository,
+    },
+    {
+      provide: PUSH_SENDER,
+      useClass: ExpoPushSender,
+    },
+    NotificationService,
+    // F-NOT-05: the four event listeners (N-03/N-04/N-05/N-08) and the four
+    // scheduler-evaluated events (N-01/N-02/N-06/N-07). Every one of the
+    // eight goes through NotificationService and nothing else.
+    EnrollmentNotificationListener,
+    MembershipNotificationListener,
+    {
+      provide: NOTIFICATION_EVALUATION_REPOSITORY,
+      useClass: NotificationEvaluationRepository,
+    },
+    DailyReminderEvaluator,
+    WeeklyReportAvailableEvaluator,
+    AtRiskEvaluator,
+    PaymentDueSoonEvaluator,
+    // F-NOT-05: three of SA §23's five Required jobs, on ADR-024's
+    // in-process scheduler — the same @nestjs/schedule + correlationId +
+    // Healthchecks.io mechanism WeeklyReportFinalizationJob has used since
+    // F-WR-02, now shared as `runScheduledJob` rather than re-implemented.
+    DailyReminderEvaluationJob,
+    AtRiskEvaluationJob,
+    PaymentDueSoonEvaluationJob,
   ],
   // SA §11: Notifications is a module other modules never call into directly —
   // they emit events and it listens. Only the device-token pair predating

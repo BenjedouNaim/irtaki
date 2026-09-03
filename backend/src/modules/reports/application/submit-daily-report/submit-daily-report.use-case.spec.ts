@@ -119,6 +119,8 @@ describe('SubmitDailyReportUseCase (F-DR-02 / API-030)', () => {
         intervals: [],
       }),
       findActiveByUserId: jest.fn(),
+      findAllLiveForReconciliation: jest.fn(),
+      correctAhzabCompleted: jest.fn(),
       applyMerge: jest.fn(),
     };
     updateCoverage = {

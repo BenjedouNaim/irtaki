@@ -1,4 +1,8 @@
-import { Environment, validate } from './app.config';
+import {
+  Environment,
+  HEALTHCHECKS_PING_URL_KEYS,
+  validate,
+} from './app.config';
 
 describe('AppConfig Environment Validation', () => {
   it('validates a valid development environment configuration', () => {
@@ -43,7 +47,7 @@ describe('AppConfig Environment Validation', () => {
     );
   });
 
-  describe('HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION (TS §32 Required)', () => {
+  describe('HEALTHCHECKS_PING_URL_* — one per scheduled job (TS §31/§32 Required)', () => {
     const prodConfig = {
       NODE_ENV: Environment.Production,
       PORT: '3000',
@@ -52,28 +56,47 @@ describe('AppConfig Environment Validation', () => {
       JWT_REFRESH_PEPPER: 'a-real-production-refresh-pepper-32-chars-long',
     };
 
-    it('fails fast in production when the ping URL is unset', () => {
-      expect(() => validate(prodConfig)).toThrow(
-        /HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION/,
-      );
+    const pingUrls = Object.fromEntries(
+      HEALTHCHECKS_PING_URL_KEYS.map((key, index) => [
+        key,
+        `https://hc-ping.com/0000000${index}-0000-0000-0000-000000000000`,
+      ]),
+    );
+
+    it('covers all five jobs TS §31 enumerates, and only those', () => {
+      expect([...HEALTHCHECKS_PING_URL_KEYS]).toEqual([
+        'HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION',
+        'HEALTHCHECKS_PING_URL_DAILY_REMINDER_EVALUATION',
+        'HEALTHCHECKS_PING_URL_AT_RISK_EVALUATION',
+        'HEALTHCHECKS_PING_URL_PAYMENT_DUE_SOON_EVALUATION',
+        'HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION',
+      ]);
     });
 
-    it('boots in production once the ping URL is supplied', () => {
-      const result = validate({
-        ...prodConfig,
-        HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION:
-          'https://hc-ping.com/00000000-0000-0000-0000-000000000000',
-      });
+    it.each([...HEALTHCHECKS_PING_URL_KEYS])(
+      'fails fast in production when %s is unset',
+      (missing) => {
+        const withOneMissing = { ...prodConfig, ...pingUrls };
+        delete (withOneMissing as Record<string, unknown>)[missing];
+        expect(() => validate(withOneMissing)).toThrow(new RegExp(missing));
+      },
+    );
+
+    it('boots in production once every ping URL is supplied', () => {
+      const result = validate({ ...prodConfig, ...pingUrls });
       expect(result.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION).toBe(
-        'https://hc-ping.com/00000000-0000-0000-0000-000000000000',
+        pingUrls.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION,
+      );
+      expect(result.HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION).toBe(
+        pingUrls.HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION,
       );
     });
 
     it('stays optional outside production (the ping is skipped with a WARN)', () => {
       const result = validate({ NODE_ENV: Environment.Development });
-      expect(
-        result.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION,
-      ).toBeUndefined();
+      for (const key of HEALTHCHECKS_PING_URL_KEYS) {
+        expect(result[key]).toBeUndefined();
+      }
     });
   });
 });

@@ -11,6 +11,10 @@ import {
   MAILER,
 } from '../../src/modules/identity/domain/mailer.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('GET /memberships/mine (F-MEM-01 / API-025 Integration)', () => {
   let app: INestApplication<App>;
@@ -34,6 +38,10 @@ describe('GET /memberships/mine (F-MEM-01 / API-025 Integration)', () => {
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     dataSource = app.get(DataSource);
     await cleanDatabase();
   });
@@ -46,6 +54,7 @@ describe('GET /memberships/mine (F-MEM-01 / API-025 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM memberships
        WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)

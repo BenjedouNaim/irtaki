@@ -15,6 +15,10 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -55,6 +59,10 @@ describe('DELETE /memberships/:id (F-MEM-03 / API-027 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -68,6 +76,7 @@ describe('DELETE /memberships/:id (F-MEM-03 / API-027 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     // Child-first ordering; scope limited to this file's email/group tags
     await dataSource.query(
       `DELETE FROM coverage_intervals WHERE coverage_id IN (

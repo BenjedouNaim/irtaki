@@ -1,8 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { correlationStorage } from '../../../../shared/middleware/correlation-id.middleware';
 import { HealthchecksPingService } from '../../../../shared/observability/healthchecks-ping.service';
+import {
+  ADR_030_TICK_CRON_EXPRESSION,
+  runScheduledJob,
+} from '../../../../shared/scheduling/scheduled-job';
 import {
   WeeklyReportFinalizationOutcome,
   WeeklyReportFinalizationService,
@@ -14,8 +16,11 @@ export const WEEKLY_REPORT_FINALIZATION_PING_KEY = 'WEEKLY_REPORT_FINALIZATION';
 /**
  * ADR-030's single tick: every 15 minutes, on the quarter hour (six-field
  * cron with seconds, as `@nestjs/schedule` parses it), on the server clock.
+ * Re-exported from the shared constant F-NOT-05 extracted from this file,
+ * so all five of TS §31's jobs demonstrably ride ONE tick definition.
  */
-export const WEEKLY_REPORT_FINALIZATION_CRON_EXPRESSION = '0 */15 * * * *';
+export const WEEKLY_REPORT_FINALIZATION_CRON_EXPRESSION =
+  ADR_030_TICK_CRON_EXPRESSION;
 
 /** `SchedulerRegistry` handle — lets a test stop the tick deterministically. */
 export const WEEKLY_REPORT_FINALIZATION_CRON = 'weekly-report-finalization';
@@ -48,7 +53,7 @@ export const WEEKLY_REPORT_FINALIZATION_CRON = 'weekly-report-finalization';
 @Injectable()
 export class WeeklyReportFinalizationJob {
   private readonly logger = new Logger(WeeklyReportFinalizationJob.name);
-  private running = false;
+  private readonly state = { running: false };
 
   constructor(
     private readonly finalizationService: WeeklyReportFinalizationService,
@@ -65,43 +70,22 @@ export class WeeklyReportFinalizationJob {
   /**
    * One run against `now` (injectable for tests). Resolves the outcome, or
    * null when the run was skipped (overlap) or failed (already logged).
+   *
+   * The correlationId context, the overlap guard, the INFO/ERROR outcome
+   * lines and the Healthchecks.io ping are `runScheduledJob` — the shared
+   * mechanism every scheduled job in this codebase uses, extracted from
+   * THIS job in F-NOT-05 and unchanged in behaviour.
    */
   run(now: Date = new Date()): Promise<WeeklyReportFinalizationOutcome | null> {
-    const store = new Map<string, string>([['correlationId', randomUUID()]]);
-    return correlationStorage.run(store, () => this.runInContext(now));
-  }
-
-  private async runInContext(
-    now: Date,
-  ): Promise<WeeklyReportFinalizationOutcome | null> {
-    if (this.running) {
-      this.logger.warn(
-        'WeeklyReportFinalizationJob tick skipped: the previous run is still in progress',
-      );
-      return null;
-    }
-
-    this.running = true;
-    const startedAt = Date.now();
-    try {
-      const outcome = await this.finalizationService.finaliseOverdue(now);
-      this.logger.log(
-        `WeeklyReportFinalizationJob succeeded: finalised ${outcome.finalised} of ${outcome.candidates} open weekly report(s) in ${
-          Date.now() - startedAt
-        }ms`,
-      );
-      await this.healthchecks.pingSuccess(WEEKLY_REPORT_FINALIZATION_PING_KEY);
-      return outcome;
-    } catch (err: unknown) {
-      this.logger.error(
-        `WeeklyReportFinalizationJob failed after ${Date.now() - startedAt}ms: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        err instanceof Error ? err.stack : undefined,
-      );
-      return null;
-    } finally {
-      this.running = false;
-    }
+    return runScheduledJob({
+      logger: this.logger,
+      jobName: WeeklyReportFinalizationJob.name,
+      pingKey: WEEKLY_REPORT_FINALIZATION_PING_KEY,
+      healthchecks: this.healthchecks,
+      state: this.state,
+      work: () => this.finalizationService.finaliseOverdue(now),
+      describe: (outcome) =>
+        `finalised ${outcome.finalised} of ${outcome.candidates} open weekly report(s)`,
+    });
   }
 }

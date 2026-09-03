@@ -15,6 +15,10 @@ import {
   PASSWORD_HASHER,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -53,6 +57,10 @@ describe('GET /memberships/:id/recovery (F-MEM-04 / API-028 Integration)', () =>
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     dataSource = app.get(DataSource);
     await cleanDatabase();
   }, 30000);
@@ -65,6 +73,7 @@ describe('GET /memberships/:id/recovery (F-MEM-04 / API-028 Integration)', () =>
   }, 30000);
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM daily_reports
        WHERE membership_id IN (

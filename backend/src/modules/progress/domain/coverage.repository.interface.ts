@@ -31,6 +31,16 @@ export interface ApplyCoverageMergeParams {
   expectedUpdatedAt: Date;
 }
 
+/**
+ * One live membership as ADR-029's nightly reconciliation needs it: the
+ * materialised coverage row with its intervals, plus every memorisation
+ * range its live `daily_reports` carry, ordered oldest-first so the newest
+ * one is DEC-D02's `last_memorized_ordinal`.
+ */
+export interface CoverageReconciliationRecord extends CoverageRecord {
+  submittedRanges: CoverageIntervalRecord[];
+}
+
 export interface ICoverageRepository {
   /** DS-01 one-time seed at membership acceptance (F-ENR-05). */
   seedFromHizbSelection(
@@ -58,6 +68,26 @@ export interface ICoverageRepository {
    * coverage is not live.
    */
   findActiveByUserId(userId: string): Promise<CoverageRecord | null>;
+
+  /**
+   * ADR-029: every live `memorization_coverage` row with its intervals and
+   * with the memorisation ranges of the membership's live `daily_reports`
+   * — the primary record the nightly job recomputes coverage FROM.
+   * Global and unscoped by design: the job is "nightly, global" (SA §19).
+   */
+  findAllLiveForReconciliation(): Promise<CoverageReconciliationRecord[]>;
+
+  /**
+   * ADR-029's count-only correction: BR-51's `ahzab_completed` recomputed
+   * over intervals that are already correct. Guarded by the same optimistic
+   * `updated_at` check `applyMerge` uses (TS §20). No-op when another
+   * writer moved the row first.
+   */
+  correctAhzabCompleted(
+    coverageId: string,
+    ahzabCompleted: number,
+    expectedUpdatedAt: Date,
+  ): Promise<boolean>;
 
   /** Persists one DS-05 merge result inside the caller's transaction. */
   applyMerge(
