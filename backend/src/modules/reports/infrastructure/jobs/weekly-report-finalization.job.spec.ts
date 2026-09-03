@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Logger } from '@nestjs/common';
+import { getCorrelationId } from '../../../../shared/middleware/correlation-id.middleware';
 import { HealthchecksPingService } from '../../../../shared/observability/healthchecks-ping.service';
 import { WeeklyReportFinalizationService } from '../../application/finalise-weekly-reports/weekly-report-finalization.service';
 import {
@@ -103,6 +104,23 @@ describe('WeeklyReportFinalizationJob (ADR-024 / ADR-030, TS §30-31)', () => {
     await first;
     await job.run(new Date());
     expect(service.finaliseOverdue).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs each tick inside its own correlationId context so every log line carries one (TS §30, SA §26)', async () => {
+    const seen: Array<string | undefined> = [];
+    service.finaliseOverdue.mockImplementation(() => {
+      seen.push(getCorrelationId());
+      return Promise.resolve({ candidates: 0, finalised: 0 });
+    });
+
+    await job.run(new Date());
+    await job.run(new Date());
+
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(seen[1]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(seen[0]).not.toBe(seen[1]);
+    expect(getCorrelationId()).toBeUndefined();
   });
 
   it('tick() delegates to run() with the current clock', async () => {

@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { correlationStorage } from '../../../../shared/middleware/correlation-id.middleware';
 import { HealthchecksPingService } from '../../../../shared/observability/healthchecks-ping.service';
 import {
   WeeklyReportFinalizationOutcome,
@@ -34,10 +36,14 @@ export const WEEKLY_REPORT_FINALIZATION_CRON = 'weekly-report-finalization';
  * by the next one (SAS §19.6 — DS-02 is idempotent).
  *
  * Logging (TS §30): run outcome at INFO (success/fail per tick — the
- * scheduled-job counter of TS §31), failure at ERROR with the cause. On
- * success, the Healthchecks.io dead-man's-switch is pinged (TS §31,
- * `HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION`). A tick never throws:
- * an exception here would only reach the scheduler's own handler.
+ * scheduled-job counter of TS §31), failure at ERROR with the cause. Every
+ * line carries a `correlationId` (TS §30, SA §26): a tick has no HTTP
+ * request, so each run opens its own `correlationStorage` context with a
+ * fresh id that the Pino bridge stamps on the job's lines and on anything
+ * DS-02 logs beneath it. On success, the Healthchecks.io dead-man's-switch
+ * is pinged (TS §31, `HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION`).
+ * A tick never throws: an exception here would only reach the scheduler's
+ * own handler.
  */
 @Injectable()
 export class WeeklyReportFinalizationJob {
@@ -60,8 +66,13 @@ export class WeeklyReportFinalizationJob {
    * One run against `now` (injectable for tests). Resolves the outcome, or
    * null when the run was skipped (overlap) or failed (already logged).
    */
-  async run(
-    now: Date = new Date(),
+  run(now: Date = new Date()): Promise<WeeklyReportFinalizationOutcome | null> {
+    const store = new Map<string, string>([['correlationId', randomUUID()]]);
+    return correlationStorage.run(store, () => this.runInContext(now));
+  }
+
+  private async runInContext(
+    now: Date,
   ): Promise<WeeklyReportFinalizationOutcome | null> {
     if (this.running) {
       this.logger.warn(
