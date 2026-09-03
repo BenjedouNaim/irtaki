@@ -67,6 +67,7 @@ describe('WeeklyReportFinalizationService (DS-02, FR-WR-06)', () => {
       findAllOpenWithTimezone: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
+      findHistoryByMembershipId: jest.fn(),
     };
     eventEmitter = { emit: jest.fn().mockReturnValue(true) };
     service = new WeeklyReportFinalizationService(

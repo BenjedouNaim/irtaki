@@ -21,7 +21,11 @@ import { ConfirmWeeklyReportResponseDto } from '../application/confirm-weekly-re
 import { ListOwnWeeklyReportsUseCase } from '../application/list-own-weekly-reports/list-own-weekly-reports.use-case';
 import { ListOwnWeeklyReportsQueryDto } from '../application/list-own-weekly-reports/list-own-weekly-reports-query.dto';
 import { ListOwnWeeklyReportsResponseDto } from '../application/list-own-weekly-reports/list-own-weekly-reports-response.dto';
+import { ListRosterWeeklyReportsUseCase } from '../application/list-roster-weekly-reports/list-roster-weekly-reports.use-case';
+import { ListRosterWeeklyReportsQueryDto } from '../application/list-roster-weekly-reports/list-roster-weekly-reports-query.dto';
+import { ListRosterWeeklyReportsResponseDto } from '../application/list-roster-weekly-reports/list-roster-weekly-reports-response.dto';
 import { OwnWeeklyReportScopeGuard } from './guards/own-weekly-report-scope.guard';
+import { MembershipWeeklyReportsScopeGuard } from './guards/membership-weekly-reports-scope.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -34,8 +38,9 @@ interface AuthenticatedRequest extends Request {
 /**
  * Weekly Reports routes (TS §13 API implementation mapping —
  * `WeeklyReportsController`). Paths are spelled in full, as in
- * `DailyReportsController`, because the resource will also be served
- * nested under `/memberships/{id}` (API-036).
+ * `DailyReportsController`, because the controller serves both the
+ * `/weekly-reports` resource (API-033…035) and the staff view nested
+ * under `/memberships/{id}` (API-036).
  */
 @Controller()
 export class WeeklyReportsController {
@@ -43,6 +48,7 @@ export class WeeklyReportsController {
     private readonly getCurrentWeeklyReportUseCase: GetCurrentWeeklyReportUseCase,
     private readonly confirmWeeklyReportUseCase: ConfirmWeeklyReportUseCase,
     private readonly listOwnWeeklyReportsUseCase: ListOwnWeeklyReportsUseCase,
+    private readonly listRosterWeeklyReportsUseCase: ListRosterWeeklyReportsUseCase,
   ) {}
 
   /**
@@ -96,5 +102,25 @@ export class WeeklyReportsController {
     @Query() query: ListOwnWeeklyReportsQueryDto,
   ): Promise<ListOwnWeeklyReportsResponseDto> {
     return this.listOwnWeeklyReportsUseCase.execute(req.user.id, query);
+  }
+
+  /**
+   * API-036 `GET /memberships/{id}/weekly-reports` — Teacher (assigned
+   * group) and Admin (all); "same pagination/scope pattern as daily
+   * reports" (APIS §10.8). Assistant is deliberately absent from @Roles()
+   * (DEC-B09): RolesGuard alone yields the unconditional 403, whatever
+   * group it is assigned to. Scope is resolved BEFORE this handler by
+   * MembershipWeeklyReportsScopeGuard (TS §15.2 "one indexed lookup before
+   * the handler runs"); the id handed to the use case is the one that
+   * passed that guard.
+   */
+  @Roles(UserRole.Admin, UserRole.Teacher)
+  @UseGuards(MembershipWeeklyReportsScopeGuard)
+  @Get('memberships/:id/weekly-reports')
+  async forMembership(
+    @Param('id') id: string,
+    @Query() query: ListRosterWeeklyReportsQueryDto,
+  ): Promise<ListRosterWeeklyReportsResponseDto> {
+    return this.listRosterWeeklyReportsUseCase.execute(id, query);
   }
 }

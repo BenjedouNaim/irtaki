@@ -74,6 +74,7 @@ describe('GetCurrentWeeklyReportUseCase (F-WR-01 / API-033)', () => {
       findAllOpenWithTimezone: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
+      findHistoryByMembershipId: jest.fn(),
     };
     dailyRepository = {
       findTodayContextByUserId: jest.fn(),

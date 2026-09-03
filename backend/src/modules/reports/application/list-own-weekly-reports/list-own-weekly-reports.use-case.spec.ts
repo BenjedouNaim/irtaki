@@ -62,6 +62,7 @@ describe('ListOwnWeeklyReportsUseCase (F-WR-03 / API-035)', () => {
       findAllOpenWithTimezone: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
+      findHistoryByMembershipId: jest.fn(),
     };
     useCase = new ListOwnWeeklyReportsUseCase(repository);
   });
