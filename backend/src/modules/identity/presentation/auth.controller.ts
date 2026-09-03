@@ -1,5 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { Public } from '../../../shared';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Public, RateLimitGuard } from '../../../shared';
+import { JOIN_REQUEST_THROTTLER } from '../../../config/rate-limit.config';
 import { RegisterDto } from '../application/register/register.dto';
 import { RegisterResponseDto } from '../application/register/register-response.dto';
 import { RegisterUseCase } from '../application/register/register.use-case';
@@ -22,6 +31,14 @@ import {
   ConfirmPasswordResetUseCase,
 } from '../application/password-reset/confirm-password-reset.use-case';
 
+/**
+ * APIS §9.8 / TS §16: `/auth/*` is rate limited as a whole (credential
+ * stuffing, ISS-19 adjacent), tracked per client IP since no caller is
+ * authenticated yet. The join-request throttler is explicitly skipped so
+ * this controller only ever consumes its own budget.
+ */
+@UseGuards(RateLimitGuard)
+@SkipThrottle({ [JOIN_REQUEST_THROTTLER]: true })
 @Controller('auth')
 export class AuthController {
   constructor(
