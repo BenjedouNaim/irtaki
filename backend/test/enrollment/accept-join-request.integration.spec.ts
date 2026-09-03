@@ -399,11 +399,19 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
         gender: 'Male',
       });
 
-      // Admin + Assistant1 both call accept at the same instant
-      const admin = await registerAndLogin(
-        'admin-conc@test-accept.com',
-        UserRole.Admin,
-      );
+      // APIS §9.7 states this race as "Two Assistants act concurrently", and
+      // §6.1 gives the Admin `—` on `accept|reject`, so both racers are the
+      // assigned Assistant — two devices, one session, one instant. The
+      // 0-row conditional UPDATE is what has to settle it, not the caller.
+      const secondSession = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'assistant-conc1@test-accept.com',
+          password: 'Password123!',
+        })
+        .expect(HttpStatus.OK);
+      const secondToken = (secondSession.body as { access_token: string })
+        .access_token;
 
       const [res1, res2] = await Promise.all([
         request(app.getHttpServer())
@@ -411,7 +419,7 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
           .set('Authorization', `Bearer ${assistant1.accessToken}`),
         request(app.getHttpServer())
           .post(`/api/v1/join-requests/${requestId}/accept`)
-          .set('Authorization', `Bearer ${admin.accessToken}`),
+          .set('Authorization', `Bearer ${secondToken}`),
       ]);
 
       const statuses = [res1.status, res2.status].sort();
@@ -547,7 +555,14 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
         .expect(HttpStatus.FORBIDDEN);
     });
 
+    // APIS §6.1's `POST /join-requests/{id}/accept|reject` row is
+    // `— | — | ✓ (g) | — | —`: the Assistant of the group is the only role
+    // that may decide. The **Admin** is in this list deliberately — it reads
+    // the queue (`GET /join-requests`, `✓ all`) but SRS §10 grants it `R` on
+    // Join Request and never `A`, and FR-REQ-04 / UC-04 name the Assistant
+    // as the actor.
     it.each([
+      ['Admin', UserRole.Admin],
       ['Teacher', UserRole.Teacher],
       ['Student', UserRole.Student],
       ['User', UserRole.User],

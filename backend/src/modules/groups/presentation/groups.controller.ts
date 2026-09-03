@@ -124,13 +124,17 @@ export class GroupsController {
     return this.createGroupUseCase.execute(req.user.id, dto);
   }
 
-  @Roles(
-    UserRole.Admin,
-    UserRole.Teacher,
-    UserRole.Assistant,
-    UserRole.Student,
-    UserRole.User,
-  )
+  /**
+   * API-011 `GET /groups/available?gender=` — **User only**. APIS §6.1 gives
+   * every other role `—` on this row, APIS §8's catalogue states the
+   * authorization as literally `role=User`, and SAS §23 API-02 repeats it
+   * (`role = User`); SRS §10's Group row grants the "open + gender match"
+   * read to the User alone. Every other role is therefore simply absent from
+   * `@Roles()` and RolesGuard answers them the uniform `403` (SA §14) — the
+   * roles that do have a group list of their own use `GET /groups`, which is
+   * scope-filtered per SAS §14.1.
+   */
+  @Roles(UserRole.User)
   @Get('available')
   async browseAvailableGroups(
     @Req() req: AuthenticatedRequest,
