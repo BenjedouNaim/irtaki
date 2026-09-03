@@ -105,6 +105,13 @@ export class NotificationService {
         }`,
         err instanceof Error ? err.stack : undefined,
       );
+      // FR-NOTIF-08 still wants the outcome on record. The log write is
+      // itself best-effort — it may be the thing that just failed.
+      try {
+        await this.record(recipient.userId, category, 'Failed', null, now);
+      } catch {
+        // Nothing left to do: the diagnosis is the ERROR line above.
+      }
       return { outcome: 'Failed', reason: null, transportReference: null };
     }
   }

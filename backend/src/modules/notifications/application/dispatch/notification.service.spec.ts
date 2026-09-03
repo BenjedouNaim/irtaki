@@ -230,6 +230,10 @@ describe('NotificationService.dispatch (SA §21)', () => {
       reason: null,
       transportReference: null,
     });
+    // FR-NOTIF-08: the outcome is still on record.
+    expect(log.record).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'N-03', outcome: 'Failed' }),
+    );
   });
 
   it('never throws when the log write itself fails', async () => {
