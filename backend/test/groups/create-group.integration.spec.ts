@@ -17,6 +17,10 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { GroupListItemDto } from '../../src/modules/groups/application/list-groups/group-list-item.dto';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('POST /groups (API-013 Integration)', () => {
   let app: INestApplication<App>;
@@ -46,6 +50,10 @@ describe('POST /groups (API-013 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -59,6 +67,7 @@ describe('POST /groups (API-013 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM memberships WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-create-group.com') OR group_id IN (SELECT id FROM groups WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE '%@test-create-group.com') OR assistant_id IN (SELECT id FROM users WHERE email LIKE '%@test-create-group.com') OR created_by IN (SELECT id FROM users WHERE email LIKE '%@test-create-group.com'))",
     );

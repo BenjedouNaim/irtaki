@@ -20,6 +20,11 @@ import {
   AuditEntryDto,
   GetAuditLogResponseDto,
 } from '../../src/modules/administration/application/get-audit-log/audit-entry.dto';
+import {
+  purgeAuditEntries,
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 type AuditLogBody = GetAuditLogResponseDto;
 
@@ -61,6 +66,10 @@ describe('GET /audit (API-054 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -74,9 +83,12 @@ describe('GET /audit (API-054 Integration)', () => {
   });
 
   async function cleanDatabase() {
-    await dataSource.query(
-      `DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%${EMAIL_SUFFIX}')`,
-    );
+    await purgeNotificationLog(dataSource);
+    // Wholesale, not scoped to this file's fixtures: SAS §21 audits login,
+    // so LOGIN rows written by every other suite (and by the seeded Admin,
+    // whose email matches no suffix) accumulate across runs until the
+    // "walk to the last page" test below cannot reach the end of the log.
+    await purgeAuditEntries(dataSource);
     await dataSource.query(
       `DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%${EMAIL_SUFFIX}')`,
     );

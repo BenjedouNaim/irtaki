@@ -90,7 +90,39 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION?: string;
+
+  @IsString()
+  @IsOptional()
+  HEALTHCHECKS_PING_URL_DAILY_REMINDER_EVALUATION?: string;
+
+  @IsString()
+  @IsOptional()
+  HEALTHCHECKS_PING_URL_AT_RISK_EVALUATION?: string;
+
+  @IsString()
+  @IsOptional()
+  HEALTHCHECKS_PING_URL_PAYMENT_DUE_SOON_EVALUATION?: string;
+
+  @IsString()
+  @IsOptional()
+  HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION?: string;
 }
+
+/**
+ * TS §31's dead-man's-switch list, verbatim: "every scheduled job
+ * (`WeeklyReportFinalizationJob`, `CoverageReconciliationJob`,
+ * `DailyReminderEvaluationJob`, `AtRiskEvaluationJob`,
+ * `PaymentDueSoonEvaluationJob`) pings on success; a missed ping alerts".
+ * Five jobs, five Required `HEALTHCHECKS_PING_URL_*` variables (TS §32) —
+ * the list production boot is validated against below.
+ */
+export const HEALTHCHECKS_PING_URL_KEYS = [
+  'HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION',
+  'HEALTHCHECKS_PING_URL_DAILY_REMINDER_EVALUATION',
+  'HEALTHCHECKS_PING_URL_AT_RISK_EVALUATION',
+  'HEALTHCHECKS_PING_URL_PAYMENT_DUE_SOON_EVALUATION',
+  'HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION',
+] as const;
 
 /**
  * Validates environment configuration at boot time (TS §32).
@@ -140,12 +172,15 @@ export function validate(
       missingProdKeys.push('JWT_REFRESH_PEPPER (production value required)');
     }
     // TS §32: one Healthchecks.io ping URL per scheduled job is Required —
-    // without it the WeeklyReportFinalizationJob's silent failure (SAS
-    // ISS-01) would go undetected (TS §31, SA §32).
-    if (!validatedConfig.HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION) {
-      missingProdKeys.push(
-        "HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION (dead-man's-switch for WeeklyReportFinalizationJob, TS §31/§32)",
-      );
+    // without it that job's silent failure (SAS ISS-01) would go undetected
+    // (TS §31, SA §32). All five of SA §23's Required jobs, not just the
+    // first one to be built.
+    for (const key of HEALTHCHECKS_PING_URL_KEYS) {
+      if (!validatedConfig[key]) {
+        missingProdKeys.push(
+          `${key} (dead-man's-switch for the matching scheduled job, TS §31/§32)`,
+        );
+      }
     }
 
     if (missingProdKeys.length > 0) {

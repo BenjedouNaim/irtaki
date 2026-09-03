@@ -15,6 +15,10 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('GET /join-requests/{id} (F-ENR-04 / API-022 Integration)', () => {
   let app: INestApplication<App>;
@@ -44,6 +48,10 @@ describe('GET /join-requests/{id} (F-ENR-04 / API-022 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -57,6 +65,7 @@ describe('GET /join-requests/{id} (F-ENR-04 / API-022 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(`
       DELETE FROM join_request_ahzab WHERE join_request_id IN (
         SELECT id FROM join_requests WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-detail.com')

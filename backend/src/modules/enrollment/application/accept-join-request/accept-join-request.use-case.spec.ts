@@ -89,6 +89,8 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
       applyMerge: jest.fn(),
+      findAllLiveForReconciliation: jest.fn(),
+      correctAhzabCompleted: jest.fn(),
     };
 
     mockManager = {} as unknown as jest.Mocked<EntityManager>;

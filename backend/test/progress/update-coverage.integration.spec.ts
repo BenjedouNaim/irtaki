@@ -18,6 +18,10 @@ import {
   UpdateCoverageOutcome,
   UpdateCoverageUseCase,
 } from '../../src/modules/progress/application/update-coverage/update-coverage.use-case';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface IntervalRow {
   start_ordinal: number;
@@ -70,6 +74,10 @@ describe('DS-05 coverage engine (F-PRG-01 Integration)', () => {
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     dataSource = app.get(DataSource);
     eventEmitter = app.get(EventEmitter2);
     updateCoverageUseCase = app.get(UpdateCoverageUseCase);
@@ -98,6 +106,7 @@ describe('DS-05 coverage engine (F-PRG-01 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM memorization_coverage
        WHERE membership_id IN (

@@ -20,6 +20,10 @@ import {
   WEEKLY_REPORT_FINALIZATION_CRON_EXPRESSION,
   WeeklyReportFinalizationJob,
 } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 /** Independent UTC date arithmetic on a YYYY-MM-DD value. */
 function shift(date: string, days: number): string {
@@ -72,6 +76,10 @@ describe('WeeklyReportFinalizationService / Job (F-WR-02, DS-02, FR-WR-06 Integr
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     // The real tick is stopped: every run below is driven with a controlled
     // clock through the service/job entry points.
     await app
@@ -94,6 +102,7 @@ describe('WeeklyReportFinalizationService / Job (F-WR-02, DS-02, FR-WR-06 Integr
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM weekly_reports
        WHERE membership_id IN (

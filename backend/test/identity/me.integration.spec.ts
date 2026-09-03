@@ -17,6 +17,7 @@ import { LoginResponseDto } from '../../src/modules/identity/application/login/l
 import { MeResponseDto } from '../../src/modules/identity/application/me/me-response.dto';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('GET & PATCH /me (API-007 & API-008 Integration)', () => {
   let app: INestApplication<App>;
@@ -46,6 +47,10 @@ describe('GET & PATCH /me (API-007 & API-008 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
   });
 

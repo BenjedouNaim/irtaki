@@ -16,6 +16,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { HizbBoundaryDto } from '../../src/modules/progress/application/list-hizb-boundaries/list-hizb-boundaries-response.dto';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('GET /quran/hizb-boundaries (F-PRG-05 / API-044 Integration)', () => {
   let app: INestApplication<App>;
@@ -38,6 +42,10 @@ describe('GET /quran/hizb-boundaries (F-PRG-05 / API-044 Integration)', () => {
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     dataSource = app.get(DataSource);
     await cleanDatabase();
   });
@@ -50,6 +58,7 @@ describe('GET /quran/hizb-boundaries (F-PRG-05 / API-044 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       'DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [`%${testEmailDomain}`],

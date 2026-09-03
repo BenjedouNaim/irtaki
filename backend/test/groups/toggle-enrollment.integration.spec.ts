@@ -21,6 +21,10 @@ import {
   GROUP_REPOSITORY,
   IGroupRepository,
 } from '../../src/modules/groups/domain/group.repository.interface';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('PATCH /groups/:id/enrollment (API-015 Integration)', () => {
   let app: INestApplication<App>;
@@ -50,6 +54,10 @@ describe('PATCH /groups/:id/enrollment (API-015 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -63,6 +71,7 @@ describe('PATCH /groups/:id/enrollment (API-015 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM memberships WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-toggle-enrollment.com') OR group_id IN (SELECT id FROM groups WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE '%@test-toggle-enrollment.com') OR assistant_id IN (SELECT id FROM users WHERE email LIKE '%@test-toggle-enrollment.com') OR created_by IN (SELECT id FROM users WHERE email LIKE '%@test-toggle-enrollment.com'))",
     );

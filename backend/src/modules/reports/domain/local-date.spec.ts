@@ -108,3 +108,110 @@ describe('daysBetween', () => {
     expect(() => daysBetween('2026-09-02', 'yesterday')).toThrow(RangeError);
   });
 });
+
+describe('local wall-clock helpers (ADR-030 per-timezone tick filter)', () => {
+  const { isWithinLocalWindow, localMinutesInTimezone } =
+    jest.requireActual<typeof import('./local-date')>('./local-date');
+
+  describe('localMinutesInTimezone', () => {
+    it('returns minutes since local midnight, not since UTC midnight', () => {
+      const now = new Date('2026-09-07T19:00:00.000Z');
+      expect(localMinutesInTimezone(now, 'Africa/Tunis')).toBe(20 * 60);
+      expect(localMinutesInTimezone(now, 'UTC')).toBe(19 * 60);
+      // Pacific/Auckland is UTC+12 in September: 07:00 the NEXT day.
+      expect(localMinutesInTimezone(now, 'Pacific/Auckland')).toBe(7 * 60);
+    });
+
+    it('reports local midnight as 0, never 1440 (h23, not h24)', () => {
+      // 23:00Z is 00:00 in Africa/Tunis.
+      expect(
+        localMinutesInTimezone(
+          new Date('2026-09-07T23:00:00.000Z'),
+          'Africa/Tunis',
+        ),
+      ).toBe(0);
+    });
+
+    it('follows a DST transition rather than a fixed offset', () => {
+      // Auckland moves to UTC+13 on 2026-09-27.
+      const before = new Date('2026-09-20T08:00:00.000Z');
+      const after = new Date('2026-10-05T08:00:00.000Z');
+      expect(localMinutesInTimezone(before, 'Pacific/Auckland')).toBe(20 * 60);
+      expect(localMinutesInTimezone(after, 'Pacific/Auckland')).toBe(21 * 60);
+    });
+
+    it('rejects an unrecognised timezone identifier', () => {
+      expect(() =>
+        localMinutesInTimezone(new Date(), 'Mars/Olympus_Mons'),
+      ).toThrow(RangeError);
+    });
+  });
+
+  describe('isWithinLocalWindow', () => {
+    const boundary = 20 * 60;
+
+    it('is true from the boundary up to, but not including, the next tick', () => {
+      expect(
+        isWithinLocalWindow(
+          new Date('2026-09-07T19:00:00.000Z'),
+          'Africa/Tunis',
+          boundary,
+          15,
+        ),
+      ).toBe(true);
+      expect(
+        isWithinLocalWindow(
+          new Date('2026-09-07T19:14:00.000Z'),
+          'Africa/Tunis',
+          boundary,
+          15,
+        ),
+      ).toBe(true);
+      expect(
+        isWithinLocalWindow(
+          new Date('2026-09-07T19:15:00.000Z'),
+          'Africa/Tunis',
+          boundary,
+          15,
+        ),
+      ).toBe(false);
+      expect(
+        isWithinLocalWindow(
+          new Date('2026-09-07T18:59:00.000Z'),
+          'Africa/Tunis',
+          boundary,
+          15,
+        ),
+      ).toBe(false);
+    });
+
+    it('catches the same local boundary at a different instant per timezone', () => {
+      const tunisEvening = new Date('2026-09-07T19:00:00.000Z');
+      const aucklandEvening = new Date('2026-09-07T08:00:00.000Z');
+
+      expect(
+        isWithinLocalWindow(tunisEvening, 'Africa/Tunis', boundary, 15),
+      ).toBe(true);
+      expect(
+        isWithinLocalWindow(tunisEvening, 'Pacific/Auckland', boundary, 15),
+      ).toBe(false);
+      expect(
+        isWithinLocalWindow(aucklandEvening, 'Pacific/Auckland', boundary, 15),
+      ).toBe(true);
+      expect(
+        isWithinLocalWindow(aucklandEvening, 'Africa/Tunis', boundary, 15),
+      ).toBe(false);
+    });
+
+    it('matches the local-midnight bucket at boundary 0', () => {
+      expect(
+        isWithinLocalWindow(
+          new Date('2026-09-07T23:05:00.000Z'),
+          'Africa/Tunis',
+          0,
+          15,
+        ),
+      ).toBe(true);
+    });
+  });
+});

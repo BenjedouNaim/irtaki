@@ -18,6 +18,8 @@ import { GetMembershipProgressUseCase } from './application/get-membership-progr
 import { MembershipProgressScopeGuard } from './presentation/guards/membership-progress-scope.guard';
 import { QuranController } from './presentation/quran.controller';
 import { ProgressController } from './presentation/progress.controller';
+import { CoverageReconciliationService } from './application/reconcile-coverage/coverage-reconciliation.service';
+import { CoverageReconciliationJob } from './infrastructure/jobs/coverage-reconciliation.job';
 
 @Module({
   imports: [
@@ -52,6 +54,12 @@ import { ProgressController } from './presentation/progress.controller';
     GetOwnProgressUseCase,
     GetMembershipProgressUseCase,
     MembershipProgressScopeGuard,
+    // F-NOT-05 / ADR-029: the nightly coverage repair that ADR-026's
+    // two-transaction submission path makes Required. Missed when F-PRG-01
+    // was scoped; it belongs to this module, which owns the table it
+    // corrects (SA §11).
+    CoverageReconciliationService,
+    CoverageReconciliationJob,
   ],
   exports: [
     COVERAGE_REPOSITORY,

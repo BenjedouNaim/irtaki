@@ -16,6 +16,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { NotificationPreferenceDto } from '../../src/modules/notifications/application/notification-preference.dto';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -57,6 +61,10 @@ describe('PATCH /me/notification-preferences (F-NOT-04 / API-051 Integration)', 
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
+
     dataSource = app.get(DataSource);
     await cleanDatabase();
   });
@@ -69,6 +77,7 @@ describe('PATCH /me/notification-preferences (F-NOT-04 / API-051 Integration)', 
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       'DELETE FROM notification_preferences WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [`%${testEmailDomain}`],

@@ -19,6 +19,10 @@ import {
   ListUsersResponseDto,
   UserListItemDto,
 } from '../../src/modules/identity/application/list-users/user-list-item.dto';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 type ListUsersBody = ListUsersResponseDto;
 
@@ -50,6 +54,10 @@ describe('GET /users (API-053 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();
@@ -63,6 +71,7 @@ describe('GET /users (API-053 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@test-list-users.com')",
     );
