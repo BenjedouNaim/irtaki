@@ -82,7 +82,50 @@ export interface WeeklyReportWithTimezoneRecord extends WeeklyReportRecord {
   timezone: string;
 }
 
+/**
+ * Keyset position for the weekly-report history lists (API-035, API-036) —
+ * the `{id, sort_key}` of the last item on the previous page (APIS §9.2),
+ * sort key `week_start` (APIS §9.4).
+ */
+export interface WeeklyReportsCursor {
+  id: string;
+  sortKey: { weekStart: string };
+}
+
+/** Filters and page window shared by both weekly history lists (APIS §9.2, §9.3). */
+export interface WeeklyReportsPageParams {
+  /** `YYYY-MM-DD`, inclusive lower bound on `week_start`; null = unbounded. */
+  from: string | null;
+  /** `YYYY-MM-DD`, inclusive upper bound on `week_start`; null = unbounded. */
+  to: string | null;
+  /** Already clamped to [1, 100] (APIS §9.2). */
+  limit: number;
+  cursor: WeeklyReportsCursor | null;
+}
+
+export interface FindOwnWeeklyReportsParams extends WeeklyReportsPageParams {
+  userId: string;
+}
+
+export interface WeeklyReportPage {
+  rows: WeeklyReportRecord[];
+  hasMore: boolean;
+}
+
 export interface IWeeklyReportRepository {
+  /**
+   * API-035 own history: the live `Finalised` rows of the caller's Active
+   * membership (BR-40 — a re-accepted student starts with zero history, so
+   * earlier memberships never contribute; UF §16/§34 — a week enters the
+   * History once finalised, the Open recitation-day row is SCR-12's),
+   * `week_start DESC, id DESC`, keyset paginated on DB-IDX-02. Scope is the
+   * `memberships.user_id` join inside the query (TS §15.2 repository scope
+   * filter), never a post-filter. Fetches `limit + 1` rows to derive
+   * `hasMore` without a count (APIS §9.1).
+   */
+  findOwnHistoryByUserId(
+    params: FindOwnWeeklyReportsParams,
+  ): Promise<WeeklyReportPage>;
   /**
    * Own-scope context for API-033. Null when the caller has no Active
    * membership.
