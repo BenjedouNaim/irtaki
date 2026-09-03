@@ -3,9 +3,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TopBar, Button, Icon, ListRow } from '@/shared/components';
 import { typography } from '@/shared/theme/typography';
-import { itemsStart } from '@/shared/theme/rtl';
 import { logoutUser } from '@/shared/api/auth.client';
-import { useMe } from '@/features/dashboard/hooks/useMe';
 import { AdminSummaryTiles } from '@/features/admin/components/AdminSummaryTiles';
 import {
   useAuthStore,
@@ -13,33 +11,30 @@ import {
   deleteStoredRefreshToken,
 } from '@/shared/auth/authStore';
 
-/** Figma 39:35 — the role line under the greeting. */
+/** Figma 39:35 — the role line under the frame's centre-name headline. */
 const ROLE_LINE = 'مدير · قراءة كاملة، وإعدادات هيكلية فقط';
 
-function firstName(fullName: string | null | undefined): string | null {
-  const trimmed = fullName?.trim();
-  if (!trimmed) return null;
-  return trimmed.split(/\s+/)[0] ?? null;
-}
-
 /**
- * SCR-26 Admin Home (Figma 39:2, UF §10 / §28 "Menu hub"): a greeting, the
+ * SCR-26 Admin Home (Figma 39:2, UF §10 / §28 "Menu hub"): the role line, the
  * four dashboard tiles and the three menu rows that are Admin's real
  * workflow — Groups (F-GRP-10), Staff & Users (F-ADM-02) and the Audit Log
- * (F-ADM-03). Nothing here aggregates cross-module data; the tiles read
- * `GET /me/dashboard` (API-009), which has no client yet, so they render
- * MetricTile's Null state (see AdminSummaryTiles).
+ * (F-ADM-03). The tiles read `GET /me/dashboard` (API-009), which has no
+ * client yet, so they render MetricTile's Null state (see AdminSummaryTiles);
+ * the group and staff tiles still carry UF §10's tap targets.
  *
- * The frame's greeting headline is the centre's name, which no endpoint
- * exposes; the caller's own name from `GET /me` fills that line instead, as
- * on SCR-17. The frame's TopBar trailing slot holds a bell — there is no
- * notification screen in UF's 35 — so, as on SCR-17, the slot carries the
- * SCR-34 Profile entry point.
+ * Two frame slots have no counterpart in the app. The headline above the role
+ * line is the centre's name, which no endpoint and no doc supplies, so the
+ * line is left out rather than filled with substitute copy. The TopBar
+ * trailing slot holds a bell — there is no notification screen among UF's 35 —
+ * so, as on SCR-17, it carries the SCR-34 Profile entry point that UF §26
+ * requires from every role's home.
  */
 export function AdminStack() {
   const router = useRouter();
-  const me = useMe();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const openGroups = () => router.push('/(app)/admin/groups' as any);
+  const openUsers = () => router.push('/(app)/admin/users' as any);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -56,8 +51,6 @@ export function AdminStack() {
       setIsLoggingOut(false);
     }
   };
-
-  const name = firstName(me.data?.full_name);
 
   return (
     <View className="flex-1 bg-canvas dark:bg-canvas-dark" testID="admin-stack">
@@ -88,38 +81,31 @@ export function AdminStack() {
         }}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <View className={`w-full gap-0.5 ${itemsStart}`}>
-          <Text
-            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
-            accessibilityRole="header"
-            numberOfLines={1}
-            testID="admin-greeting"
-          >
-            {name ? `مرحبًا، ${name}` : 'مرحبًا'}
-          </Text>
-          <Text
-            className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
-            testID="admin-role-line"
-          >
-            {ROLE_LINE}
-          </Text>
-        </View>
+        <Text
+          className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          testID="admin-role-line"
+        >
+          {ROLE_LINE}
+        </Text>
 
-        <AdminSummaryTiles />
+        <AdminSummaryTiles
+          onGroupsPress={openGroups}
+          onStaffPress={openUsers}
+        />
 
         <View className="w-full gap-2.5 pt-1.5" testID="admin-menu">
           <ListRow
             title="المجموعات"
             subtitle="إنشاء · أرشفة · إسناد الطاقم · القوائم"
             leadingIcon="layers"
-            onPress={() => router.push('/(app)/admin/groups' as any)}
+            onPress={openGroups}
             testID="admin-groups-button"
           />
           <ListRow
             title="الطاقم والمستخدمون"
             subtitle="ترقية مستخدم إلى معلّم أو مساعد"
             leadingIcon="users"
-            onPress={() => router.push('/(app)/admin/users' as any)}
+            onPress={openUsers}
             testID="admin-users-button"
           />
           <ListRow

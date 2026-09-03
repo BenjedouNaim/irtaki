@@ -12,6 +12,10 @@ export interface AdminSummaryTilesProps {
   studentCount?: number | null;
   /** `pending_recovery_count` — informational, reached via Group → Roster. */
   pendingRecoveryCount?: number | null;
+  /** UF §10 tap target of the group tile — the Groups list (SCR-27). */
+  onGroupsPress?: () => void;
+  /** UF §10 tap target of the staff tile — the users list (SCR-32). */
+  onStaffPress?: () => void;
   testID?: string;
 }
 
@@ -23,6 +27,11 @@ export interface AdminSummaryTilesProps {
  * "بيانات غير كافية") rather than a fabricated number (DEC-B04). Passing the
  * counts in is all that is needed once the dashboard call exists.
  *
+ * UF §10 gives the group and staff tiles a tap target (Groups list / users
+ * list) and marks the other two as non-tappable ("Student count —
+ * non-tappable"; "Pending recovery count — informational only"), so only the
+ * first two take a press handler.
+ *
  * The groups tile carries no caption: the frame's "4 نشطة · 1 مؤرشفة" splits
  * `group_count` by lifecycle state, which the Admin payload does not carry.
  */
@@ -31,6 +40,8 @@ export function AdminSummaryTiles({
   staffCount = null,
   studentCount = null,
   pendingRecoveryCount = null,
+  onGroupsPress,
+  onStaffPress,
   testID = 'admin-summary-tiles',
 }: AdminSummaryTilesProps) {
   return (
@@ -39,12 +50,14 @@ export function AdminSummaryTiles({
         <MetricTile
           label="المجموعات"
           value={groupCount}
+          onPress={onGroupsPress}
           testID={`${testID}-groups`}
         />
         <MetricTile
           label="أعضاء الطاقم"
           value={staffCount}
           caption="معلّمون ومساعدون"
+          onPress={onStaffPress}
           testID={`${testID}-staff`}
         />
       </View>

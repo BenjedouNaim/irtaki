@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { MetricTile, METRIC_TILE_NULL_VALUE } from '../MetricTile';
 import { METRIC_NULL_PLACEHOLDER } from '../MetricRow';
 
@@ -29,5 +29,24 @@ describe('MetricTile (Figma 16:50)', () => {
     expect(screen.getByTestId('metric-tile-caption').props.children).toBe(
       METRIC_NULL_PLACEHOLDER,
     );
+  });
+
+  it('is a plain text tile unless a tap target is given', () => {
+    render(<MetricTile label="الطلاب" value={61} />);
+
+    expect(screen.getByTestId('metric-tile').props.accessibilityRole).toBe(
+      'text',
+    );
+  });
+
+  it('becomes a button when a tap target is given', () => {
+    const onPress = jest.fn();
+    render(<MetricTile label="المجموعات" value={5} onPress={onPress} />);
+
+    const tile = screen.getByTestId('metric-tile');
+    expect(tile.props.accessibilityRole).toBe('button');
+    expect(tile.props.accessibilityLabel).toBe('المجموعات: 5');
+    fireEvent.press(tile);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

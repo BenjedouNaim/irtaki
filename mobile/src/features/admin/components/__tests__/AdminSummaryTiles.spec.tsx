@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { METRIC_NULL_PLACEHOLDER } from '@/shared/components/MetricRow';
 import { METRIC_TILE_NULL_VALUE } from '@/shared/components/MetricTile';
 import { AdminSummaryTiles } from '../AdminSummaryTiles';
@@ -81,5 +81,43 @@ describe('AdminSummaryTiles (SCR-26 tiles, Figma 39:36)', () => {
     expect(
       screen.getByTestId('admin-summary-tiles-groups-value').props.children,
     ).toBe('0');
+  });
+
+  it('taps through to the Groups list and the users list (UF §10)', () => {
+    const onGroupsPress = jest.fn();
+    const onStaffPress = jest.fn();
+    render(
+      <AdminSummaryTiles
+        onGroupsPress={onGroupsPress}
+        onStaffPress={onStaffPress}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('admin-summary-tiles-groups'));
+    expect(onGroupsPress).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByTestId('admin-summary-tiles-staff'));
+    expect(onStaffPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the student and recovery tiles non-tappable (UF §10)', () => {
+    render(
+      <AdminSummaryTiles onGroupsPress={jest.fn()} onStaffPress={jest.fn()} />,
+    );
+
+    expect(
+      screen.getByTestId('admin-summary-tiles-groups').props.accessibilityRole,
+    ).toBe('button');
+    expect(
+      screen.getByTestId('admin-summary-tiles-staff').props.accessibilityRole,
+    ).toBe('button');
+    expect(
+      screen.getByTestId('admin-summary-tiles-students').props
+        .accessibilityRole,
+    ).toBe('text');
+    expect(
+      screen.getByTestId('admin-summary-tiles-recoveries').props
+        .accessibilityRole,
+    ).toBe('text');
   });
 });
