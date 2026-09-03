@@ -1,5 +1,13 @@
 import { uuidv7 } from 'uuidv7';
-import { UserRole } from './user-role.enum';
+import {
+  PROMOTION_TARGET_ROLES,
+  PromotionTargetRole,
+  UserRole,
+} from './user-role.enum';
+import {
+  InvalidPromotionTargetRoleError,
+  SourceRoleNotUserError,
+} from './user.errors';
 
 export interface CreateUserProps {
   id?: string;
@@ -86,6 +94,24 @@ export class User {
 
   updatePassword(passwordHash: string): void {
     this._passwordHash = passwordHash;
+    this._updatedAt = new Date();
+  }
+
+  /**
+   * UC-17 — promote this account to Teacher or Assistant (BR-R03).
+   *
+   * The source role must be exactly `User`; every other role is rejected,
+   * which is what makes demotion and role reassignment impossible through
+   * this transition rather than merely unimplemented (SAS §26 EC-22).
+   */
+  promoteTo(role: PromotionTargetRole): void {
+    if (this._role !== UserRole.User) {
+      throw new SourceRoleNotUserError();
+    }
+    if (!PROMOTION_TARGET_ROLES.includes(role)) {
+      throw new InvalidPromotionTargetRoleError();
+    }
+    this._role = role;
     this._updatedAt = new Date();
   }
 }

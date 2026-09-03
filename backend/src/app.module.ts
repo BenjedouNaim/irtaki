@@ -24,6 +24,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AdministrationModule } from './modules/administration/administration.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 interface ValidationDetail {
@@ -83,6 +84,7 @@ function flattenValidationErrors(
     ReportsModule,
     PaymentsModule,
     NotificationsModule,
+    AdministrationModule,
   ],
 
   controllers: [AppController],

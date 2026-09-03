@@ -8,6 +8,9 @@ import { ApiError } from '@/shared/api/types';
 jest.mock('@/shared/api/groups.client');
 jest.mock('@/shared/api/users.client');
 
+/** The single-page `GET /users` envelope the staff picker reads (APIS §9.2). */
+const NO_MORE = { next_cursor: null, has_more: false };
+
 describe('StaffReassignmentPanel (Figma SCR-29 Staff card + Reassign staff sheet)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
@@ -54,9 +57,9 @@ describe('StaffReassignmentPanel (Figma SCR-29 Staff card + Reassign staff sheet
   const mockStaffLists = () =>
     jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
       if (role === 'Teacher') {
-        return Promise.resolve({ data: mockTeachersList });
+        return Promise.resolve({ data: mockTeachersList, pagination: NO_MORE });
       }
-      return Promise.resolve({ data: mockAssistantsList });
+      return Promise.resolve({ data: mockAssistantsList, pagination: NO_MORE });
     });
 
   beforeEach(() => {
@@ -271,9 +274,15 @@ describe('StaffReassignmentPanel (Figma SCR-29 Staff card + Reassign staff sheet
       .mockRejectedValueOnce(new Error('Network error'))
       .mockImplementation((role) => {
         if (role === 'Teacher') {
-          return Promise.resolve({ data: mockTeachersList });
+          return Promise.resolve({
+            data: mockTeachersList,
+            pagination: NO_MORE,
+          });
         }
-        return Promise.resolve({ data: mockAssistantsList });
+        return Promise.resolve({
+          data: mockAssistantsList,
+          pagination: NO_MORE,
+        });
       });
 
     const { findByTestId, getByTestId, queryByTestId } = render(

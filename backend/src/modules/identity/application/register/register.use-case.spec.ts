@@ -22,10 +22,11 @@ describe('RegisterUseCase', () => {
     mockUserRepo = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
-      findAllByRole: jest.fn(),
+      findPageByRole: jest.fn(),
       save: jest.fn().mockImplementation((user: User) => Promise.resolve(user)),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     mockPasswordHasher = {

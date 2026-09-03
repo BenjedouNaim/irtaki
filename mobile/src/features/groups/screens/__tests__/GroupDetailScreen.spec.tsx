@@ -24,6 +24,9 @@ jest.mock('expo-router', () => ({
 jest.mock('@/shared/api/groups.client');
 jest.mock('@/shared/api/users.client');
 
+/** The single-page `GET /users` envelope the staff picker reads (APIS §9.2). */
+const NO_MORE = { next_cursor: null, has_more: false };
+
 describe('GroupDetailScreen (SCR-29, Figma 41:207 / 52:797)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
@@ -47,7 +50,9 @@ describe('GroupDetailScreen (SCR-29, Figma 41:207 / 52:797)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useAuthStore.setState({ role: 'Admin' });
-    jest.spyOn(usersApi, 'listUsersByRole').mockResolvedValue({ data: [] });
+    jest
+      .spyOn(usersApi, 'listUsersByRole')
+      .mockResolvedValue({ data: [], pagination: NO_MORE });
   });
 
   it('renders loading skeleton on initial mount', async () => {
