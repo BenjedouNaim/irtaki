@@ -11,3 +11,4 @@ export * from './progress.client';
 export * from './dailyReports.client';
 export * from './weeklyReports.client';
 export * from './payments.client';
+export * from './notificationPreferences.client';
