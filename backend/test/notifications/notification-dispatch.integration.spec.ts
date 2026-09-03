@@ -997,6 +997,63 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
   // ADR-032 / AGENTS §8 — the transport can never reach the request
   // ────────────────────────────────────────────────────────────────────
 
+  describe('EventEmitter2 wiring — the listeners are reachable from a request', () => {
+    it('DELETE /memberships/{id} produces the N-08 row through the real event bus', async () => {
+      const student = await createStudent();
+      const admin = await loginAsAdmin();
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/memberships/${student.membershipId}`)
+        .set('Authorization', `Bearer ${admin}`)
+        .expect(HttpStatus.OK);
+
+      // ADR-032: the use case does not await its listener, so the row lands
+      // after the response. Poll rather than assume an ordering.
+      const rows = await eventually(() => logFor(student.userId));
+
+      expect(rows).toEqual([
+        {
+          category: 'N-08',
+          outcome: 'Sent',
+          transport_reference: 'expo-ticket',
+        },
+      ]);
+      expect(pushedFor(student.membershipId)).toEqual([
+        { eventType: 'N-08', resourceId: student.membershipId },
+      ]);
+    });
+
+    async function eventually(
+      read: () => Promise<LogRow[]>,
+    ): Promise<LogRow[]> {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const rows = await read();
+        if (rows.length > 0) {
+          return rows;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return read();
+    }
+
+    async function loginAsAdmin(): Promise<string> {
+      const password = 'Password123!';
+      const admins: Array<{ id: string; email: string }> =
+        await dataSource.query(
+          "SELECT id, email FROM users WHERE role = 'Admin' LIMIT 1",
+        );
+      const hasher = app.get<IPasswordHasher>(PASSWORD_HASHER);
+      await dataSource.query(
+        'UPDATE users SET password_hash = $1 WHERE id = $2',
+        [await hasher.hash(password), admins[0].id],
+      );
+      const login = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ email: admins[0].email, password });
+      return login.body.access_token as string;
+    }
+  });
+
   describe('External-service failure never surfaces on the triggering request', () => {
     it('DELETE /memberships/{id} still answers 200 with the transport down', async () => {
       const student = await createStudent();
