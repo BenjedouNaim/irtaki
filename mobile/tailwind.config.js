@@ -211,6 +211,8 @@ module.exports = {
       // (see src/shared/theme/typography.ts) — RN cannot derive Medium/SemiBold
       // from a single family name, the weight lives in the family.
       fontSize: {
+        // display/lg — the auth brand wordmark only (SCR-01)
+        'display-lg': ['44px', { lineHeight: '52px', letterSpacing: '-0.5px' }],
         'heading-xl': ['28px', { lineHeight: '40px' }],
         'heading-lg': ['22px', { lineHeight: '34px' }],
         'heading-md': ['18px', { lineHeight: '30px' }],
@@ -222,6 +224,8 @@ module.exports = {
         'label-md': ['14px', { lineHeight: '22px' }],
         'label-sm': ['12px', { lineHeight: '18px', letterSpacing: '0.2px' }],
         caption: ['12px', { lineHeight: '18px' }],
+        // overline 11/16 SemiBold +0.8 — section labels (Figma "overline")
+        overline: ['11px', { lineHeight: '16px', letterSpacing: '0.8px' }],
       },
       fontFamily: {
         sans: ['NotoSansArabic_400Regular', 'sans-serif'],

@@ -36,9 +36,7 @@ export default function LoginPage() {
       }
       onLoginSuccess={handleLoginSuccess}
       successMessage={
-        resetSuccess === 'true'
-          ? 'تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.'
-          : undefined
+        resetSuccess === 'true' ? 'تم تغيير كلمة المرور بنجاح' : undefined
       }
     />
   );

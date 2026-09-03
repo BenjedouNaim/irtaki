@@ -60,8 +60,14 @@ describe('UserStack (SCR-05 / F-ENR-02)', () => {
       expect(screen.queryByTestId('user-stack-loading')).toBeNull();
     });
 
+    expect(screen.getByText('أهلًا بك')).toBeTruthy();
+    expect(screen.getByTestId('user-stack-top-bar-title')).toHaveTextContent(
+      'ارتقِ',
+    );
+    expect(screen.getByTestId('no-join-request-card')).toBeTruthy();
+    expect(screen.getByText('لم تنضم إلى مجموعة بعد')).toBeTruthy();
     expect(screen.getByTestId('browse-groups-button')).toBeTruthy();
-    expect(screen.getByText('تصفح الحلقات المتاحة')).toBeTruthy();
+    expect(screen.getByText('تصفّح المجموعات')).toBeTruthy();
     expect(screen.getByTestId('profile-button')).toBeTruthy();
     expect(screen.getByTestId('logout-button')).toBeTruthy();
     expect(screen.queryByTestId('join-request-status-card')).toBeNull();
@@ -86,10 +92,11 @@ describe('UserStack (SCR-05 / F-ENR-02)', () => {
 
     expect(screen.getByTestId('join-request-status-card')).toBeTruthy();
     expect(screen.getByText('قيد المراجعة')).toBeTruthy();
-    expect(screen.getByText('طلب الانضمام قيد المراجعة')).toBeTruthy();
+    expect(screen.getByText('طلبك قيد المراجعة')).toBeTruthy();
 
     // "Browse Groups" CTA must NOT be rendered when request is Pending
     expect(screen.queryByTestId('browse-groups-button')).toBeNull();
+    expect(screen.queryByTestId('no-join-request-card')).toBeNull();
   });
 
   it('renders Rejected JoinRequestStatusCard with "Apply again" button on 200 Rejected', async () => {
@@ -106,8 +113,8 @@ describe('UserStack (SCR-05 / F-ENR-02)', () => {
     });
 
     expect(screen.getByTestId('join-request-status-card')).toBeTruthy();
-    expect(screen.getByText('لم يتم القبول')).toBeTruthy();
-    expect(screen.getByText('لم يتم قبول الطلب هذه المرة')).toBeTruthy();
+    expect(screen.getByText('لم يُقبل')).toBeTruthy();
+    expect(screen.getByText('لم يُقبل طلبك هذه المرة')).toBeTruthy();
 
     // "Browse Groups" CTA must NOT be rendered outside the card
     expect(screen.queryByTestId('browse-groups-button')).toBeNull();
@@ -115,7 +122,7 @@ describe('UserStack (SCR-05 / F-ENR-02)', () => {
     // "Apply again" CTA inside status card
     const applyAgainBtn = screen.getByTestId('apply-again-button');
     expect(applyAgainBtn).toBeTruthy();
-    expect(screen.getByText('التقديم مجدداً')).toBeTruthy();
+    expect(screen.getByText('التقديم مجددًا')).toBeTruthy();
 
     fireEvent.press(applyAgainBtn);
     expect(mockPush).toHaveBeenCalledWith('/(app)/user/join-stepper');
@@ -143,7 +150,7 @@ describe('UserStack (SCR-05 / F-ENR-02)', () => {
       ),
     ).toBeTruthy();
 
-    const retryBtn = screen.getByTestId('retry-button');
+    const retryBtn = screen.getByTestId('user-stack-error-banner-retry-button');
     fireEvent.press(retryBtn);
 
     await waitFor(() => {

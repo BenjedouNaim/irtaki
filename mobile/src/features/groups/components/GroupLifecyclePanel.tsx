@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Button } from '@/shared/components/Button';
-import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { Button, Banner, Icon, ConfirmationDialog } from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import {
   setGroupLifecycle,
   GroupListItemFull,
@@ -12,14 +13,22 @@ import { ApiError } from '@/shared/api/types';
 export interface GroupLifecyclePanelProps {
   groupId: string;
   lifecycleState: 'Active' | 'Archived';
+  /** Names the group in the confirmation title ("أرشفة حلقة الفجر؟"). */
+  groupName?: string;
   onChanged?: (updatedGroup: GroupListItemFull) => void;
   className?: string;
   style?: StyleProp<ViewStyle>;
 }
 
+/**
+ * Figma SCR-29 Lifecycle card (41:291 / 52:1054) + Archive confirm
+ * (52:971, standard dialog): archive / un-archive with the consequence
+ * named in the dialog body (UF §25).
+ */
 export function GroupLifecyclePanel({
   groupId,
   lifecycleState,
+  groupName,
   onChanged,
   className,
   style,
@@ -30,6 +39,7 @@ export function GroupLifecyclePanel({
 
   const isArchived = lifecycleState === 'Archived';
   const targetState: 'Active' | 'Archived' = isArchived ? 'Active' : 'Archived';
+  const subject = groupName ?? 'المجموعة';
 
   const triggerHaptic = () => {
     if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
@@ -67,12 +77,13 @@ export function GroupLifecyclePanel({
       setShowConfirmModal(false);
       onChanged?.(response.data as GroupListItemFull);
     } catch (err) {
+      setShowConfirmModal(false);
       if (err instanceof ApiError) {
         if (err.statusCode === 422 && err.details && err.details.length > 0) {
           setErrorMessage(err.details[0].message);
         } else {
           setErrorMessage(
-            err.message || 'حدث خطأ أثناء تعديل دورة حياة الحلقة',
+            err.message || 'حدث خطأ أثناء تعديل دورة حياة المجموعة',
           );
         }
       } else {
@@ -86,59 +97,64 @@ export function GroupLifecyclePanel({
   return (
     <View
       testID="group-lifecycle-panel"
-      className={`p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-4 ${
+      className={`w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-[18px] py-4 gap-2.5 ${itemsStart} ${
         className ?? ''
       }`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
-      <View className="gap-1">
-        <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right">
-          إدارة دورة حياة الحلقة
-        </Text>
-        <Text className="text-xs text-gray-500 dark:text-gray-400 text-right leading-5">
-          {isArchived
-            ? 'الحلقة مؤرشفة حالياً وموقوفة عن استقبال الطلبات والتقارير. يمكنك إلغاء الأرشفة لإعادة تفعيلها.'
-            : 'الحلقة نشطة حالياً. عند الأرشفة، سيتم إيقاف استقبال الطلبات والتقارير اليومية مع بقاء الطلاب مسجلين.'}
-        </Text>
-      </View>
+      <Text
+        className={`w-full ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      >
+        دورة الحياة
+      </Text>
 
-      {/* Error Message Banner */}
       {errorMessage ? (
-        <View
-          className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
-          style={{ borderCurve: 'continuous' }}
+        <Banner
+          tone="error"
+          icon="alert"
+          message={errorMessage}
           testID="group-lifecycle-error"
-        >
-          <Text
-            selectable
-            className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
-          >
-            {errorMessage}
-          </Text>
-        </View>
+        />
       ) : null}
 
-      {/* Action Button */}
-      <Button
-        label={isArchived ? 'إلغاء الأرشفة وتفعيل الحلقة' : 'أرشفة الحلقة'}
-        variant={isArchived ? 'primary' : 'destructive'}
-        onPress={handleOpenConfirm}
-        disabled={isSubmitting}
-        testID="toggle-lifecycle-button"
-      />
+      <View className={`${rowStart} items-center gap-3 w-full`}>
+        <Icon name="archive" size={20} tone="secondary" />
+        <View className={`flex-1 ${itemsStart}`}>
+          <Text
+            className={`w-full ${typography.bodyMdMedium} text-right text-fg dark:text-fg-dark`}
+          >
+            {isArchived ? 'المجموعة مؤرشفة' : 'أرشفة المجموعة'}
+          </Text>
+          <Text
+            className={`w-full ${typography.caption} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          >
+            {isArchived
+              ? 'إلغاء الأرشفة يعيد التقارير والدفع، ولا يعيد الطلبات المرفوضة.'
+              : 'ترفض الطلبات المعلّقة، توقف التقارير والدفع. قابلة للعكس.'}
+          </Text>
+        </View>
+        <Button
+          label={isArchived ? 'إلغاء الأرشفة' : 'أرشفة'}
+          variant="secondary"
+          size="small"
+          onPress={handleOpenConfirm}
+          disabled={isSubmitting}
+          testID="toggle-lifecycle-button"
+          className="min-w-[120px]"
+        />
+      </View>
 
-      {/* Confirmation Dialog */}
       <ConfirmationDialog
         visible={showConfirmModal}
-        title={isArchived ? 'تأكيد تفعيل الحلقة' : 'تأكيد أرشفة الحلقة'}
+        title={isArchived ? `إلغاء أرشفة ${subject}؟` : `أرشفة ${subject}؟`}
         message={
           isArchived
-            ? 'هل أنت متأكد من رغبتك في إلغاء أرشفة هذه الحلقة وإعادتها إلى الحالة النشطة؟'
-            : 'هل أنت متأكد من رغبتك في أرشفة هذه الحلقة؟ سيتم إيقاف استقبال طلبات الانضمام وتعليق تسجيل التقارير اليومية.'
+            ? 'تعود المجموعة نشطة وتستأنف التقارير والدفع. الطلبات التي رُفضت عند الأرشفة لا تعود.'
+            : 'تُرفض الطلبات المعلّقة تلقائيًا، وتتوقف التقارير والدفع. يمكن إلغاء الأرشفة لاحقًا، لكن الطلبات المرفوضة لا تعود.'
         }
-        confirmLabel={isArchived ? 'إلغاء الأرشفة' : 'أرشفة الحلقة'}
-        cancelLabel="تراجع"
-        confirmVariant={isArchived ? 'primary' : 'destructive'}
+        confirmLabel={isArchived ? 'إلغاء الأرشفة' : 'أرشفة'}
+        cancelLabel="إلغاء"
+        weight="standard"
         loading={isSubmitting}
         onConfirm={handleConfirmLifecycleChange}
         onCancel={() => {

@@ -79,7 +79,7 @@ function renderScreen(
   );
 }
 
-describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
+describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03, Figma 31:746)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -99,17 +99,20 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
     renderScreen();
 
     expect(screen.getByTestId('report-history-title').props.children).toBe(
-      'سجل التقارير',
+      'سجلّ التقارير',
     );
+    // Figma SegmentedControl (7:28) — one radio group, the Daily segment first.
     expect(
       screen.getByTestId('report-history-tabs').props.accessibilityRole,
-    ).toBe('tablist');
+    ).toBe('radiogroup');
+    expect(screen.getByText('اليومية')).toBeTruthy();
+    expect(screen.getByText('الأسبوعية')).toBeTruthy();
     expect(
-      screen.getByTestId('report-history-tab-daily').props.accessibilityState
+      screen.getByTestId('report-history-tabs-daily').props.accessibilityState
         .selected,
     ).toBe(true);
     expect(
-      screen.getByTestId('report-history-tab-weekly').props.accessibilityState
+      screen.getByTestId('report-history-tabs-weekly').props.accessibilityState
         .selected,
     ).toBe(false);
     expect(screen.getByTestId('report-history-content-daily')).toBeTruthy();
@@ -133,10 +136,10 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
     renderScreen({ onOpenWeeklyReport });
     await screen.findByTestId('daily-report-row-r1');
 
-    fireEvent.press(screen.getByTestId('report-history-tab-weekly'));
+    fireEvent.press(screen.getByTestId('report-history-tabs-weekly'));
 
     expect(
-      screen.getByTestId('report-history-tab-weekly').props.accessibilityState
+      screen.getByTestId('report-history-tabs-weekly').props.accessibilityState
         .selected,
     ).toBe(true);
     expect(screen.getByTestId('report-history-content-weekly')).toBeTruthy();
@@ -151,7 +154,7 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
     fireEvent.press(screen.getByTestId('weekly-report-row-w1'));
     expect(onOpenWeeklyReport).toHaveBeenCalledWith(weeklyPage.data[0]);
 
-    fireEvent.press(screen.getByTestId('report-history-tab-daily'));
+    fireEvent.press(screen.getByTestId('report-history-tabs-daily'));
     expect(await screen.findByTestId('daily-report-row-r1')).toBeTruthy();
   });
 
@@ -171,7 +174,7 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
   it('honours initialTab', async () => {
     renderScreen({ initialTab: 'weekly' });
     expect(
-      screen.getByTestId('report-history-tab-weekly').props.accessibilityState
+      screen.getByTestId('report-history-tabs-weekly').props.accessibilityState
         .selected,
     ).toBe(true);
     expect(await screen.findByTestId('weekly-report-row-w1')).toBeTruthy();
@@ -179,7 +182,7 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
 
   it('goes back from the top-right control (UF §31)', () => {
     renderScreen();
-    fireEvent.press(screen.getByTestId('report-history-back-button'));
+    fireEvent.press(screen.getByTestId('report-history-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -187,7 +190,7 @@ describe('ReportHistoryScreen (SCR-14, F-DR-05 / F-WR-03)', () => {
   it('falls back to Home when there is no history', () => {
     mockCanGoBack.mockReturnValue(false);
     renderScreen();
-    fireEvent.press(screen.getByTestId('report-history-back-button'));
+    fireEvent.press(screen.getByTestId('report-history-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
     expect(mockBack).not.toHaveBeenCalled();
   });

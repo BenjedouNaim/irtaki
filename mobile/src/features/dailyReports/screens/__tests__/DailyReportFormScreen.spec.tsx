@@ -131,8 +131,11 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
     it('shows the reason picker only, enables submit once a reason is chosen, posts and returns Home', async () => {
       renderScreen('Absent');
 
+      expect(
+        screen.getByTestId('daily-report-form-top-bar-title').props.children,
+      ).toBe('غياب');
       expect(screen.getByTestId('daily-report-form-title').props.children).toBe(
-        'تقرير غياب',
+        'سبب الغياب',
       );
       expect(screen.getByTestId('absence-reason-picker')).toBeTruthy();
       expect(screen.queryByTestId('memo-section')).toBeNull();
@@ -201,8 +204,8 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
 
       pickRange('memo-range-field');
       expect(
-        screen.getByTestId('memo-range-field-summary').props.children,
-      ).toBe('من سورة البقرة آية 1 إلى سورة البقرة آية 20');
+        screen.getByTestId('memo-range-field-trigger-value').props.children,
+      ).toBe('البقرة 1 ← البقرة 20');
       pickTime('memo-time-field', 'from', 18);
       pickTime('memo-time-field', 'to', 19);
 
@@ -453,7 +456,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
   describe('discard (UF §25: prompt only if touched)', () => {
     it('goes straight back when nothing was touched', () => {
       renderScreen('Absent');
-      fireEvent.press(screen.getByTestId('daily-report-form-cancel-button'));
+      fireEvent.press(screen.getByTestId('daily-report-form-top-bar-back'));
       expect(mockBack).toHaveBeenCalledTimes(1);
       expect(screen.queryByTestId('discard-report-dialog')).toBeNull();
     });
@@ -461,7 +464,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
     it('asks before discarding a touched form and only leaves on confirm', () => {
       renderScreen('Absent');
       fireEvent.press(screen.getByTestId('absence-reason-picker-sick'));
-      fireEvent.press(screen.getByTestId('daily-report-form-cancel-button'));
+      fireEvent.press(screen.getByTestId('daily-report-form-top-bar-back'));
 
       expect(screen.getByTestId('discard-report-dialog')).toBeTruthy();
       expect(screen.getByText('تجاهل هذا التقرير؟')).toBeTruthy();
@@ -473,7 +476,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       expect(screen.queryByTestId('discard-report-dialog')).toBeNull();
       expect(mockBack).not.toHaveBeenCalled();
 
-      fireEvent.press(screen.getByTestId('daily-report-form-cancel-button'));
+      fireEvent.press(screen.getByTestId('daily-report-form-top-bar-back'));
       fireEvent.press(
         screen.getByTestId('discard-report-dialog-confirm-button'),
       );
@@ -483,7 +486,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
     it('falls back to Home when there is no history', () => {
       mockCanGoBack.mockReturnValue(false);
       renderScreen('Revision');
-      fireEvent.press(screen.getByTestId('daily-report-form-cancel-button'));
+      fireEvent.press(screen.getByTestId('daily-report-form-top-bar-back'));
       expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
     });
   });

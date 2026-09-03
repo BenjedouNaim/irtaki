@@ -2,9 +2,20 @@ import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { ProfileScreen } from '../ProfileScreen';
 import * as meApi from '@/shared/api/me.client';
+import * as authApi from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
+import { useAuthStore } from '@/shared/auth/authStore';
 
 jest.mock('@/shared/api/me.client');
+jest.mock('@/shared/api/auth.client');
+jest.mock('@/shared/auth/authStore', () => {
+  const original = jest.requireActual('@/shared/auth/authStore');
+  return {
+    ...original,
+    getStoredRefreshToken: jest.fn().mockResolvedValue('stored-refresh-token'),
+    deleteStoredRefreshToken: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 describe('ProfileScreen (SCR-34)', () => {
   const sampleProfile: meApi.MeResponse = {
@@ -31,17 +42,21 @@ describe('ProfileScreen (SCR-34)', () => {
   it('renders profile data with read-only displays and editable timezone on successful load', async () => {
     jest.spyOn(meApi, 'getMe').mockResolvedValueOnce(sampleProfile);
 
-    const { findByText, getByTestId, getByDisplayValue } = await render(
-      <ProfileScreen />,
-    );
+    const { findByText, getByText, getByTestId, getByDisplayValue } =
+      await render(<ProfileScreen />);
 
-    expect(await findByText('الملف الشخصي')).toBeTruthy();
-    expect(getByDisplayValue('student@example.com')).toBeTruthy();
-    expect(getByDisplayValue('أحمد بن علي')).toBeTruthy();
-    expect(getByDisplayValue('ذكر')).toBeTruthy();
-    expect(getByDisplayValue('طالب')).toBeTruthy();
+    expect(await findByText('الحساب')).toBeTruthy();
+    // Header — avatar initial, name, role badge (Figma 43:73)
+    expect(getByText('أ')).toBeTruthy();
+    expect(getByText('أحمد بن علي')).toBeTruthy();
+    expect(getByText('طالب')).toBeTruthy();
+    // Info card — read-only rows (Figma 43:80)
+    expect(getByText('student@example.com')).toBeTruthy();
+    expect(getByText('ذكر')).toBeTruthy();
+    // Timezone stays the single editable field (UF SCR-34)
     expect(getByDisplayValue('Africa/Tunis')).toBeTruthy();
     expect(getByTestId('profile-submit-button')).toBeTruthy();
+    expect(getByTestId('profile-logout-button')).toBeTruthy();
   });
 
   it('renders fallback placeholders when full_name and gender are null', async () => {
@@ -55,14 +70,15 @@ describe('ProfileScreen (SCR-34)', () => {
     };
     jest.spyOn(meApi, 'getMe').mockResolvedValueOnce(preEnrollProfile);
 
-    const { findByText, getAllByDisplayValue, getByDisplayValue } =
-      await render(<ProfileScreen />);
+    const { findByText, getAllByText, getByText } = await render(
+      <ProfileScreen />,
+    );
 
-    expect(await findByText('الملف الشخصي')).toBeTruthy();
-    expect(getByDisplayValue('newuser@example.com')).toBeTruthy();
-    expect(getByDisplayValue('مستخدم جديد')).toBeTruthy();
-    // Both full_name and gender show 'غير محدد بعد'
-    const placeholders = getAllByDisplayValue('غير محدد بعد');
+    expect(await findByText('الحساب')).toBeTruthy();
+    expect(getByText('newuser@example.com')).toBeTruthy();
+    expect(getByText('مستخدم جديد')).toBeTruthy();
+    // Both full_name (header) and gender (info row) show 'غير محدد بعد'
+    const placeholders = getAllByText('غير محدد بعد');
     expect(placeholders.length).toBe(2);
   });
 
@@ -77,13 +93,14 @@ describe('ProfileScreen (SCR-34)', () => {
     );
 
     expect(await findByTestId('profile-load-error-banner')).toBeTruthy();
-    expect(getByTestId('profile-retry-button')).toBeTruthy();
+    expect(getByTestId('profile-load-error-banner-icon')).toBeTruthy();
+    expect(getByTestId('profile-load-error-banner-retry-button')).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(getByTestId('profile-retry-button'));
+      fireEvent.press(getByTestId('profile-load-error-banner-retry-button'));
     });
 
-    expect(await findByText('الملف الشخصي')).toBeTruthy();
+    expect(await findByText('الحساب')).toBeTruthy();
     expect(meApi.getMe).toHaveBeenCalledTimes(2);
   });
 
@@ -199,5 +216,22 @@ describe('ProfileScreen (SCR-34)', () => {
     expect(getByTestId('profile-general-error')).toBeTruthy();
     // Form value preserved
     expect(getByDisplayValue('UTC')).toBeTruthy();
+  });
+
+  it('logs out with a single tap: best-effort POST /auth/logout, then clears the session (UF §9)', async () => {
+    jest.spyOn(meApi, 'getMe').mockResolvedValueOnce(sampleProfile);
+    jest.spyOn(authApi, 'logoutUser').mockResolvedValueOnce(undefined);
+    useAuthStore.getState().setSession('access-token', 'Student');
+
+    const { findByTestId, getByTestId } = await render(<ProfileScreen />);
+
+    await findByTestId('profile-screen');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('profile-logout-button'));
+    });
+
+    expect(authApi.logoutUser).toHaveBeenCalledWith('stored-refresh-token');
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });

@@ -3,8 +3,25 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StudentTabs } from '../StudentTabs';
 import * as dailyReportsApi from '@/shared/api/dailyReports.client';
+import * as weeklyReportsApi from '@/shared/api/weeklyReports.client';
+import * as meApi from '@/shared/api/me.client';
+import * as membershipsApi from '@/shared/api/memberships.client';
+import * as progressApi from '@/shared/api/progress.client';
+import * as quranApi from '@/shared/api/quran.client';
+import { ApiError } from '@/shared/api/types';
+import { localTodayIsoDate } from '@/features/dailyReports/utils/dailyReportForm';
+import {
+  addDays,
+  parseIsoDate,
+  toIsoDate,
+} from '@/features/dailyReports/utils/arabicDate';
 
 jest.mock('@/shared/api/dailyReports.client');
+jest.mock('@/shared/api/weeklyReports.client');
+jest.mock('@/shared/api/me.client');
+jest.mock('@/shared/api/memberships.client');
+jest.mock('@/shared/api/progress.client');
+jest.mock('@/shared/api/quran.client');
 jest.mock('@/shared/api/auth.client');
 
 const mockPush = jest.fn();
@@ -14,6 +31,27 @@ jest.mock('expo-router', () => ({
     push: mockPush,
   }),
 }));
+
+const NEVER = () => new Promise<never>(() => {});
+
+const today = localTodayIsoDate();
+const weekStart = toIsoDate(addDays(parseIsoDate(today)!, -3));
+const weekEnd = toIsoDate(addDays(parseIsoDate(today)!, 3));
+
+const liveWeek: weeklyReportsApi.WeeklyReportLiveDto = {
+  id: null,
+  week_start: weekStart,
+  week_end: weekEnd,
+  expected_days: 6,
+  missed_daily_reports: 2,
+  missed_daily_memorization: 2,
+  missed_daily_revision: 3,
+  missed_50_repetitions: 1,
+  missed_single_session: 0,
+  attended_recitation_call: false,
+  state: 'Open',
+  can_confirm: false,
+};
 
 let queryClient: QueryClient;
 
@@ -28,13 +66,103 @@ function renderTabs() {
   );
 }
 
-describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
+describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:553)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(meApi, 'getMe').mockResolvedValue({
+      id: 'u1',
+      role: 'Student',
+      email: 'khalil@example.com',
+      full_name: 'خليل بن يعلى',
+      gender: 'Male',
+      timezone: 'Africa/Tunis',
+    });
+    jest.spyOn(membershipsApi, 'getMyMembership').mockResolvedValue({
+      id: 'm1',
+      group: {
+        id: 'g1',
+        name: 'حلقة الفجر',
+        recitation_day: 6,
+        enrollment_status: 'Open',
+      },
+      started_at: '2026-01-01T00:00:00.000Z',
+      state: 'Active',
+    });
+    jest
+      .spyOn(weeklyReportsApi, 'getCurrentWeeklyReport')
+      .mockResolvedValue(liveWeek);
+    jest.spyOn(progressApi, 'getMyProgress').mockResolvedValue({
+      ahzab_completed: 23,
+      coverage_percent: 38.5,
+      last_memorized_position: { surah: 2, ayah: 101, ordinal: 108 },
+      is_activity_pointer_only: true,
+    });
+    jest.spyOn(quranApi, 'listSurahs').mockResolvedValue([]);
   });
 
   afterEach(() => {
     queryClient?.clear();
+  });
+
+  it('greets the student by first name with the avatar initial and the group + recitation day line', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+
+    expect(screen.getByTestId('student-tabs')).toBeTruthy();
+    expect(
+      (await screen.findByTestId('home-header-greeting')).props.children,
+    ).toMatch(/^(صباح|مساء) الخير، خليل$/);
+    expect(screen.getByTestId('home-header-initial').props.children).toBe('خ');
+    expect(screen.getByTestId('home-header-membership').props.children).toBe(
+      'حلقة الفجر · يوم التسميع: السبت',
+    );
+  });
+
+  it('shows the header skeleton while the profile loads (Figma 50:1072)', () => {
+    jest.spyOn(meApi, 'getMe').mockImplementation(NEVER);
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+
+    expect(screen.getByTestId('home-header-skeleton')).toBeTruthy();
+    expect(screen.queryByTestId('home-header')).toBeNull();
+  });
+
+  it('greets without a name or membership line when neither is available', async () => {
+    jest.spyOn(meApi, 'getMe').mockResolvedValue({
+      id: 'u1',
+      role: 'Student',
+      email: 'khalil@example.com',
+      full_name: null,
+      gender: null,
+      timezone: 'Africa/Tunis',
+    });
+    jest.spyOn(membershipsApi, 'getMyMembership').mockRejectedValue(
+      new ApiError({
+        statusCode: 404,
+        error: 'NOT_FOUND',
+        message: 'لا توجد عضوية نشطة',
+      }),
+    );
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: false, block_reason: 'group_archived' });
+
+    renderTabs();
+
+    expect(
+      (await screen.findByTestId('home-header-greeting')).props.children,
+    ).toMatch(/^(صباح|مساء) الخير$/);
+    expect(screen.queryByTestId('home-header-initial')).toBeNull();
+    expect(screen.queryByTestId('home-header-membership')).toBeNull();
+    // A 404 on the membership hides the week card; the CTA banner says why.
+    expect(await screen.findByTestId('report-status-card-banner')).toBeTruthy();
+    expect(screen.queryByTestId('week-card-error')).toBeNull();
   });
 
   it('renders the report status card and routes "Submit Today\'s Report" to SCR-09 (UF §26)', async () => {
@@ -44,14 +172,13 @@ describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
 
     renderTabs();
 
-    expect(screen.getByTestId('student-tabs')).toBeTruthy();
     fireEvent.press(await screen.findByTestId('submit-report-button'));
     expect(mockPush).toHaveBeenCalledWith(
       '/(app)/student/daily-report/type-selection',
     );
   });
 
-  it('keeps the profile entry point', async () => {
+  it('keeps the profile entry point on the avatar', async () => {
     jest
       .spyOn(dailyReportsApi, 'getTodayReportStatus')
       .mockResolvedValue({ can_submit: false, block_reason: 'group_archived' });
@@ -59,19 +186,109 @@ describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
     renderTabs();
 
     expect(await screen.findByTestId('report-status-card-banner')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('profile-button'));
+    fireEvent.press(await screen.findByTestId('profile-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/profile');
   });
 
-  it('offers Report History and routes it to SCR-14 (UF §26 Progress tab → History)', async () => {
+  it('drives the week card from API-033: 7 day cells, recitation day rightmost-last, today outlined, others empty', async () => {
     jest
       .spyOn(dailyReportsApi, 'getTodayReportStatus')
       .mockResolvedValue({ can_submit: true });
 
     renderTabs();
 
-    fireEvent.press(await screen.findByTestId('report-history-button'));
+    expect(await screen.findByTestId('week-card')).toBeTruthy();
+    expect(screen.getByTestId('week-card-count').props.children).toBe(
+      '4 من 6 أيام',
+    );
+    expect(screen.getByText('هذا الأسبوع')).toBeTruthy();
+    expect(
+      screen.getByTestId(`week-card-strip-${weekEnd}-circle-recitation`),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId(`week-card-strip-${today}-circle-today`),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId(`week-card-strip-${weekStart}-circle-future`),
+    ).toBeTruthy();
+    expect(screen.queryByTestId(/circle-reported$/)).toBeNull();
+    expect(screen.queryByTestId(/circle-missed$/)).toBeNull();
+  });
+
+  it('shows two skeleton rows while the week loads and a retry banner on failure', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+    const spy = jest
+      .spyOn(weeklyReportsApi, 'getCurrentWeeklyReport')
+      .mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 500,
+          error: 'INTERNAL_ERROR',
+          message: 'boom',
+        }),
+      )
+      .mockResolvedValueOnce(liveWeek);
+
+    renderTabs();
+
+    expect(screen.getByTestId('week-card-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('week-card-skeleton-row-1')).toBeTruthy();
+
+    const error = await screen.findByTestId('week-card-error');
+    expect(error.props.accessibilityRole).toBe('alert');
+    expect(screen.getByTestId('week-card-error-message').props.children).toBe(
+      'حدث خطأ أثناء تحميل بيانات الأسبوع',
+    );
+    fireEvent.press(screen.getByTestId('week-card-error-retry-button'));
+    expect(await screen.findByTestId('week-card')).toBeTruthy();
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('switches to the Progress tab: the memorization card and the History link to SCR-14 (UF §26)', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+    await screen.findByTestId('submit-report-button');
+
+    expect(
+      screen.getByTestId('student-tab-bar-home').props.accessibilityState
+        .selected,
+    ).toBe(true);
+    fireEvent.press(screen.getByTestId('student-tab-bar-progress'));
+
+    expect(screen.getByTestId('student-progress')).toBeTruthy();
+    expect(screen.getByTestId('progress-top-bar-title').props.children).toBe(
+      'التقدّم',
+    );
+    expect(await screen.findByTestId('progress-section')).toBeTruthy();
+    expect(screen.queryByTestId('student-home')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('report-history-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/student/reports/history');
+
+    fireEvent.press(screen.getByTestId('student-tab-bar-home'));
+    expect(await screen.findByTestId('student-home')).toBeTruthy();
+  });
+
+  it('lists the Payment tab dimmed and never selects it (SCR-16 not built)', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+    await screen.findByTestId('submit-report-button');
+
+    const payment = screen.getByTestId('student-tab-bar-payment');
+    expect(payment.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(payment);
+    expect(screen.getByTestId('student-home')).toBeTruthy();
+    expect(
+      screen.getByTestId('student-tab-bar-home').props.accessibilityState
+        .selected,
+    ).toBe(true);
   });
 
   it('routes "View Today\'s Report" to SCR-15 by the id of the report already fetched (F-DR-07)', async () => {
@@ -117,5 +334,15 @@ describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
     fireEvent.press(await screen.findByTestId('weekly-report-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/student/weekly-report');
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
+  });
+
+  it('keeps the logout entry point', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+
+    expect(await screen.findByTestId('logout-button')).toBeTruthy();
   });
 });

@@ -20,6 +20,17 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+/** Five toggles reach the VR-04a minimum. */
+function selectMinimumAhzab(getByTestId: any) {
+  for (let hizb = 1; hizb <= 5; hizb += 1) {
+    fireEvent.press(getByTestId(`ahzab-chip-${hizb}`));
+  }
+}
+
 describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -68,12 +79,33 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
   it('renders Step 1 with gender choices and disabled Next button initially', async () => {
     const { getByText, getByTestId } = render(<JoinStepperScreen />);
 
-    expect(getByText('الخطوة 1 من 3: تحديد الجنس')).toBeTruthy();
+    expect(getByTestId('join-stepper-top-bar-title')).toHaveTextContent(
+      'طلب الانضمام',
+    );
+    expect(getByTestId('step-indicator-bar-1-active')).toBeTruthy();
+    expect(getByTestId('step-indicator-bar-2-inactive')).toBeTruthy();
+    expect(getByText('ما جنسك؟')).toBeTruthy();
     expect(getByTestId('gender-male-option')).toBeTruthy();
     expect(getByTestId('gender-female-option')).toBeTruthy();
 
     const submitBtn = getByTestId('step1-submit-button');
     expect(submitBtn.props.accessibilityState.disabled).toBe(true);
+
+    // The top-bar back control leaves the stepper from Step 1
+    fireEvent.press(getByTestId('join-stepper-top-bar-back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the chosen gender option selected', () => {
+    const { getByTestId } = render(<JoinStepperScreen />);
+
+    fireEvent.press(getByTestId('gender-female-option'));
+    expect(
+      getByTestId('gender-female-option').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      getByTestId('gender-male-option').props.accessibilityState.selected,
+    ).toBe(false);
   });
 
   it('enables Next button upon selecting Male, fetches Male groups, and renders Step 2', async () => {
@@ -83,10 +115,106 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     await navigateToStep2(getByTestId);
 
     expect(groupsApi.listAvailableGroups).toHaveBeenCalledWith('Male');
-    expect(await findByText('الخطوة 2 من 3: اختيار الحلقة')).toBeTruthy();
+    expect(await findByText('المجموعات المتاحة')).toBeTruthy();
+    expect(getByTestId('step-indicator-bar-2-active')).toBeTruthy();
     expect(await findByText('حلقة قالون رجال')).toBeTruthy();
-    expect(getByText('الإثنين')).toBeTruthy();
-    expect(getByText('مفتوح للتسجيل')).toBeTruthy();
+    expect(getByText('يوم التسميع: الإثنين')).toBeTruthy();
+
+    // Group Detail sheet (SCR-07): name, "Open" badge, recitation day, CTA
+    await act(async () => {
+      fireEvent.press(getByTestId('group-card-group-101'));
+    });
+    expect(getByTestId('group-detail-modal-title')).toHaveTextContent(
+      'حلقة قالون رجال',
+    );
+    expect(getByText('التسجيل مفتوح')).toBeTruthy();
+    expect(getByTestId('group-detail-modal-day')).toHaveTextContent('الإثنين');
+    expect(getByText('التقديم لهذه المجموعة')).toBeTruthy();
+  });
+
+  it('renders the empty state when no group is open for the chosen gender', async () => {
+    jest.spyOn(groupsApi, 'listAvailableGroups').mockResolvedValueOnce({
+      data: [],
+    });
+    const { getByTestId, findByText } = render(<JoinStepperScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('gender-female-option'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('step1-submit-button'));
+    });
+
+    expect(
+      await findByText('لا توجد مجموعات متاحة للإناث حاليًا'),
+    ).toBeTruthy();
+    expect(getByTestId('empty-groups-state')).toBeTruthy();
+  });
+
+  it('renders the retry banner on a network failure and re-fetches on retry, gender kept', async () => {
+    jest
+      .spyOn(groupsApi, 'listAvailableGroups')
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({ data: [mockMaleGroup] });
+    const { getByTestId, findByText } = render(<JoinStepperScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('gender-male-option'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('step1-submit-button'));
+    });
+
+    expect(
+      await findByText('تعذّر تحميل المجموعات. جنسك محفوظ — أعد المحاولة.'),
+    ).toBeTruthy();
+    expect(getByTestId('groups-error-banner')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('groups-error-banner-retry-button'));
+    });
+
+    expect(await findByText('حلقة قالون رجال')).toBeTruthy();
+    expect(groupsApi.listAvailableGroups).toHaveBeenLastCalledWith('Male');
+  });
+
+  it('shows the "no longer available" sheet for a closed group and refreshes the list on close', async () => {
+    const closedGroup: groupsApi.GroupListItemLimited = {
+      ...mockMaleGroup,
+      enrollment_status: 'Closed',
+    };
+    jest
+      .spyOn(groupsApi, 'listAvailableGroups')
+      .mockResolvedValueOnce({ data: [closedGroup] })
+      .mockResolvedValueOnce({ data: [] });
+    const { getByTestId, findByText, getByText } = render(
+      <JoinStepperScreen />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('gender-male-option'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('step1-submit-button'));
+    });
+    await act(async () => {
+      fireEvent.press(await waitFor(() => getByTestId('group-card-group-101')));
+    });
+
+    expect(getByText('التسجيل مغلق')).toBeTruthy();
+    expect(getByTestId('group-detail-modal-unavailable-banner')).toBeTruthy();
+    const applyBtn = getByTestId('apply-group-button');
+    expect(applyBtn.props.accessibilityState.disabled).toBe(true);
+    expect(getByText('لم تعد هذه المجموعة متاحة')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('close-detail-button'));
+    });
+
+    expect(
+      await findByText('لا توجد مجموعات متاحة للذكور حاليًا'),
+    ).toBeTruthy();
+    expect(groupsApi.listAvailableGroups).toHaveBeenCalledTimes(2);
   });
 
   it('navigates to Step 3 upon pressing "التقديم على هذه الحلقة" in modal', async () => {
@@ -95,9 +223,13 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     );
     await navigateToStep3(getByTestId);
 
-    expect(await findByText('الخطوة 3 من 3: بيانات التقديم')).toBeTruthy();
-    expect(getByText('حلقة قالون رجال')).toBeTruthy();
+    expect(await findByText('ملفك الشخصي')).toBeTruthy();
+    expect(getByTestId('step-indicator-bar-3-active')).toBeTruthy();
+    expect(getByText('البيانات الأساسية')).toBeTruthy();
     expect(getByTestId('step3-profile-form')).toBeTruthy();
+    expect(getByTestId('ahzab-counter')).toHaveTextContent(
+      '0 محددة · الحد الأدنى 5',
+    );
     expect(
       getByTestId('submit-application-button').props.accessibilityState
         .disabled,
@@ -280,7 +412,7 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
     fireEvent.changeText(getByTestId('input-city'), 'تونس');
 
-    fireEvent.press(getByTestId('ahzab-select-all'));
+    selectMinimumAhzab(getByTestId);
     fireEvent.press(getByTestId('tajweed-option-Advanced'));
     fireEvent.press(getByTestId('theory-yes'));
     fireEvent.press(getByTestId('qalun-yes'));
@@ -290,13 +422,13 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
       fireEvent.press(getByTestId('submit-application-button'));
     });
 
-    // Should return to Step 2
-    expect(await findByText('الخطوة 2 من 3: اختيار الحلقة')).toBeTruthy();
+    // Should return to Step 2 with the toast (Figma 54:4735), list re-fetched
+    expect(await findByText('المجموعات المتاحة')).toBeTruthy();
+    expect(getByTestId('group-unavailable-notice')).toBeTruthy();
     expect(
-      await findByText(
-        'هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.',
-      ),
+      await findByText('المجموعة لم تعد متاحة — حُدِّثت القائمة'),
     ).toBeTruthy();
+    expect(groupsApi.listAvailableGroups).toHaveBeenLastCalledWith('Male');
   });
 
   it('handles duplicate submit 409 as silent success routing to home (UF.md §13)', async () => {
@@ -317,7 +449,7 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
     fireEvent.changeText(getByTestId('input-city'), 'تونس');
 
-    fireEvent.press(getByTestId('ahzab-select-all'));
+    selectMinimumAhzab(getByTestId);
     fireEvent.press(getByTestId('tajweed-option-Advanced'));
     fireEvent.press(getByTestId('theory-yes'));
     fireEvent.press(getByTestId('qalun-yes'));
@@ -330,14 +462,19 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/user');
   });
 
-  it('allows navigating back to Step 2 from Step 3 via back button', async () => {
+  it('steps back from Step 3 to Step 2, then to Step 1, via the top-bar back control', async () => {
     const { getByTestId, findByText } = render(<JoinStepperScreen />);
     await navigateToStep3(getByTestId);
 
     await act(async () => {
-      fireEvent.press(getByTestId('step3-back-button'));
+      fireEvent.press(getByTestId('join-stepper-top-bar-back'));
     });
+    expect(await findByText('المجموعات المتاحة')).toBeTruthy();
 
-    expect(await findByText('الخطوة 2 من 3: اختيار الحلقة')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(getByTestId('join-stepper-top-bar-back'));
+    });
+    expect(await findByText('ما جنسك؟')).toBeTruthy();
+    expect(mockBack).not.toHaveBeenCalled();
   });
 });

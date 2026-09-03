@@ -103,7 +103,7 @@ function mockReport(report: weeklyReportsApi.WeeklyReportLiveDto) {
     .mockResolvedValue(report);
 }
 
-describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
+describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02, Figma 27:633)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -121,11 +121,11 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
     renderScreen();
 
     expect(screen.getByTestId('weekly-report-skeleton')).toBeTruthy();
-    expect(screen.getByTestId('skeleton-metric-row-5')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-metric-row-4')).toBeTruthy();
     expect(screen.queryByTestId('weekly-report-content')).toBeNull();
   });
 
-  it('renders the header with the week range and the six metric rows from API-033 (UF §16)', async () => {
+  it('renders the header with the week range, the expected-days line and the five metric rows from API-033 (UF §16)', async () => {
     mockReport(liveReport);
 
     renderScreen();
@@ -136,10 +136,12 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
       'التقرير الأسبوعي',
     );
     expect(screen.getByTestId('weekly-report-week-range').props.children).toBe(
-      'من 2026-08-29 إلى 2026-09-04',
+      'أسبوع 29 أوت — 4 سبتمبر',
     );
+    expect(
+      screen.getByTestId('weekly-report-expected-days').props.children,
+    ).toBe('5 أيام متوقّعة. ملخّص صادق — لا يُخفَّف.');
     const rows: Array<[string, string]> = [
-      ['metric-expected-days', '5'],
       ['metric-missed-daily-reports', '3'],
       ['metric-missed-daily-memorization', '3'],
       ['metric-missed-daily-revision', '4'],
@@ -149,7 +151,7 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
     for (const [testID, value] of rows) {
       expect(screen.getByTestId(`${testID}-value`).props.children).toBe(value);
     }
-    expect(screen.getByTestId('metric-expected-days-hint')).toBeTruthy();
+    expect(screen.queryByTestId('metric-expected-days-value')).toBeNull();
   });
 
   it('before the recitation day (id null, can_confirm false): read-only, no gate, no CTA, live note (UXQ-06)', async () => {
@@ -162,7 +164,7 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
     expect(screen.queryByTestId('attended-toggle')).toBeNull();
     expect(screen.queryByTestId('confirm-weekly-report-button')).toBeNull();
     expect(screen.queryByTestId('weekly-report-finalised-note')).toBeNull();
-    expect(screen.getByText('مفتوح')).toBeTruthy();
+    expect(screen.queryByTestId('weekly-report-state-badge')).toBeNull();
   });
 
   it('on the recitation day (can_confirm true): gate with no default, Confirm disabled until answered', async () => {
@@ -278,8 +280,8 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
       screen.getByTestId('weekly-report-already-finalised-note'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('weekly-report-attended-line').props.children,
-    ).toBe('حضور جلسة التسميع: لا');
+      screen.getByTestId('weekly-report-attended-line-value').props.children,
+    ).toBe('لا');
     expect(getSpy).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('weekly-report-confirm-section')).toBeNull();
     expect(screen.queryByTestId('weekly-report-confirm-banner')).toBeNull();
@@ -414,9 +416,9 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
       await screen.findByTestId('weekly-report-finalised-note'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('weekly-report-attended-line').props.children,
-    ).toBe('حضور جلسة التسميع: نعم');
-    expect(screen.getByText('معتمد')).toBeTruthy();
+      screen.getByTestId('weekly-report-attended-line-value').props.children,
+    ).toBe('نعم');
+    expect(screen.getByText('مؤكَّد')).toBeTruthy();
     expect(screen.queryByTestId('weekly-report-confirm-section')).toBeNull();
     expect(screen.queryByTestId('weekly-report-live-note')).toBeNull();
     expect(
@@ -464,7 +466,7 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
       (await screen.findByTestId('weekly-report-error-message')).props.children,
     ).toBe('المورد المطلوب غير موجود');
 
-    fireEvent.press(screen.getByTestId('weekly-report-retry-button'));
+    fireEvent.press(screen.getByTestId('weekly-report-error-retry-button'));
 
     expect(await screen.findByTestId('weekly-report-content')).toBeTruthy();
     expect(spy).toHaveBeenCalledTimes(2);
@@ -488,11 +490,11 @@ describe('WeeklyReportScreen (SCR-12, F-WR-01 / F-WR-02)', () => {
     renderScreen();
     await screen.findByTestId('weekly-report-content');
 
-    fireEvent.press(screen.getByTestId('weekly-report-back-button'));
+    fireEvent.press(screen.getByTestId('weekly-report-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
 
     mockCanGoBack.mockReturnValue(false);
-    fireEvent.press(screen.getByTestId('weekly-report-back-button'));
+    fireEvent.press(screen.getByTestId('weekly-report-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
   });
 });

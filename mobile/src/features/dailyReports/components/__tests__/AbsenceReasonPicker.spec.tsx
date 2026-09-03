@@ -6,13 +6,12 @@ describe('AbsenceReasonPicker (UF §15 absence form)', () => {
   it('renders Sick/Studying as the excused group and Other apart with its missed-day note', () => {
     render(<AbsenceReasonPicker value={null} onChange={jest.fn()} />);
 
-    expect(
-      screen.getByText('غياب بعذر — لا يُحتسب في التقييم الأسبوعي'),
-    ).toBeTruthy();
+    expect(screen.getByText('غياب بعذر')).toBeTruthy();
+    expect(screen.getByText('غير ذلك')).toBeTruthy();
     expect(screen.getByTestId('absence-reason-picker-sick')).toBeTruthy();
     expect(screen.getByTestId('absence-reason-picker-studying')).toBeTruthy();
     expect(screen.getByTestId('absence-reason-picker-other')).toBeTruthy();
-    expect(screen.getByText('سيُحتسب هذا يوماً فائتاً')).toBeTruthy();
+    expect(screen.getByText('سيُحتسب هذا كيوم فائت')).toBeTruthy();
     expect(screen.queryByPlaceholderText(/.+/)).toBeNull();
   });
 

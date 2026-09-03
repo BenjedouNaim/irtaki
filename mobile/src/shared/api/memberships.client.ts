@@ -125,3 +125,36 @@ export async function getMembershipRecovery(
     `/memberships/${id}/recovery`,
   );
 }
+
+/**
+ * API-025 `GET /memberships/mine` resource (APIS §10.6): the Student's own
+ * Active membership with its group — `404 NOT_FOUND` when none is active.
+ */
+export interface OwnMembershipGroupDto {
+  id: string;
+  name: string;
+  /** ISO-8601 day of week, 1 = Monday … 7 = Sunday (DBD DB-CHK-20). */
+  recitation_day: number;
+  enrollment_status: string;
+}
+
+export interface OwnMembershipDto {
+  id: string;
+  group: OwnMembershipGroupDto;
+  started_at: string;
+  state: 'Active';
+}
+
+export interface OwnMembershipResponse {
+  data: OwnMembershipDto;
+}
+
+/**
+ * Fetches the caller's own Active membership (Student only, API-025) and
+ * unwraps the APIS §9.1 envelope. Errors surface as `ApiError` unchanged.
+ */
+export async function getMyMembership(): Promise<OwnMembershipDto> {
+  const response =
+    await apiClient.get<OwnMembershipResponse>('/memberships/mine');
+  return response.data;
+}

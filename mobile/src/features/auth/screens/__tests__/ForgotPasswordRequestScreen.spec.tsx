@@ -16,8 +16,9 @@ describe('ForgotPasswordRequestScreen (SCR-03)', () => {
       <ForgotPasswordRequestScreen />,
     );
 
-    expect(getByText('إرتقِ')).toBeTruthy();
     expect(getByText('استعادة كلمة المرور')).toBeTruthy();
+    expect(getByText('أدخل بريدك الإلكتروني')).toBeTruthy();
+    expect(getByText('إرسال الرابط')).toBeTruthy();
     expect(getByTestId('forgot-password-email-input')).toBeTruthy();
     expect(getByTestId('forgot-password-submit-button')).toBeTruthy();
   });
@@ -79,8 +80,10 @@ describe('ForgotPasswordRequestScreen (SCR-03)', () => {
       email: 'user@example.com',
     });
 
-    expect(await findByText('تم إرسال التعليمات')).toBeTruthy();
+    expect(await findByText('تحقّق من بريدك')).toBeTruthy();
     expect(getByTestId('forgot-password-success-banner')).toBeTruthy();
+    expect(getByTestId('forgot-password-success-banner-icon')).toBeTruthy();
+    expect(getByTestId('forgot-password-top-bar')).toBeTruthy();
     expect(queryByTestId('forgot-password-email-input')).toBeNull();
 
     // Verify back to login button in banner
@@ -144,14 +147,14 @@ describe('ForgotPasswordRequestScreen (SCR-03)', () => {
     expect(getByTestId('forgot-password-general-error')).toBeTruthy();
   });
 
-  it('calls onNavigateToLogin when back link in footer is pressed', async () => {
+  it('calls onNavigateToLogin from the TopBar back control', async () => {
     const onNavigateToLogin = jest.fn();
     const { getByTestId } = await render(
       <ForgotPasswordRequestScreen onNavigateToLogin={onNavigateToLogin} />,
     );
 
     await act(async () => {
-      fireEvent.press(getByTestId('forgot-password-back-link'));
+      fireEvent.press(getByTestId('forgot-password-top-bar-back'));
     });
 
     expect(onNavigateToLogin).toHaveBeenCalledTimes(1);

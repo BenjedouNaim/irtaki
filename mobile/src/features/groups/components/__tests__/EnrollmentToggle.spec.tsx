@@ -6,35 +6,37 @@ import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/groups.client');
 
-describe('EnrollmentToggle component', () => {
+describe('EnrollmentToggle (Figma SCR-23 EnrollmentToggle row 37:160)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders correctly when enrollment status is Open', () => {
+  it('renders the "open" state: title, caption and a checked switch', () => {
     const { getByTestId, getByText } = render(
       <EnrollmentToggle groupId={mockGroupId} enrollmentStatus="Open" />,
     );
 
     expect(getByTestId('enrollment-toggle')).toBeTruthy();
-    expect(getByTestId('enrollment-toggle-badge')).toBeTruthy();
-    expect(getByText('مفتوح للتسجيل')).toBeTruthy();
-    expect(getByTestId('enrollment-toggle-button')).toBeTruthy();
-    expect(getByText('إغلاق التسجيل')).toBeTruthy();
+    expect(getByText('التسجيل مفتوح')).toBeTruthy();
+    expect(
+      getByText('صلاحيتك الوحيدة للكتابة — بلا تأكيد، قابلة للعكس فورًا'),
+    ).toBeTruthy();
+    const toggle = getByTestId('enrollment-toggle-button');
+    expect(toggle.props.accessibilityRole).toBe('switch');
+    expect(toggle.props.accessibilityState.checked).toBe(true);
   });
 
-  it('renders correctly when enrollment status is Closed', () => {
+  it('renders the "closed" state with an unchecked switch', () => {
     const { getByTestId, getByText } = render(
       <EnrollmentToggle groupId={mockGroupId} enrollmentStatus="Closed" />,
     );
 
-    expect(getByTestId('enrollment-toggle')).toBeTruthy();
-    expect(getByTestId('enrollment-toggle-badge')).toBeTruthy();
-    expect(getByText('مغلق للتسجيل')).toBeTruthy();
-    expect(getByTestId('enrollment-toggle-button')).toBeTruthy();
-    expect(getByText('فتح التسجيل')).toBeTruthy();
+    expect(getByText('التسجيل مغلق')).toBeTruthy();
+    expect(
+      getByTestId('enrollment-toggle-button').props.accessibilityState.checked,
+    ).toBe(false);
   });
 
   it('successfully toggles from Open to Closed and invokes onToggled', async () => {
@@ -91,7 +93,7 @@ describe('EnrollmentToggle component', () => {
     expect(onToggled).toHaveBeenCalledWith('Open');
   });
 
-  it('shows error message when toggle fails with 403 Forbidden', async () => {
+  it('shows the icon + text error when the toggle fails with 403 Forbidden', async () => {
     (groupsApi.toggleEnrollment as jest.Mock).mockRejectedValueOnce(
       new ApiError({
         statusCode: 403,
@@ -100,7 +102,7 @@ describe('EnrollmentToggle component', () => {
       }),
     );
 
-    const { getByTestId, findByText } = render(
+    const { getByTestId, findByText, getByLabelText } = render(
       <EnrollmentToggle groupId={mockGroupId} enrollmentStatus="Open" />,
     );
 
@@ -112,6 +114,7 @@ describe('EnrollmentToggle component', () => {
       await findByText('غير مصرح لك بتعديل حالة التسجيل لهذه الحلقة'),
     ).toBeTruthy();
     expect(getByTestId('enrollment-toggle-error')).toBeTruthy();
+    expect(getByLabelText('تنبيه')).toBeTruthy();
   });
 
   it('shows field error message when toggle fails with 422 and details', async () => {

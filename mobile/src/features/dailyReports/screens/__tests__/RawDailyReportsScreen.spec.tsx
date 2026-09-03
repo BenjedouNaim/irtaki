@@ -63,7 +63,7 @@ function renderScreen(
   );
 }
 
-describe('RawDailyReportsScreen (SCR-25, F-DR-06)', () => {
+describe('RawDailyReportsScreen (SCR-25, Figma 38:297, F-DR-06)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -76,30 +76,35 @@ describe('RawDailyReportsScreen (SCR-25, F-DR-06)', () => {
     queryClient?.clear();
   });
 
-  it('renders the header with the student name and the SCR-14 list fed by API-032 for that membership', async () => {
+  it('names the screen after the student, heads the read-only list and feeds it from API-032', async () => {
     renderScreen({ studentName: 'محمد بن علي' });
 
+    expect(
+      screen.getByTestId('raw-daily-reports-top-bar-title').props.children,
+    ).toBe('تقارير محمد بن علي');
     expect(screen.getByTestId('raw-daily-reports-title').props.children).toBe(
       'التقارير اليومية',
     );
-    expect(screen.getByTestId('raw-daily-reports-student').props.children).toBe(
-      'محمد بن علي',
-    );
+    expect(screen.getByText('للقراءة فقط')).toBeTruthy();
     expect(await screen.findByTestId('daily-report-row-r1')).toBeTruthy();
     expect(dailyReportsApi.listMembershipDailyReports).toHaveBeenCalledWith(
       MEMBERSHIP_ID,
       { limit: 20 },
     );
     expect(dailyReportsApi.listOwnDailyReports).not.toHaveBeenCalled();
-    // UF §15: no date-range filter control, no sub-tabs of its own.
+    // UF §15: no date-range filter control; no Daily/Weekly control either —
+    // no staff weekly-report screen exists to switch to.
     expect(screen.queryByTestId('report-history-tabs')).toBeNull();
+    expect(screen.queryByTestId('segmented-control')).toBeNull();
   });
 
-  it('omits the student line when no name is known', async () => {
+  it('falls back to the generic title when no name is known', async () => {
     renderScreen();
 
     expect(await screen.findByTestId('daily-report-row-r1')).toBeTruthy();
-    expect(screen.queryByTestId('raw-daily-reports-student')).toBeNull();
+    expect(
+      screen.getByTestId('raw-daily-reports-top-bar-title').props.children,
+    ).toBe('التقارير اليومية');
   });
 
   it('hands a tapped row to onOpenReport (→ SCR-15 from the cached row, F-DR-07)', async () => {
@@ -144,12 +149,12 @@ describe('RawDailyReportsScreen (SCR-25, F-DR-06)', () => {
 
   it('goes back from the top-right control, falling back to Teacher Home without history (UF §31)', () => {
     renderScreen();
-    fireEvent.press(screen.getByTestId('raw-daily-reports-back-button'));
+    fireEvent.press(screen.getByTestId('raw-daily-reports-top-bar-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
 
     mockCanGoBack.mockReturnValue(false);
-    fireEvent.press(screen.getByTestId('raw-daily-reports-back-button'));
+    fireEvent.press(screen.getByTestId('raw-daily-reports-top-bar-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/teacher');
   });
 });

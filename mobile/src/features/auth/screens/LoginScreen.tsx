@@ -10,6 +10,12 @@ import {
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
+import { Banner } from '@/shared/components/Banner';
+import { Toast } from '@/shared/components/Toast';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart } from '@/shared/theme/rtl';
+import { TextInputField } from '@/features/auth/components/TextInputField';
+import { AuthFooterLink } from '@/features/auth/components/AuthFooterLink';
 import { loginUser } from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
 import { useAuthStore, storeRefreshToken } from '@/shared/auth/authStore';
@@ -32,6 +38,10 @@ export interface LoginScreenProps {
   successMessage?: string;
 }
 
+/** The 22px link + slop reaches the 48dp minimum (UF §32). */
+const LINK_HIT_SLOP = { top: 13, bottom: 13, left: 8, right: 8 };
+
+/** SCR-01 Login — Figma 20:2 (default) · 20:55 (401 banner) · 44:387 (dark). */
 export function LoginScreen({
   onNavigateToRegister,
   onNavigateToForgotPassword,
@@ -111,75 +121,70 @@ export function LoginScreen({
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-white dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="login-screen"
     >
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          paddingVertical: 32,
+          paddingTop: 48,
+          paddingHorizontal: 16,
+          paddingBottom: 32,
+          gap: 32,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="items-center mb-8">
-          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
-            إرتقِ
+        {/* Brand */}
+        <View className={`w-full gap-1.5 ${itemsStart}`}>
+          <Text
+            accessibilityRole="header"
+            className={`${typography.displayLg} text-right text-brand dark:text-brand-dark`}
+          >
+            ارتقِ
           </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
-            تسجيل الدخول
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            أدخل بريدك الإلكتروني وكلمة المرور للمتابعة
+          <Text
+            className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          >
+            سجّل الدخول لمتابعة رحلة الحفظ
           </Text>
         </View>
 
         {successMessage && !generalError ? (
-          <View
-            className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
-            testID="login-success-banner"
-          >
-            <Text className="text-emerald-800 dark:text-emerald-200 text-sm text-center font-medium">
-              {successMessage}
-            </Text>
-          </View>
+          <Toast message={successMessage} testID="login-success-banner" />
         ) : null}
 
         {generalError ? (
-          <View
-            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
+          <Banner
+            message={generalError}
+            tone="error"
+            icon="circle-x"
             testID="login-general-error"
-          >
-            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
-              {generalError}
-            </Text>
-          </View>
+          />
         ) : null}
 
-        <View className="w-full">
+        {/* Form */}
+        <View className={`w-full gap-5 ${itemsStart}`}>
           <FormField
             label="البريد الإلكتروني"
             required
             error={errors.email}
+            disabled={isSubmitting}
             testID="login-email-field"
+            style={{ marginBottom: 0 }}
           >
-            <TextInput
+            <TextInputField
               testID="login-email-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.email
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
-              style={{ borderCurve: 'continuous' }}
-              placeholder="example@domain.com"
-              placeholderTextColor="#9ca3af"
+              ltr
+              placeholder="name@example.com"
               keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isSubmitting}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              error={Boolean(errors.email)}
+              disabled={isSubmitting}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -187,7 +192,6 @@ export function LoginScreen({
                   setErrors((prev) => ({ ...prev, email: undefined }));
                 }
               }}
-              textAlign="right"
             />
           </FormField>
 
@@ -195,23 +199,23 @@ export function LoginScreen({
             label="كلمة المرور"
             required
             error={errors.password}
+            disabled={isSubmitting}
             testID="login-password-field"
+            style={{ marginBottom: 0 }}
           >
-            <TextInput
+            <TextInputField
               ref={passwordInputRef}
               testID="login-password-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.password
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
-              style={{ borderCurve: 'continuous' }}
+              secure
               placeholder="••••••••"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
+              textContentType="password"
+              autoComplete="password"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isSubmitting}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+              error={Boolean(errors.password)}
+              disabled={isSubmitting}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -219,7 +223,6 @@ export function LoginScreen({
                   setErrors((prev) => ({ ...prev, password: undefined }));
                 }
               }}
-              textAlign="right"
             />
           </FormField>
 
@@ -227,40 +230,37 @@ export function LoginScreen({
             <Pressable
               onPress={onNavigateToForgotPassword}
               disabled={isSubmitting}
-              className="self-start mb-4"
+              hitSlop={LINK_HIT_SLOP}
+              accessibilityRole="link"
+              accessibilityState={{ disabled: isSubmitting }}
+              className="w-full active:opacity-70"
               testID="login-forgot-password-link"
             >
-              <Text className="text-xs font-semibold text-accent dark:text-accent-300">
+              <Text
+                className={`w-full ${typography.labelMd} text-right text-brand dark:text-brand-dark`}
+              >
                 نسيت كلمة المرور؟
               </Text>
             </Pressable>
           ) : null}
-
-          <Button
-            label="تسجيل الدخول"
-            onPress={handleSubmit}
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            testID="login-submit-button"
-            className="mt-2"
-          />
         </View>
 
+        <Button
+          label="تسجيل الدخول"
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          testID="login-submit-button"
+        />
+
         {onNavigateToRegister ? (
-          <View className="flex-row-reverse justify-center items-center mt-6">
-            <Text className="text-sm text-gray-500 dark:text-gray-400">
-              ليس لديك حساب؟{' '}
-            </Text>
-            <Pressable
-              onPress={onNavigateToRegister}
-              disabled={isSubmitting}
-              testID="login-register-link"
-            >
-              <Text className="text-sm font-bold text-primary dark:text-primary-400">
-                إنشاء حساب جديد
-              </Text>
-            </Pressable>
-          </View>
+          <AuthFooterLink
+            prompt="ليس لديك حساب؟"
+            linkLabel="إنشاء حساب"
+            onPress={onNavigateToRegister}
+            disabled={isSubmitting}
+            testID="login-register-link"
+          />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>

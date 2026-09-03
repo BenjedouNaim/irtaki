@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
-  Pressable,
-} from 'react-native';
+import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
@@ -15,6 +10,10 @@ import {
   StatusBadge,
   StatusBadgeVariant,
 } from '@/shared/components/StatusBadge';
+import { TopBar } from '@/shared/components/TopBar';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import {
   getJoinRequestDetail,
   acceptJoinRequest,
@@ -23,6 +22,7 @@ import {
 } from '@/shared/api/joinRequests.client';
 import { ApiError } from '@/shared/api/types';
 import { AhzabChipGrid } from '../components/AhzabChipGrid';
+import { nameInitial } from '../components/JoinRequestQueueRow';
 
 export function formatDate(isoString: string): string {
   try {
@@ -47,6 +47,28 @@ function mapTajweedLevel(level: string): string {
   }
 }
 
+function mapProgramGoal(goal: string): string {
+  switch (goal) {
+    case 'Memorization':
+      return 'حفظ';
+    case 'Revision':
+      return 'مراجعة فقط';
+    default:
+      return goal;
+  }
+}
+
+function mapGender(gender: string): string {
+  switch (gender) {
+    case 'Male':
+      return 'ذكر';
+    case 'Female':
+      return 'أنثى';
+    default:
+      return gender;
+  }
+}
+
 function mapStatus(status: string): {
   label: string;
   variant: StatusBadgeVariant;
@@ -57,14 +79,95 @@ function mapStatus(status: string): {
     case 'Accepted':
       return { label: 'تم القبول', variant: 'success' };
     case 'Rejected':
-      return { label: 'لم يتم القبول', variant: 'error' };
+      return { label: 'لم يُقبل', variant: 'neutral' };
     default:
       return { label: status, variant: 'neutral' };
   }
 }
 
+/** "N ahzab" with Arabic number agreement (Figma 35:259). */
+export function formatAhzabCount(count: number): string {
+  if (count === 0) return 'لا أحزاب';
+  if (count === 1) return 'حزب واحد';
+  if (count === 2) return 'حزبان';
+  if (count <= 10) return `${count} أحزاب`;
+  return `${count} حزبًا`;
+}
+
+const CARD_CLASS =
+  'w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark';
+
+/** Figma Applicant Detail label/value row (35:228): 44px, label right, value left. */
+function DetailRow({
+  label,
+  value,
+  testID,
+}: {
+  label: string;
+  value: string;
+  testID: string;
+}) {
+  return (
+    <View
+      className={`${rowStart} items-center justify-between min-h-[44px] gap-3 w-full`}
+      testID={`row-${testID}`}
+      accessibilityRole="text"
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      <Text
+        className={`flex-1 ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        maxFontSizeMultiplier={1.6}
+      >
+        {label}
+      </Text>
+      <Text
+        selectable
+        className={`${typography.bodyMdMedium} text-left text-fg dark:text-fg-dark`}
+        style={{ fontVariant: ['tabular-nums'] }}
+        testID={`field-${testID}`}
+        maxFontSizeMultiplier={1.6}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+  testID,
+}: {
+  title: string;
+  children: React.ReactNode;
+  testID?: string;
+}) {
+  return (
+    <View
+      className={`${CARD_CLASS} px-4 py-3 gap-1 ${itemsStart}`}
+      style={{ borderCurve: 'continuous' }}
+      testID={testID}
+    >
+      <Text
+        className={`w-full ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        accessibilityRole="header"
+      >
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * SCR-19 Applicant Detail (Figma 35:183) with the Accept (35:395) and
+ * Reject (53:585) confirmations (UF §13, §25). Email is never rendered
+ * (APIQ-04); the applicant score sorts the queue and is shown to the
+ * assistant only.
+ */
 export function ApplicantDetailScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
   const params = useLocalSearchParams<{ id: string }>();
   const requestId = params.id;
 
@@ -250,89 +353,82 @@ export function ApplicantDetailScreen() {
   };
 
   const statusConfig = applicant ? mapStatus(applicant.status) : null;
+  const actionsBusy = isSubmitting || isRejectSubmitting;
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
-      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="applicant-detail-screen"
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-      }
     >
-      {/* Navigation & Header */}
-      <View className="flex-row-reverse items-center justify-between">
-        <View className="gap-1 flex-1">
-          <Text
-            className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
-            testID="applicant-detail-title"
-          >
-            الملف الشخصي للمتقدم
-          </Text>
-          <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-            مراجعة بيانات التسجيل والأحزاب المحفوظة
-          </Text>
-        </View>
-        <Pressable
-          onPress={handleBack}
-          accessibilityRole="button"
-          accessibilityLabel="العودة"
-          testID="back-button"
-          className="px-3 py-1.5 rounded-lg bg-gray-200/80 dark:bg-gray-800 active:opacity-70 mr-2"
-          style={{ borderCurve: 'continuous' }}
-        >
-          <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            رجوع
-          </Text>
-        </Pressable>
-      </View>
+      <TopBar
+        title="طلب الانضمام"
+        onBack={handleBack}
+        testID="applicant-detail-top-bar"
+      />
 
-      {/* Loading Skeleton */}
-      {isLoading ? (
-        <View testID="applicant-detail-skeleton" className="gap-4">
-          <SkeletonLoader variant="dashboard" count={1} />
-          <SkeletonLoader variant="row" count={5} />
-        </View>
-      ) : errorMessage ? (
-        <View
-          className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
-          style={{ borderCurve: 'continuous' }}
-          testID="applicant-detail-error"
-        >
-          <Text
-            selectable
-            className="text-sm font-medium text-destructive-700 dark:text-destructive-300 text-right leading-5"
-          >
-            {errorMessage}
-          </Text>
-          <Button
-            label="إعادة المحاولة"
-            variant="outline"
-            onPress={fetchDetail}
-            testID="retry-button"
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingTop: 4,
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+          gap: 16,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.textBrand}
+            colors={[colors.textBrand]}
           />
-        </View>
-      ) : applicant ? (
-        <View className="gap-4" testID="applicant-detail-content">
-          {/* Main Info Card */}
-          <View
-            className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-4"
-            style={{ borderCurve: 'continuous' }}
-            testID="applicant-profile-card"
-          >
-            {/* Top row: Name, Status & Score */}
-            <View className="flex-row-reverse items-center justify-between gap-2">
-              <View className="flex-1">
+        }
+      >
+        {isLoading ? (
+          <View testID="applicant-detail-skeleton" className="w-full gap-4">
+            <View className={CARD_CLASS} style={{ borderCurve: 'continuous' }}>
+              <SkeletonLoader variant="card" />
+            </View>
+            <View
+              className={`${CARD_CLASS} px-4 py-3`}
+              style={{ borderCurve: 'continuous' }}
+            >
+              <SkeletonLoader variant="metricRow" count={4} />
+            </View>
+          </View>
+        ) : errorMessage ? (
+          <Banner
+            message={errorMessage}
+            tone="error"
+            onRetry={fetchDetail}
+            testID="applicant-detail-error"
+          />
+        ) : applicant ? (
+          <View className="w-full gap-4" testID="applicant-detail-content">
+            {/* Header (Figma 35:214): avatar · name + status + meta · score */}
+            <View
+              className={`${CARD_CLASS} ${rowStart} items-center gap-3.5 px-5 py-[18px]`}
+              style={{ borderCurve: 'continuous' }}
+              testID="applicant-profile-card"
+            >
+              <View className="w-[52px] h-[52px] rounded-full bg-subtle dark:bg-subtle-dark items-center justify-center">
+                <Text
+                  className={`${typography.headingMd} text-center text-fg-secondary dark:text-fg-secondary-dark`}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  {nameInitial(applicant.full_name)}
+                </Text>
+              </View>
+
+              <View className={`flex-1 gap-1 ${itemsStart}`}>
                 <Text
                   selectable
-                  className="text-xl font-bold text-gray-900 dark:text-gray-100 text-right"
+                  className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
                   testID="applicant-full-name"
+                  accessibilityRole="header"
                 >
                   {applicant.full_name}
                 </Text>
-              </View>
-              <View className="flex-row-reverse items-center gap-2">
                 {statusConfig && (
                   <StatusBadge
                     status={statusConfig.label}
@@ -340,394 +436,218 @@ export function ApplicantDetailScreen() {
                     testID="applicant-status-badge"
                   />
                 )}
-                <View
-                  className="flex-row-reverse items-center gap-1 px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800"
-                  style={{ borderCurve: 'continuous' }}
-                  testID="applicant-score-container"
-                >
-                  <Text className="text-xs text-primary-700 dark:text-primary-300 font-medium">
-                    التقييم:
+                <View className={`${rowStart} items-center gap-1`}>
+                  <Text
+                    className={`${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                    testID="field-gender"
+                  >
+                    {mapGender(applicant.gender)}
                   </Text>
                   <Text
-                    selectable
-                    className="text-xs font-bold text-primary-800 dark:text-primary-200"
-                    style={{ fontVariant: ['tabular-nums'] }}
-                    testID="applicant-score"
+                    className={`${typography.bodySm} text-fg-secondary dark:text-fg-secondary-dark`}
                   >
-                    {applicant.score}
+                    ·
+                  </Text>
+                  <Text
+                    className={`${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                    testID="field-created-at"
+                  >
+                    {`قُدِّم في ${formatDate(applicant.created_at)}`}
                   </Text>
                 </View>
               </View>
-            </View>
 
-            {/* Divider */}
-            <View className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
-
-            {/* Label-Value Fields */}
-            <View className="gap-3">
-              {/* Full Name */}
               <View
-                className="flex-row-reverse items-center justify-between py-1"
-                testID="row-full-name"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  الاسم الكامل
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                  testID="field-full-name"
-                >
-                  {applicant.full_name}
-                </Text>
-              </View>
-
-              {/* Gender */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-gender"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  الجنس
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-gender"
-                >
-                  {applicant.gender === 'Male'
-                    ? 'ذكر'
-                    : applicant.gender === 'Female'
-                      ? 'أنثى'
-                      : applicant.gender}
-                </Text>
-              </View>
-
-              {/* Age */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-age"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  العمر
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  style={{ fontVariant: ['tabular-nums'] }}
-                  testID="field-age"
-                >
-                  {applicant.age} سنة
-                </Text>
-              </View>
-
-              {/* Phone */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-phone"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  رقم الهاتف
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-phone"
-                >
-                  {applicant.phone_number}
-                </Text>
-              </View>
-
-              {/* City */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-city"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  المدينة
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-city"
-                >
-                  {applicant.city}
-                </Text>
-              </View>
-
-              {/* Occupation */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-occupation"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  المهنة
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-occupation"
-                >
-                  {applicant.occupation}
-                </Text>
-              </View>
-
-              {/* Tajweed Level */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-tajweed-level"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  مستوى التجويد
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-tajweed-level"
-                >
-                  {mapTajweedLevel(applicant.tajweed_level)}
-                </Text>
-              </View>
-
-              {/* Studied Tajweed Theory */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-tajweed-theory"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  دراسة التجويد نظرياً
-                </Text>
-                <Text
-                  selectable
-                  className={`text-sm font-semibold ${
-                    applicant.studied_tajweed_theory
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                  testID="field-tajweed-theory"
-                >
-                  {applicant.studied_tajweed_theory ? 'نعم' : 'لا'}
-                </Text>
-              </View>
-
-              {/* Studied Qalun */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-studied-qalun"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  دراسة رواية قالون
-                </Text>
-                <Text
-                  selectable
-                  className={`text-sm font-semibold ${
-                    applicant.studied_qalun
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                  testID="field-studied-qalun"
-                >
-                  {applicant.studied_qalun ? 'نعم' : 'لا'}
-                </Text>
-              </View>
-
-              {/* Program Goal */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-program-goal"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  الهدف من البرنامج
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-900 dark:text-gray-100"
-                  testID="field-program-goal"
-                >
-                  {applicant.program_goal === 'Memorization'
-                    ? 'حفظ القرآن الكريم'
-                    : applicant.program_goal}
-                </Text>
-              </View>
-
-              {/* Fee Agreement */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-fee-agreement"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  الموافقة على الرسوم
-                </Text>
-                <Text
-                  selectable
-                  className={`text-sm font-semibold ${
-                    applicant.fee_agreement
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-rose-600 dark:text-rose-400'
-                  }`}
-                  testID="field-fee-agreement"
-                >
-                  {applicant.fee_agreement ? 'نعم (تمت الموافقة)' : 'لا'}
-                </Text>
-              </View>
-
-              {/* Created At */}
-              <View
-                className="flex-row-reverse items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800/60"
-                testID="row-created-at"
-              >
-                <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  تاريخ التقديم
-                </Text>
-                <Text
-                  selectable
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  testID="field-created-at"
-                >
-                  {formatDate(applicant.created_at)}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Memorized Ahzab Section */}
-          <View
-            className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-            style={{ borderCurve: 'continuous' }}
-            testID="applicant-ahzab-section"
-          >
-            <View className="flex-row-reverse items-center justify-between">
-              <Text
-                className="text-base font-bold text-gray-900 dark:text-gray-100 text-right"
-                testID="applicant-ahzab-title"
-              >
-                الأحزاب المحفوظة
-              </Text>
-              <View
-                className="px-2.5 py-0.5 rounded-full bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800"
+                className="items-center rounded-md bg-primary-subtle dark:bg-primary-subtle-dark px-3 py-1.5"
                 style={{ borderCurve: 'continuous' }}
+                testID="applicant-score-container"
+                accessibilityRole="text"
+                accessibilityLabel={`نقاط الطلب: ${applicant.score}`}
               >
                 <Text
-                  className="text-xs font-bold text-primary-700 dark:text-primary-300"
+                  selectable
+                  className={`${typography.headingLg} text-center text-brand dark:text-brand-dark`}
+                  style={{ fontVariant: ['tabular-nums'] }}
+                  testID="applicant-score"
+                  maxFontSizeMultiplier={1.5}
+                >
+                  {applicant.score}
+                </Text>
+                <Text
+                  className={`${typography.caption} text-center text-brand dark:text-brand-dark`}
+                  maxFontSizeMultiplier={1.5}
+                >
+                  نقاط الطلب
+                </Text>
+              </View>
+            </View>
+
+            <SectionCard
+              title="البيانات الشخصية"
+              testID="applicant-personal-card"
+            >
+              <DetailRow
+                label="العمر"
+                value={`${applicant.age} سنة`}
+                testID="age"
+              />
+              <DetailRow
+                label="الهاتف"
+                value={applicant.phone_number}
+                testID="phone"
+              />
+              <DetailRow
+                label="المهنة"
+                value={applicant.occupation}
+                testID="occupation"
+              />
+              <DetailRow label="المدينة" value={applicant.city} testID="city" />
+            </SectionCard>
+
+            <SectionCard title="التجويد والهدف" testID="applicant-tajweed-card">
+              <DetailRow
+                label="مستوى التجويد"
+                value={mapTajweedLevel(applicant.tajweed_level)}
+                testID="tajweed-level"
+              />
+              <DetailRow
+                label="درس أحكام التجويد"
+                value={applicant.studied_tajweed_theory ? 'نعم' : 'لا'}
+                testID="tajweed-theory"
+              />
+              <DetailRow
+                label="درس رواية قالون"
+                value={applicant.studied_qalun ? 'نعم' : 'لا'}
+                testID="studied-qalun"
+              />
+              <DetailRow
+                label="الهدف"
+                value={mapProgramGoal(applicant.program_goal)}
+                testID="program-goal"
+              />
+              <DetailRow
+                label="وافق على الرسوم"
+                value={applicant.fee_agreement ? 'نعم' : 'لا'}
+                testID="fee-agreement"
+              />
+            </SectionCard>
+
+            {/* Memorized Ahzab (Figma 35:257) — read-only grid (UF §19) */}
+            <View
+              className={`${CARD_CLASS} p-4 gap-3 ${itemsStart}`}
+              style={{ borderCurve: 'continuous' }}
+              testID="applicant-ahzab-section"
+            >
+              <View
+                className={`${rowStart} items-center justify-between w-full`}
+              >
+                <Text
+                  className={`${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                  testID="applicant-ahzab-title"
+                  accessibilityRole="header"
+                >
+                  الأحزاب المحفوظة
+                </Text>
+                <Text
+                  className={`${typography.labelMd} text-left text-brand dark:text-brand-dark`}
                   style={{ fontVariant: ['tabular-nums'] }}
                   testID="applicant-ahzab-count"
                 >
-                  {applicant.memorized_ahzab.length} حزباً
+                  {formatAhzabCount(applicant.memorized_ahzab.length)}
                 </Text>
               </View>
+
+              <AhzabChipGrid
+                selectedAhzab={applicant.memorized_ahzab}
+                readOnly
+                testID="applicant-ahzab-grid"
+              />
             </View>
 
-            <AhzabChipGrid
-              selectedAhzab={applicant.memorized_ahzab}
-              readOnly={true}
-              testID="applicant-ahzab-grid"
-            />
+            {/* Decision (Figma 35:388; F-ENR-05 & F-ENR-06) */}
+            {applicant.status === 'Pending' && (
+              <View
+                className="w-full pt-2 gap-2.5"
+                testID="applicant-actions-card"
+              >
+                {actionErrorMessage && (
+                  <Banner
+                    message={actionErrorMessage}
+                    tone="error"
+                    testID="accept-action-error"
+                  />
+                )}
+
+                {rejectActionErrorMessage && (
+                  <Banner
+                    message={rejectActionErrorMessage}
+                    tone="error"
+                    testID="reject-action-error"
+                  />
+                )}
+
+                <Button
+                  label="قبول الطلب"
+                  variant="primary"
+                  onPress={handleOpenAcceptConfirm}
+                  disabled={actionsBusy}
+                  loading={isSubmitting}
+                  testID="accept-join-request-button"
+                  className="w-full"
+                />
+
+                <Button
+                  label="رفض الطلب"
+                  variant="outline"
+                  onPress={handleOpenRejectConfirm}
+                  disabled={actionsBusy}
+                  loading={isRejectSubmitting}
+                  testID="reject-join-request-button"
+                  className="w-full"
+                  style={
+                    actionsBusy
+                      ? undefined
+                      : { borderColor: colors.borderError }
+                  }
+                  textStyle={
+                    actionsBusy ? undefined : { color: colors.textError }
+                  }
+                />
+
+                <ConfirmationDialog
+                  visible={showConfirmModal}
+                  title={`قبول طلب ${applicant.full_name}؟`}
+                  message="سيتم إنشاء عضوية في المجموعة وبدء دورة الدفع الأولى فورًا."
+                  confirmLabel="قبول"
+                  cancelLabel="إلغاء"
+                  weight="standard"
+                  loading={isSubmitting}
+                  onConfirm={handleConfirmAccept}
+                  onCancel={() => {
+                    if (!isSubmitting) setShowConfirmModal(false);
+                  }}
+                  testID="accept-confirm-dialog"
+                />
+
+                <ConfirmationDialog
+                  visible={showRejectConfirmModal}
+                  title={`رفض طلب ${applicant.full_name}؟`}
+                  message="قرار نهائي بلا سبب مُسجَّل. يمكنه التقديم مجددًا فورًا على أي مجموعة متاحة."
+                  confirmLabel="رفض الطلب"
+                  cancelLabel="إلغاء"
+                  weight="strong"
+                  loading={isRejectSubmitting}
+                  onConfirm={handleConfirmReject}
+                  onCancel={() => {
+                    if (!isRejectSubmitting) setShowRejectConfirmModal(false);
+                  }}
+                  testID="reject-confirm-dialog"
+                />
+              </View>
+            )}
           </View>
-
-          {/* Action Decision Card (SCR-19 / F-ENR-05 & F-ENR-06) */}
-          {applicant.status === 'Pending' && (
-            <View
-              className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-              style={{ borderCurve: 'continuous' }}
-              testID="applicant-actions-card"
-            >
-              <View className="gap-1">
-                <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right">
-                  اتخاذ قرار بشأن الطلب
-                </Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400 text-right leading-5">
-                  قبول المتقدم يضيفه تلقائياً كطالب في الحلقة ويسجل أحزابه
-                  المحفوظة كبداية لمسار حفظه.
-                </Text>
-              </View>
-
-              {/* Accept Action Error Banner */}
-              {actionErrorMessage && (
-                <View
-                  className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
-                  style={{ borderCurve: 'continuous' }}
-                  testID="accept-action-error"
-                >
-                  <Text
-                    selectable
-                    className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
-                  >
-                    {actionErrorMessage}
-                  </Text>
-                </View>
-              )}
-
-              {/* Reject Action Error Banner */}
-              {rejectActionErrorMessage && (
-                <View
-                  className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
-                  style={{ borderCurve: 'continuous' }}
-                  testID="reject-action-error"
-                >
-                  <Text
-                    selectable
-                    className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
-                  >
-                    {rejectActionErrorMessage}
-                  </Text>
-                </View>
-              )}
-
-              {/* Accept Button */}
-              <Button
-                label="قبول طلب الانضمام"
-                variant="primary"
-                onPress={handleOpenAcceptConfirm}
-                disabled={isSubmitting || isRejectSubmitting}
-                loading={isSubmitting}
-                testID="accept-join-request-button"
-              />
-
-              {/* Reject Button */}
-              <Button
-                label="رفض طلب الانضمام"
-                variant="destructive"
-                onPress={handleOpenRejectConfirm}
-                disabled={isSubmitting || isRejectSubmitting}
-                loading={isRejectSubmitting}
-                testID="reject-join-request-button"
-              />
-
-              {/* Accept Confirmation Dialog */}
-              <ConfirmationDialog
-                visible={showConfirmModal}
-                title="قبول طلب الانضمام"
-                message="هل أنت متأكد من قبول طلب انضمام هذا المتقدم؟ سيتم تسجيله كطالب في الحلقة وبدء مسار الحفظ."
-                confirmLabel="تأكيد القبول"
-                cancelLabel="إلغاء"
-                confirmVariant="primary"
-                loading={isSubmitting}
-                onConfirm={handleConfirmAccept}
-                onCancel={() => {
-                  if (!isSubmitting) setShowConfirmModal(false);
-                }}
-                testID="accept-confirm-dialog"
-              />
-
-              {/* Reject Confirmation Dialog */}
-              <ConfirmationDialog
-                visible={showRejectConfirmModal}
-                title="رفض طلب الانضمام"
-                message="هل أنت متأكد من رفض طلب انضمام هذا المتقدم؟ لن يتمكن من الانضمام إلى هذه الحلقة."
-                confirmLabel="تأكيد الرفض"
-                cancelLabel="إلغاء"
-                confirmVariant="destructive"
-                loading={isRejectSubmitting}
-                onConfirm={handleConfirmReject}
-                onCancel={() => {
-                  if (!isRejectSubmitting) setShowRejectConfirmModal(false);
-                }}
-                testID="reject-confirm-dialog"
-              />
-            </View>
-          )}
-        </View>
-      ) : null}
-    </ScrollView>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }

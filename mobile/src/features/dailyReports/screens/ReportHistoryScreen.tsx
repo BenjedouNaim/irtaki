@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SegmentedControl } from '@/shared/components/SegmentedControl';
+import { TopBar } from '@/shared/components/TopBar';
 import { DailyReportDto } from '@/shared/api/dailyReports.client';
 import { WeeklyReportDto } from '@/shared/api/weeklyReports.client';
 import { WeeklyReportHistoryList } from '@/features/weeklyReports/components/WeeklyReportHistoryList';
@@ -17,10 +19,10 @@ export interface ReportHistoryScreenProps {
   initialTab?: ReportHistoryTab;
 }
 
-/** UF §15: "[Daily Reports] · [Weekly Reports] (two sub-tabs)". */
-const TABS: ReadonlyArray<{ key: ReportHistoryTab; label: string }> = [
-  { key: 'daily', label: 'التقارير اليومية' },
-  { key: 'weekly', label: 'التقارير الأسبوعية' },
+/** UF §15: "[Daily Reports] · [Weekly Reports] (two sub-tabs)" — Figma segment labels. */
+const TABS: Array<{ value: ReportHistoryTab; label: string }> = [
+  { value: 'daily', label: 'اليومية' },
+  { value: 'weekly', label: 'الأسبوعية' },
 ];
 
 const TAB_CONTENT: Record<
@@ -36,10 +38,11 @@ const TAB_CONTENT: Record<
 };
 
 /**
- * SCR-14 Report History (F-DR-05 / F-WR-03, UF §15 / §28): "Two sub-tabs,
- * chronological list". Progress tab → History (UF §26). Tab selection is
- * UI-only state local to the screen (TS §26). Header layout mirrors SCR-10:
- * title on the reading side, back control top-right (UF §31).
+ * SCR-14 Report History (F-DR-05 / F-WR-03, UF §15 / §28; Figma 31:746 /
+ * 31:857 / 31:933): TopBar "سجلّ التقارير" with the back control top-right
+ * (UF §31), a 2-segment SegmentedControl (Daily first, rightmost) and the
+ * chosen chronological list. Progress tab → History (UF §26). Tab
+ * selection is UI-only state local to the screen (TS §26).
  */
 export function ReportHistoryScreen({
   onOpenReport,
@@ -61,71 +64,26 @@ export function ReportHistoryScreen({
 
   return (
     <View
-      className="flex-1 bg-white dark:bg-gray-950 p-5 gap-4"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="report-history-screen"
     >
-      <View className="flex-row-reverse items-center justify-between">
-        <Text
-          className="flex-1 text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
-          accessibilityRole="header"
-          testID="report-history-title"
-        >
-          سجل التقارير
-        </Text>
-        <Pressable
-          testID="report-history-back-button"
-          accessibilityRole="button"
-          accessibilityLabel="العودة"
-          onPress={goBack}
-          className="min-h-[48px] min-w-[48px] items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-gray-800"
-        >
-          <Text className="text-xl font-bold text-gray-800 dark:text-gray-200">
-            →
-          </Text>
-        </Pressable>
-      </View>
+      <TopBar title="سجلّ التقارير" onBack={goBack} testID="report-history" />
 
-      {/* Sub-tabs: full-width segmented control (UF §29), leading tab on the right (UF §31). */}
-      <View
-        className="flex-row-reverse rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
-        style={{ borderCurve: 'continuous' }}
-        accessibilityRole="tablist"
-        testID="report-history-tabs"
-      >
-        {TABS.map(({ key, label }) => {
-          const selected = tab === key;
-          return (
-            <Pressable
-              key={key}
-              testID={`report-history-tab-${key}`}
-              accessibilityRole="tab"
-              accessibilityLabel={label}
-              accessibilityState={{ selected }}
-              onPress={() => setTab(key)}
-              className={`flex-1 min-h-[48px] items-center justify-center ${
-                selected
-                  ? 'bg-primary dark:bg-primary-600'
-                  : 'bg-white dark:bg-gray-900'
-              }`}
-            >
-              <Text
-                className={`text-base font-semibold ${
-                  selected ? 'text-white' : 'text-gray-800 dark:text-gray-200'
-                }`}
-                maxFontSizeMultiplier={1.4}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View className="flex-1" testID={`report-history-content-${tab}`}>
-        <Content
-          onOpenReport={onOpenReport}
-          onOpenWeeklyReport={onOpenWeeklyReport}
+      <View className="flex-1 px-4 pt-1 pb-6 gap-4">
+        <SegmentedControl<ReportHistoryTab>
+          options={TABS}
+          value={tab}
+          onChange={setTab}
+          accessibilityLabel="نوع التقارير"
+          testID="report-history-tabs"
         />
+
+        <View className="flex-1" testID={`report-history-content-${tab}`}>
+          <Content
+            onOpenReport={onOpenReport}
+            onOpenWeeklyReport={onOpenWeeklyReport}
+          />
+        </View>
       </View>
     </View>
   );

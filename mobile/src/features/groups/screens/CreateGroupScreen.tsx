@@ -10,28 +10,39 @@ import {
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
-import { FormField } from '@/shared/components/FormField';
-import { Button } from '@/shared/components/Button';
-import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import {
+  TopBar,
+  FormField,
+  Button,
+  Banner,
+  Icon,
+  SegmentedControl,
+  SkeletonLoader,
+  getInputClassName,
+} from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import { createGroup, listUsersByRole, UserListItem } from '@/shared/api';
 import { ApiError } from '@/shared/api/types';
 import { RECITATION_DAYS_MAP } from '@/features/joinRequests/screens/JoinStepperScreen';
+import { StaffPickerSheet } from '../components/StaffPickerSheet';
 
 export const createGroupSchema = z.object({
-  name: z.string().trim().min(1, 'اسم الحلقة مطلوب'),
+  name: z.string().trim().min(1, 'اسم المجموعة مطلوب'),
   gender: z
     .string()
-    .min(1, 'يرجى تحديد الفئة المستهدفة')
+    .min(1, 'يرجى تحديد الجنس')
     .refine((v): v is 'Male' | 'Female' => v === 'Male' || v === 'Female', {
-      message: 'يرجى تحديد الفئة المستهدفة',
+      message: 'يرجى تحديد الجنس',
     }),
   recitation_day: z
     .number({ message: 'يرجى تحديد يوم التسميع' })
     .int('يوم التسميع غير صالح')
     .min(1, 'يوم التسميع غير صالح')
     .max(7, 'يوم التسميع غير صالح'),
-  teacher_id: z.string().min(1, 'يرجى اختيار المعلم المشرف'),
-  assistant_id: z.string().min(1, 'يرجى اختيار المساعد الإداري'),
+  teacher_id: z.string().min(1, 'يرجى اختيار المعلّم'),
+  assistant_id: z.string().min(1, 'يرجى اختيار المساعد'),
 });
 
 export type CreateGroupFormData = z.infer<typeof createGroupSchema>;
@@ -40,15 +51,95 @@ export interface CreateGroupScreenProps {
   onSuccess?: (groupId: string) => void;
 }
 
+/** Figma Days (39:289): Saturday first (rightmost), one letter per day. */
+const DAY_ORDER = [6, 7, 1, 2, 3, 4, 5] as const;
+const DAY_LETTERS: Record<number, string> = {
+  6: 'س',
+  7: 'ح',
+  1: 'ن',
+  2: 'ث',
+  3: 'ر',
+  4: 'خ',
+  5: 'ج',
+};
+
+type PickerRole = 'teacher' | 'assistant';
+
+function StaffPickerRow({
+  selected,
+  placeholder,
+  roleLabel,
+  error,
+  disabled,
+  onPress,
+  testID,
+}: {
+  selected: UserListItem | null;
+  placeholder: string;
+  roleLabel: string;
+  error?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  testID: string;
+}) {
+  const name = selected ? selected.full_name || selected.email : null;
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`${roleLabel}: ${name ?? placeholder}`}
+      accessibilityState={{ disabled }}
+      className={`${rowStart} items-center gap-2.5 w-full rounded-md bg-surface dark:bg-surface-dark px-3.5 py-3 active:opacity-80 ${
+        error
+          ? 'border-[1.5px] border-line-error'
+          : 'border border-line dark:border-line-dark'
+      } ${disabled ? 'opacity-60' : ''}`}
+      style={{ borderCurve: 'continuous' }}
+    >
+      <View className="w-8 h-8 rounded-full bg-primary-subtle dark:bg-primary-subtle-dark items-center justify-center">
+        <Icon name="shield" size={16} tone="brand" />
+      </View>
+      <View className={`flex-1 ${itemsStart}`}>
+        <Text
+          numberOfLines={1}
+          className={`w-full ${typography.bodyMdMedium} text-right ${
+            name
+              ? 'text-fg dark:text-fg-dark'
+              : 'text-fg-tertiary dark:text-fg-tertiary-dark'
+          }`}
+        >
+          {name ?? placeholder}
+        </Text>
+        <Text
+          className={`w-full ${typography.caption} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        >
+          {roleLabel}
+        </Text>
+      </View>
+      <Icon name="chevron-down" size={18} tone="tertiary" />
+    </Pressable>
+  );
+}
+
+/**
+ * SCR-28 Create Group (Figma 39:230): name, gender segments, the 7-day
+ * picker (fixed at creation, BR), and Teacher/Assistant pickers opening a
+ * candidate sheet. Validation and the 409/422 handling are unchanged.
+ */
 export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
   const router = useRouter();
+  const colors = useThemeColors();
 
   // Form state
   const [name, setName] = useState('');
+  const [isNameFocused, setIsNameFocused] = useState(false);
   const [gender, setGender] = useState<'Male' | 'Female' | null>(null);
   const [recitationDay, setRecitationDay] = useState<number | null>(null);
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [assistantId, setAssistantId] = useState<string | null>(null);
+  const [openPicker, setOpenPicker] = useState<PickerRole | null>(null);
 
   // Staff options state
   const [teachers, setTeachers] = useState<UserListItem[]>([]);
@@ -98,36 +189,32 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
     }
   };
 
+  const clearError = (field: string) => {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  };
+
   const handleGenderSelect = (selected: 'Male' | 'Female') => {
     triggerHaptic();
     setGender(selected);
-    if (errors.gender) {
-      setErrors((prev) => ({ ...prev, gender: undefined }));
-    }
+    clearError('gender');
   };
 
   const handleDaySelect = (day: number) => {
     triggerHaptic();
     setRecitationDay(day);
-    if (errors.recitation_day) {
-      setErrors((prev) => ({ ...prev, recitation_day: undefined }));
-    }
+    clearError('recitation_day');
   };
 
-  const handleTeacherSelect = (id: string) => {
+  const handleStaffSelect = (sectionKey: string, id: string) => {
     triggerHaptic();
-    setTeacherId(id);
-    if (errors.teacher_id) {
-      setErrors((prev) => ({ ...prev, teacher_id: undefined }));
+    if (sectionKey === 'teacher') {
+      setTeacherId(id);
+      clearError('teacher_id');
+    } else {
+      setAssistantId(id);
+      clearError('assistant_id');
     }
-  };
-
-  const handleAssistantSelect = (id: string) => {
-    triggerHaptic();
-    setAssistantId(id);
-    if (errors.assistant_id) {
-      setErrors((prev) => ({ ...prev, assistant_id: undefined }));
-    }
+    setOpenPicker(null);
   };
 
   const handleSubmit = async () => {
@@ -178,7 +265,7 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
       if (err instanceof ApiError) {
         if (err.statusCode === 409 || err.errorCode === 'GROUP_NAME_TAKEN') {
           // 409 is a business rule / state conflict -> render as top banner (UF.md §21)
-          setGeneralError(err.message || 'اسم الحلقة مستخدم بالفعل');
+          setGeneralError(err.message || 'اسم المجموعة مستخدم بالفعل');
         } else if (err.statusCode === 422 && err.details) {
           const newErrors: Record<string, string> = {};
           for (const detail of err.details) {
@@ -188,7 +275,7 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
           }
           setErrors(newErrors);
         } else {
-          setGeneralError(err.message || 'حدث خطأ أثناء إنشاء الحلقة');
+          setGeneralError(err.message || 'حدث خطأ أثناء إنشاء المجموعة');
         }
       } else {
         setGeneralError('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
@@ -198,150 +285,121 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
     }
   };
 
+  const selectedTeacher = teachers.find((t) => t.id === teacherId) ?? null;
+  const selectedAssistant =
+    assistants.find((a) => a.id === assistantId) ?? null;
+
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="create-group-screen"
     >
+      <TopBar title="مجموعة جديدة" testID="create-group-top-bar" />
       <ScrollView
         contentContainerStyle={{
-          padding: 16,
-          gap: 20,
-          paddingBottom: 48,
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+          gap: 14,
         }}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
       >
-        {/* Header Title */}
-        <View className="mb-2">
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right mb-1">
-            إنشاء حلقة جديدة
+        {/* Heading */}
+        <View className={`w-full gap-1 ${itemsStart}`}>
+          <Text
+            accessibilityRole="header"
+            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+          >
+            إعداد المجموعة
           </Text>
-          <Text className="text-sm text-gray-600 dark:text-gray-400 text-right">
-            أدخل تفاصيل الحلقة القرآنية وقم بتعيين المعلم والمساعد المشرفين
+          <Text
+            className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          >
+            تُنشأ المجموعة مغلقة التسجيل ونشطة. يوم التسميع لا يُعدَّل لاحقًا.
           </Text>
         </View>
 
         {/* General Error Banner (409 Conflict / Network) */}
         {generalError ? (
-          <View
-            className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800"
-            style={{ borderCurve: 'continuous' }}
+          <Banner
+            tone="error"
+            icon="alert"
+            message={generalError}
             testID="create-group-general-error"
-          >
-            <Text
-              selectable
-              className="text-sm font-medium text-destructive-700 dark:text-destructive-300 text-right leading-5"
-            >
-              {generalError}
-            </Text>
-          </View>
+          />
         ) : null}
 
-        {/* Form Container */}
-        <View
-          className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-5"
-          style={{ borderCurve: 'continuous' }}
-        >
+        {/* Form */}
+        <View className="w-full gap-5 pt-1.5">
           {/* 1. Group Name */}
           <FormField
-            label="اسم الحلقة"
+            label="اسم المجموعة"
             required
+            helpText="يجب أن يكون فريدًا"
             error={errors.name}
             testID="group-name-field"
+            className="mb-0"
           >
             <TextInput
               testID="group-name-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.name
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
+              className={getInputClassName({
+                error: Boolean(errors.name),
+                focused: isNameFocused,
+              })}
               style={{ borderCurve: 'continuous' }}
-              placeholder="مثال: حلقة الإمام نافع"
-              placeholderTextColor="#9ca3af"
+              placeholder="مثال: حلقة الفجر"
+              placeholderTextColor={colors.textTertiary}
               editable={!isSubmitting}
               value={name}
               onChangeText={(text) => {
                 setName(text);
-                if (errors.name) {
-                  setErrors((prev) => ({ ...prev, name: undefined }));
-                }
+                clearError('name');
               }}
+              onFocus={() => setIsNameFocused(true)}
+              onBlur={() => setIsNameFocused(false)}
               textAlign="right"
+              selectionColor={colors.textBrand}
             />
           </FormField>
 
-          {/* 2. Target Gender */}
+          {/* 2. Gender */}
           <FormField
-            label="الفئة المستهدفة"
+            label="الجنس"
             required
             error={errors.gender}
             testID="group-gender-field"
+            className="mb-0"
           >
-            <View className="flex-row gap-3">
-              <Pressable
-                testID="gender-male-option"
-                accessibilityRole="radio"
-                accessibilityState={{ selected: gender === 'Male' }}
-                accessibilityLabel="ذكور (بنين)"
-                onPress={() => handleGenderSelect('Male')}
-                disabled={isSubmitting}
-                className={`flex-1 p-3.5 rounded-xl border-2 items-center justify-center ${
-                  gender === 'Male'
-                    ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                    : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'
-                }`}
-                style={{ borderCurve: 'continuous' }}
-              >
-                <Text
-                  className={`text-sm font-bold ${
-                    gender === 'Male'
-                      ? 'text-primary dark:text-primary-400'
-                      : 'text-gray-800 dark:text-gray-200'
-                  }`}
-                >
-                  ذكور (بنين)
-                </Text>
-              </Pressable>
-
-              <Pressable
-                testID="gender-female-option"
-                accessibilityRole="radio"
-                accessibilityState={{ selected: gender === 'Female' }}
-                accessibilityLabel="إناث (بنات)"
-                onPress={() => handleGenderSelect('Female')}
-                disabled={isSubmitting}
-                className={`flex-1 p-3.5 rounded-xl border-2 items-center justify-center ${
-                  gender === 'Female'
-                    ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                    : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'
-                }`}
-                style={{ borderCurve: 'continuous' }}
-              >
-                <Text
-                  className={`text-sm font-bold ${
-                    gender === 'Female'
-                      ? 'text-primary dark:text-primary-400'
-                      : 'text-gray-800 dark:text-gray-200'
-                  }`}
-                >
-                  إناث (بنات)
-                </Text>
-              </Pressable>
-            </View>
+            <SegmentedControl<'Male' | 'Female'>
+              options={[
+                { label: 'ذكور', value: 'Male' },
+                { label: 'إناث', value: 'Female' },
+              ]}
+              value={gender}
+              onChange={handleGenderSelect}
+              disabled={isSubmitting}
+              accessibilityLabel="الجنس"
+              testID="gender"
+            />
           </FormField>
 
           {/* 3. Recitation Day */}
           <FormField
-            label="يوم التسميع الأسبوعي"
+            label="يوم التسميع"
             required
             error={errors.recitation_day}
+            helpText={
+              recitationDay !== null
+                ? `${RECITATION_DAYS_MAP[recitationDay]} — يُثبَّت عند الإنشاء`
+                : undefined
+            }
             testID="group-recitation-day-field"
+            className="mb-0"
           >
-            <View className="flex-row flex-wrap gap-2 justify-end">
-              {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+            <View className={`${rowStart} items-start gap-1.5 w-full`}>
+              {DAY_ORDER.map((day) => {
                 const isSelected = recitationDay === day;
                 return (
                   <Pressable
@@ -352,21 +410,22 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
                     accessibilityLabel={RECITATION_DAYS_MAP[day]}
                     onPress={() => handleDaySelect(day)}
                     disabled={isSubmitting}
-                    className={`px-3 py-2.5 rounded-lg border min-w-[70px] items-center justify-center ${
+                    className={`flex-1 h-11 rounded-sm items-center justify-center active:opacity-80 ${
                       isSelected
-                        ? 'border-primary bg-primary-50/50 dark:bg-primary-950/50'
-                        : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'
+                        ? 'bg-primary dark:bg-primary-dark'
+                        : 'bg-surface dark:bg-surface-dark border border-line dark:border-line-dark'
                     }`}
                     style={{ borderCurve: 'continuous' }}
                   >
                     <Text
-                      className={`text-xs font-semibold ${
+                      className={`${typography.labelMd} text-center ${
                         isSelected
-                          ? 'text-primary dark:text-primary-400'
-                          : 'text-gray-700 dark:text-gray-300'
+                          ? 'text-fg-on-primary'
+                          : 'text-fg dark:text-fg-dark'
                       }`}
+                      maxFontSizeMultiplier={1.4}
                     >
-                      {RECITATION_DAYS_MAP[day]}
+                      {DAY_LETTERS[day]}
                     </Text>
                   </Pressable>
                 );
@@ -374,146 +433,111 @@ export function CreateGroupScreen({ onSuccess }: CreateGroupScreenProps) {
             </View>
           </FormField>
 
-          {/* 4. Staff Assignment Wrapper */}
-          <View className="border-t border-gray-100 dark:border-gray-800 pt-4 gap-4">
-            <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right">
-              تعيين الكادر المشرف
-            </Text>
-
-            {isLoadingStaff ? (
-              <View testID="staff-loading-skeleton" className="gap-3">
-                <SkeletonLoader count={2} variant="row" />
-              </View>
-            ) : staffError ? (
-              <View
-                className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 gap-2"
-                style={{ borderCurve: 'continuous' }}
+          {/* 4. Staff */}
+          {isLoadingStaff ? (
+            <View testID="staff-loading-skeleton" className="w-full">
+              <SkeletonLoader count={2} variant="row" />
+            </View>
+          ) : staffError ? (
+            <Banner
+              tone="error"
+              message={staffError}
+              onRetry={fetchStaff}
+              testID="staff-error"
+            />
+          ) : (
+            <>
+              <FormField
+                label="المعلّم"
+                required
+                error={errors.teacher_id}
+                testID="teacher-select-field"
+                className="mb-0"
               >
-                <Text className="text-xs text-destructive-700 dark:text-destructive-300 text-right">
-                  {staffError}
-                </Text>
-                <Button
-                  label="إعادة المحاولة"
-                  variant="outline"
-                  onPress={fetchStaff}
-                  testID="retry-staff-button"
+                <StaffPickerRow
+                  selected={selectedTeacher}
+                  placeholder={
+                    teachers.length === 0
+                      ? 'لا يوجد معلمون مسجلون حاليًا'
+                      : 'اختر المعلّم'
+                  }
+                  roleLabel="معلّم"
+                  error={Boolean(errors.teacher_id)}
+                  disabled={isSubmitting || teachers.length === 0}
+                  onPress={() => setOpenPicker('teacher')}
+                  testID="teacher-picker"
                 />
-              </View>
-            ) : (
-              <>
-                {/* Teacher Selection */}
-                <FormField
-                  label="المعلم المشرف"
-                  required
-                  error={errors.teacher_id}
-                  testID="teacher-select-field"
-                >
-                  {teachers.length === 0 ? (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 text-right py-2">
-                      لا يوجد معلمون مسجلون حالياً
-                    </Text>
-                  ) : (
-                    <View className="gap-2">
-                      {teachers.map((t) => {
-                        const isSelected = teacherId === t.id;
-                        return (
-                          <Pressable
-                            key={t.id}
-                            testID={`teacher-option-${t.id}`}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: isSelected }}
-                            accessibilityLabel={t.full_name || t.email}
-                            onPress={() => handleTeacherSelect(t.id)}
-                            disabled={isSubmitting}
-                            className={`p-3 rounded-xl border flex-row-reverse items-center justify-between ${
-                              isSelected
-                                ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                                : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'
-                            }`}
-                            style={{ borderCurve: 'continuous' }}
-                          >
-                            <Text
-                              className={`text-sm font-semibold text-right ${
-                                isSelected
-                                  ? 'text-primary dark:text-primary-400'
-                                  : 'text-gray-900 dark:text-gray-100'
-                              }`}
-                            >
-                              {t.full_name || t.email}
-                            </Text>
-                            {isSelected && (
-                              <View className="w-2.5 h-2.5 rounded-full bg-primary" />
-                            )}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
-                </FormField>
+              </FormField>
 
-                {/* Assistant Selection */}
-                <FormField
-                  label="المساعد الإداري"
-                  required
-                  error={errors.assistant_id}
-                  testID="assistant-select-field"
-                >
-                  {assistants.length === 0 ? (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 text-right py-2">
-                      لا يوجد مساعدون إداريون مسجلون حالياً
-                    </Text>
-                  ) : (
-                    <View className="gap-2">
-                      {assistants.map((a) => {
-                        const isSelected = assistantId === a.id;
-                        return (
-                          <Pressable
-                            key={a.id}
-                            testID={`assistant-option-${a.id}`}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: isSelected }}
-                            accessibilityLabel={a.full_name || a.email}
-                            onPress={() => handleAssistantSelect(a.id)}
-                            disabled={isSubmitting}
-                            className={`p-3 rounded-xl border flex-row-reverse items-center justify-between ${
-                              isSelected
-                                ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                                : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900'
-                            }`}
-                            style={{ borderCurve: 'continuous' }}
-                          >
-                            <Text
-                              className={`text-sm font-semibold text-right ${
-                                isSelected
-                                  ? 'text-primary dark:text-primary-400'
-                                  : 'text-gray-900 dark:text-gray-100'
-                              }`}
-                            >
-                              {a.full_name || a.email}
-                            </Text>
-                            {isSelected && (
-                              <View className="w-2.5 h-2.5 rounded-full bg-primary" />
-                            )}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
-                </FormField>
-              </>
-            )}
-          </View>
+              <FormField
+                label="المساعد"
+                required
+                error={errors.assistant_id}
+                testID="assistant-select-field"
+                className="mb-0"
+              >
+                <StaffPickerRow
+                  selected={selectedAssistant}
+                  placeholder={
+                    assistants.length === 0
+                      ? 'لا يوجد مساعدون إداريون مسجلون حاليًا'
+                      : 'اختر المساعد'
+                  }
+                  roleLabel="مساعد"
+                  error={Boolean(errors.assistant_id)}
+                  disabled={isSubmitting || assistants.length === 0}
+                  onPress={() => setOpenPicker('assistant')}
+                  testID="assistant-picker"
+                />
+              </FormField>
+            </>
+          )}
         </View>
 
         {/* Submit Button */}
         <Button
-          label="إنشاء الحلقة"
+          label="إنشاء المجموعة"
           onPress={handleSubmit}
           loading={isSubmitting}
           disabled={isSubmitting}
           testID="create-group-submit-button"
+          className="mt-2"
         />
       </ScrollView>
+
+      <StaffPickerSheet
+        visible={openPicker !== null}
+        title={openPicker === 'assistant' ? 'اختيار المساعد' : 'اختيار المعلّم'}
+        subtitle="الاختيار من قائمة المستخدمين بالدور المطابق."
+        sections={
+          openPicker === 'assistant'
+            ? [
+                {
+                  key: 'assistant',
+                  label: 'المساعد',
+                  roleLabel: 'مساعد',
+                  candidates: assistants,
+                  selectedId: assistantId,
+                  emptyMessage: 'لا يوجد مساعدون إداريون مسجلون حاليًا',
+                },
+              ]
+            : [
+                {
+                  key: 'teacher',
+                  label: 'المعلّم',
+                  roleLabel: 'معلّم',
+                  candidates: teachers,
+                  selectedId: teacherId,
+                  emptyMessage: 'لا يوجد معلمون مسجلون حاليًا',
+                },
+              ]
+        }
+        activeKey={openPicker ?? 'teacher'}
+        onSelect={handleStaffSelect}
+        onClose={() => setOpenPicker(null)}
+        testID="staff-picker"
+        optionTestID={(key, id) => `${key}-option-${id}`}
+      />
     </KeyboardAvoidingView>
   );
 }

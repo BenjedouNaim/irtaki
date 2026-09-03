@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { DailyReportFormScreen } from '@/features/dailyReports/screens/DailyReportFormScreen';
 import { isDailyReportType } from '@/features/dailyReports/utils/dailyReportForm';
 
@@ -17,20 +18,20 @@ export default function DailyReportFormRoute() {
   if (!isDailyReportType(type)) {
     return (
       <View
-        className="flex-1 items-center justify-center p-5 gap-4 bg-white dark:bg-gray-950"
+        className="flex-1 justify-center px-4 bg-canvas dark:bg-canvas-dark"
         testID="daily-report-form-invalid-type"
       >
-        <Text className="text-base text-gray-700 dark:text-gray-300 text-center">
-          يرجى اختيار نوع التقرير أولاً.
-        </Text>
-        <Button
-          label="اختيار نوع التقرير"
-          variant="outline"
-          onPress={() =>
-            router.replace('/(app)/student/daily-report/type-selection')
-          }
-          testID="daily-report-form-choose-type-button"
-        />
+        <EmptyState message="يرجى اختيار نوع التقرير أولاً." icon="pen">
+          <Button
+            label="اختيار نوع التقرير"
+            variant="outline"
+            onPress={() =>
+              router.replace('/(app)/student/daily-report/type-selection')
+            }
+            testID="daily-report-form-choose-type-button"
+            className="mt-2"
+          />
+        </EmptyState>
       </View>
     );
   }

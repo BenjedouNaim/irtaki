@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { StaffReassignmentPanel } from '../StaffReassignmentPanel';
 import * as groupsApi from '@/shared/api/groups.client';
 import * as usersApi from '@/shared/api/users.client';
@@ -8,7 +8,7 @@ import { ApiError } from '@/shared/api/types';
 jest.mock('@/shared/api/groups.client');
 jest.mock('@/shared/api/users.client');
 
-describe('StaffReassignmentPanel Component', () => {
+describe('StaffReassignmentPanel (Figma SCR-29 Staff card + Reassign staff sheet)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
   const mockCurrentTeacher = {
@@ -51,27 +51,7 @@ describe('StaffReassignmentPanel Component', () => {
     },
   ];
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('renders loading skeleton initially while fetching staff', () => {
-    jest
-      .spyOn(usersApi, 'listUsersByRole')
-      .mockImplementation(() => new Promise(() => {})); // Never resolves
-
-    const { getByTestId } = render(
-      <StaffReassignmentPanel
-        groupId={mockGroupId}
-        currentTeacher={mockCurrentTeacher}
-        currentAssistant={mockCurrentAssistant}
-      />,
-    );
-
-    expect(getByTestId('staff-reassign-loading')).toBeTruthy();
-  });
-
-  it('renders staff options with current teacher and assistant selected, and save button disabled', async () => {
+  const mockStaffLists = () =>
     jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
       if (role === 'Teacher') {
         return Promise.resolve({ data: mockTeachersList });
@@ -79,7 +59,26 @@ describe('StaffReassignmentPanel Component', () => {
       return Promise.resolve({ data: mockAssistantsList });
     });
 
-    const { findByText, getByTestId } = render(
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  /** Waits for the candidates to load, then opens the sheet. */
+  async function openSheet(findByTestId: (id: string) => Promise<any>) {
+    const open = await findByTestId('staff-reassign-open-button');
+    await waitFor(() =>
+      expect(open.props.accessibilityState.disabled).toBe(false),
+    );
+    await act(async () => {});
+    fireEvent.press(open);
+  }
+
+  it('renders the current staff and a loading CTA while fetching the candidates', () => {
+    jest
+      .spyOn(usersApi, 'listUsersByRole')
+      .mockImplementation(() => new Promise(() => {})); // Never resolves
+
+    const { getByTestId, getByText } = render(
       <StaffReassignmentPanel
         groupId={mockGroupId}
         currentTeacher={mockCurrentTeacher}
@@ -87,22 +86,54 @@ describe('StaffReassignmentPanel Component', () => {
       />,
     );
 
-    expect(await findByText('الشيخ محمد الحالي')).toBeTruthy();
-    expect(await findByText('الأستاذ أحمد الحالي')).toBeTruthy();
-    expect(await findByText('الشيخ علي الجديد')).toBeTruthy();
-    expect(await findByText('الأستاذ كمال الجديد')).toBeTruthy();
+    expect(getByText('الطاقم')).toBeTruthy();
+    expect(getByTestId('staff-current-teacher')).toHaveTextContent(
+      'الشيخ محمد الحالي',
+    );
+    expect(getByTestId('staff-current-assistant')).toHaveTextContent(
+      'الأستاذ أحمد الحالي',
+    );
+    expect(getByTestId('staff-reassign-loading')).toBeTruthy();
+    expect(
+      getByTestId('staff-reassign-open-button').props.accessibilityState.busy,
+    ).toBe(true);
+  });
+
+  it('opens the sheet with the current teacher selected and the confirm CTA disabled', async () => {
+    mockStaffLists();
+
+    const { findByTestId, getByTestId, getByText, queryByText } = render(
+      <StaffReassignmentPanel
+        groupId={mockGroupId}
+        currentTeacher={mockCurrentTeacher}
+        currentAssistant={mockCurrentAssistant}
+      />,
+    );
+
+    const open = await findByTestId('staff-reassign-open-button');
+    await waitFor(() =>
+      expect(open.props.accessibilityState.disabled).toBe(false),
+    );
+    // Candidates live in the sheet only.
+    expect(queryByText('الشيخ علي الجديد')).toBeNull();
+
+    await act(async () => {});
+    fireEvent.press(open);
+
+    expect(getByTestId('reassign-staff-container')).toBeTruthy();
+    expect(getByText('الشيخ علي الجديد')).toBeTruthy();
+    expect(
+      getByTestId('reassign-teacher-option-teacher-1').props.accessibilityState
+        .selected,
+    ).toBe(true);
+    expect(getByText('الحالي')).toBeTruthy();
 
     const saveButton = getByTestId('reassign-staff-save-button');
     expect(saveButton.props.accessibilityState.disabled).toBe(true);
   });
 
-  it('enables save button when a new teacher is selected, and calls reassignStaff upon save', async () => {
-    jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
-      if (role === 'Teacher') {
-        return Promise.resolve({ data: mockTeachersList });
-      }
-      return Promise.resolve({ data: mockAssistantsList });
-    });
+  it('enables the confirm CTA when a new teacher is selected and calls reassignStaff with that role only', async () => {
+    mockStaffLists();
 
     const updatedGroupResponse: groupsApi.GroupListItemFull = {
       id: mockGroupId,
@@ -132,10 +163,8 @@ describe('StaffReassignmentPanel Component', () => {
       />,
     );
 
-    const newTeacherOption = await findByTestId(
-      'reassign-teacher-option-teacher-2',
-    );
-    fireEvent.press(newTeacherOption);
+    await openSheet(findByTestId);
+    fireEvent.press(getByTestId('reassign-teacher-option-teacher-2'));
 
     const saveButton = getByTestId('reassign-staff-save-button');
     expect(saveButton.props.accessibilityState.disabled).toBe(false);
@@ -150,13 +179,8 @@ describe('StaffReassignmentPanel Component', () => {
     expect(onReassignedMock).toHaveBeenCalledWith(updatedGroupResponse);
   });
 
-  it('enables save button when both new teacher and assistant are selected and submits both', async () => {
-    jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
-      if (role === 'Teacher') {
-        return Promise.resolve({ data: mockTeachersList });
-      }
-      return Promise.resolve({ data: mockAssistantsList });
-    });
+  it('switches to the assistant segment and submits both roles when both changed', async () => {
+    mockStaffLists();
 
     const updatedGroupResponse: groupsApi.GroupListItemFull = {
       id: mockGroupId,
@@ -177,7 +201,7 @@ describe('StaffReassignmentPanel Component', () => {
 
     const onReassignedMock = jest.fn();
 
-    const { findByTestId, getByTestId } = render(
+    const { findByTestId, getByTestId, queryByTestId } = render(
       <StaffReassignmentPanel
         groupId={mockGroupId}
         currentTeacher={mockCurrentTeacher}
@@ -186,19 +210,15 @@ describe('StaffReassignmentPanel Component', () => {
       />,
     );
 
-    const newTeacherOption = await findByTestId(
-      'reassign-teacher-option-teacher-2',
-    );
-    const newAssistantOption = await findByTestId(
-      'reassign-assistant-option-assistant-2',
-    );
+    await openSheet(findByTestId);
+    fireEvent.press(getByTestId('reassign-teacher-option-teacher-2'));
 
-    fireEvent.press(newTeacherOption);
-    fireEvent.press(newAssistantOption);
+    expect(queryByTestId('reassign-assistant-option-assistant-2')).toBeNull();
+    fireEvent.press(getByTestId('reassign-staff-role-assistant'));
+    fireEvent.press(getByTestId('reassign-assistant-option-assistant-2'));
 
-    const saveButton = getByTestId('reassign-staff-save-button');
     await act(async () => {
-      fireEvent.press(saveButton);
+      fireEvent.press(getByTestId('reassign-staff-save-button'));
     });
 
     expect(reassignSpy).toHaveBeenCalledWith(mockGroupId, {
@@ -208,13 +228,8 @@ describe('StaffReassignmentPanel Component', () => {
     expect(onReassignedMock).toHaveBeenCalledWith(updatedGroupResponse);
   });
 
-  it('displays error banner when reassignStaff fails with 422 role mismatch', async () => {
-    jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
-      if (role === 'Teacher') {
-        return Promise.resolve({ data: mockTeachersList });
-      }
-      return Promise.resolve({ data: mockAssistantsList });
-    });
+  it('displays the error banner inside the sheet when reassignStaff fails with 422', async () => {
+    mockStaffLists();
 
     jest.spyOn(groupsApi, 'reassignStaff').mockRejectedValueOnce(
       new ApiError({
@@ -239,21 +254,18 @@ describe('StaffReassignmentPanel Component', () => {
       />,
     );
 
-    const newTeacherOption = await findByTestId(
-      'reassign-teacher-option-teacher-2',
-    );
-    fireEvent.press(newTeacherOption);
+    await openSheet(findByTestId);
+    fireEvent.press(getByTestId('reassign-teacher-option-teacher-2'));
 
-    const saveButton = getByTestId('reassign-staff-save-button');
     await act(async () => {
-      fireEvent.press(saveButton);
+      fireEvent.press(getByTestId('reassign-staff-save-button'));
     });
 
     expect(await findByText('المستخدم المحدد ليس معلماً مؤهلاً')).toBeTruthy();
     expect(getByTestId('reassign-staff-error')).toBeTruthy();
   });
 
-  it('displays fetch error banner when staff loading fails and retries upon pressing retry', async () => {
+  it('displays the fetch error banner when staff loading fails and retries upon pressing retry', async () => {
     jest
       .spyOn(usersApi, 'listUsersByRole')
       .mockRejectedValueOnce(new Error('Network error'))
@@ -264,7 +276,7 @@ describe('StaffReassignmentPanel Component', () => {
         return Promise.resolve({ data: mockAssistantsList });
       });
 
-    const { findByTestId, getByTestId, findByText } = render(
+    const { findByTestId, getByTestId, queryByTestId } = render(
       <StaffReassignmentPanel
         groupId={mockGroupId}
         currentTeacher={mockCurrentTeacher}
@@ -273,12 +285,17 @@ describe('StaffReassignmentPanel Component', () => {
     );
 
     expect(await findByTestId('staff-reassign-fetch-error')).toBeTruthy();
+    expect(
+      getByTestId('staff-reassign-open-button').props.accessibilityState
+        .disabled,
+    ).toBe(true);
 
-    // Click retry button
     await act(async () => {
-      fireEvent.press(getByTestId('staff-reassign-retry-button'));
+      fireEvent.press(getByTestId('staff-reassign-fetch-error-retry-button'));
     });
 
-    expect(await findByText('الشيخ محمد الحالي')).toBeTruthy();
+    expect(queryByTestId('staff-reassign-fetch-error')).toBeNull();
+    const open = await findByTestId('staff-reassign-open-button');
+    expect(open.props.accessibilityState.disabled).toBe(false);
   });
 });

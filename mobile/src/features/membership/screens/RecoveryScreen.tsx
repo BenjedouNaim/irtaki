@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
-import { Button } from '@/shared/components/Button';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import {
+  TopBar,
+  Banner,
+  StatusBadge,
+  SkeletonLoader,
+} from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import {
   getMembershipRecovery,
   MembershipRecoveryData,
@@ -11,6 +17,12 @@ import {
   PaymentRecordRecoveryEntry,
 } from '@/shared/api/memberships.client';
 import { ApiError } from '@/shared/api/types';
+import {
+  formatArabicCount,
+  formatArabicDate,
+  REPORT_COUNT_FORMS,
+  CYCLE_COUNT_FORMS,
+} from '@/shared/utils/format';
 
 export function getRecitationDayName(day: number): string {
   switch (day) {
@@ -46,11 +58,140 @@ function mapReportType(type: string): string {
   }
 }
 
+/** Same wording as the SCR-10 reason picker (UF §33 consistency). */
+function mapAbsenceReason(reason: string): string {
+  switch (reason) {
+    case 'Sick':
+      return 'مريض';
+    case 'Studying':
+      return 'دراسة';
+    case 'Other':
+      return 'سبب آخر';
+    default:
+      return reason;
+  }
+}
+
+function describeDailyReport(report: DailyReportRecoveryEntry): string {
+  const type = mapReportType(report.type);
+  if (report.type === 'Absent' && report.absence_reason) {
+    return `${type} — ${mapAbsenceReason(report.absence_reason)}`;
+  }
+  return type;
+}
+
+function describeWeeklyReport(report: WeeklyReportRecoveryEntry): string {
+  const attendance = report.attended_recitation_call ? 'حضر' : 'لم يحضر';
+  return `فائت ${report.missed_daily_reports} · ${attendance}`;
+}
+
 interface RecoveryScreenProps {
   membershipId: string;
 }
 
+const CARD =
+  'w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-[18px] py-4';
+
+function SummaryRow({
+  label,
+  value,
+  testID,
+}: {
+  label: string;
+  value: React.ReactNode;
+  testID?: string;
+}) {
+  return (
+    <View
+      className={`${rowStart} items-center justify-between h-11 gap-3 w-full`}
+      testID={testID}
+    >
+      <Text
+        className={`flex-1 ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      >
+        {label}
+      </Text>
+      {typeof value === 'string' ? (
+        <Text
+          selectable
+          className={`${typography.bodyMdMedium} text-left text-fg dark:text-fg-dark`}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      ) : (
+        value
+      )}
+    </View>
+  );
+}
+
+function SectionHead({ title, count }: { title: string; count: string }) {
+  return (
+    <View className={`${rowStart} items-center justify-between w-full`}>
+      <Text
+        className={`${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      >
+        {title}
+      </Text>
+      <Text
+        className={`${typography.labelSm} text-left text-fg-tertiary dark:text-fg-tertiary-dark`}
+      >
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+function RecordRow({
+  primary,
+  secondary,
+  testID,
+}: {
+  primary: string;
+  secondary: string;
+  testID: string;
+}) {
+  return (
+    <View
+      testID={testID}
+      className={`${rowStart} items-center justify-between gap-3 py-2 w-full`}
+    >
+      <Text
+        className={`${typography.bodyMd} text-right text-fg dark:text-fg-dark`}
+        style={{ fontVariant: ['tabular-nums'] }}
+      >
+        {primary}
+      </Text>
+      <Text
+        className={`flex-1 ${typography.bodySm} text-left text-fg-secondary dark:text-fg-secondary-dark`}
+        numberOfLines={2}
+      >
+        {secondary}
+      </Text>
+    </View>
+  );
+}
+
+function EmptyLine({ message, testID }: { message: string; testID: string }) {
+  return (
+    <View testID={testID} className="w-full py-2">
+      <Text
+        className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      >
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * SCR-31 Recovery (Figma 41:429): the read-only view of a terminated
+ * membership's soft-deleted records — an info banner, the membership
+ * summary and the daily / weekly / payment record lists (API-028).
+ */
 export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
+  const colors = useThemeColors();
   const [data, setData] = useState<MembershipRecoveryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -89,301 +230,185 @@ export default function RecoveryScreen({ membershipId }: RecoveryScreenProps) {
     fetchRecovery();
   }, [fetchRecovery]);
 
+  const title = data?.membership.user.full_name || (data ? 'غير محدد' : '');
+
+  let body: React.ReactElement;
   if (isLoading) {
-    return (
-      <View
-        className="flex-1 bg-gray-50 dark:bg-gray-950 p-4"
-        testID="recovery-screen"
-      >
+    body = (
+      <View className="px-4 pt-1">
         <SkeletonLoader variant="row" count={4} testID="recovery-skeleton" />
       </View>
     );
-  }
-
-  if (errorMessage || !data) {
-    return (
-      <View
-        className="flex-1 bg-gray-50 dark:bg-gray-950 p-4"
-        testID="recovery-screen"
-      >
-        <View
-          className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
-          style={{ borderCurve: 'continuous' }}
+  } else if (errorMessage || !data) {
+    body = (
+      <View className="px-4 pt-1">
+        <Banner
+          tone="error"
+          message={errorMessage || 'تعذر العثور على بيانات الاسترجاع'}
+          onRetry={() => {
+            setIsLoading(true);
+            fetchRecovery();
+          }}
           testID="recovery-error"
+        />
+      </View>
+    );
+  } else {
+    const { membership, daily_reports, weekly_reports, payment_records } = data;
+    body = (
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+          gap: 14,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.textBrand}
+          />
+        }
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <Banner
+          tone="info"
+          message="سجلات محذوفة منطقيًا — عرض للقراءة فقط، لا استعادة للعضوية."
+          testID="recovery-info-banner"
+        />
+
+        {/* 1. Membership summary */}
+        <View
+          className={`${CARD} gap-1.5 ${itemsStart}`}
+          style={{ borderCurve: 'continuous' }}
+          testID="membership-info-card"
         >
           <Text
-            selectable
-            className="text-sm font-medium text-destructive-700 dark:text-destructive-300 text-right leading-5"
+            className={`w-full ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
           >
-            {errorMessage || 'تعذر العثور على بيانات الاسترجاع'}
+            العضوية
           </Text>
-          <Button
-            label="إعادة المحاولة"
-            variant="outline"
-            onPress={() => {
-              setIsLoading(true);
-              fetchRecovery();
-            }}
-            testID="retry-button"
+          <SummaryRow label="المجموعة" value={membership.group.name} />
+          <SummaryRow
+            label="من"
+            value={formatArabicDate(membership.started_at)}
+          />
+          <SummaryRow
+            label="إلى"
+            value={
+              membership.ended_at ? formatArabicDate(membership.ended_at) : '—'
+            }
+          />
+          <SummaryRow
+            label="الحالة"
+            value={
+              <StatusBadge
+                status={membership.state === 'Active' ? 'نشطة' : 'منتهية'}
+                variant={membership.state === 'Active' ? 'success' : 'neutral'}
+                testID="membership-state-badge"
+              />
+            }
           />
         </View>
-      </View>
+
+        {/* 2. Daily reports */}
+        <View
+          className={`${CARD} gap-2 ${itemsStart}`}
+          style={{ borderCurve: 'continuous' }}
+          testID="daily-reports-card"
+        >
+          <SectionHead
+            title="التقارير اليومية"
+            count={formatArabicCount(daily_reports.length, REPORT_COUNT_FORMS)}
+          />
+          {daily_reports.length === 0 ? (
+            <EmptyLine
+              message="لا توجد تقارير يومية محذوفة"
+              testID="daily-reports-empty"
+            />
+          ) : (
+            daily_reports.map((report) => (
+              <RecordRow
+                key={report.id}
+                testID={`daily-report-row-${report.id}`}
+                primary={formatArabicDate(report.report_date, { year: false })}
+                secondary={describeDailyReport(report)}
+              />
+            ))
+          )}
+        </View>
+
+        {/* 3. Weekly reports */}
+        <View
+          className={`${CARD} gap-2 ${itemsStart}`}
+          style={{ borderCurve: 'continuous' }}
+          testID="weekly-reports-card"
+        >
+          <SectionHead
+            title="التقارير الأسبوعية"
+            count={formatArabicCount(weekly_reports.length, REPORT_COUNT_FORMS)}
+          />
+          {weekly_reports.length === 0 ? (
+            <EmptyLine
+              message="لا توجد تقارير أسبوعية محذوفة"
+              testID="weekly-reports-empty"
+            />
+          ) : (
+            weekly_reports.map((report) => (
+              <RecordRow
+                key={report.id}
+                testID={`weekly-report-row-${report.id}`}
+                primary={`أسبوع ${formatArabicDate(report.week_start, {
+                  year: false,
+                })} — ${formatArabicDate(report.week_end, { year: false })}`}
+                secondary={describeWeeklyReport(report)}
+              />
+            ))
+          )}
+        </View>
+
+        {/* 4. Payment records */}
+        <View
+          className={`${CARD} gap-2 ${itemsStart}`}
+          style={{ borderCurve: 'continuous' }}
+          testID="payment-records-card"
+        >
+          <SectionHead
+            title="المدفوعات"
+            count={formatArabicCount(payment_records.length, CYCLE_COUNT_FORMS)}
+          />
+          {payment_records.length === 0 ? (
+            <EmptyLine
+              message="لا توجد سجلات دفع محذوفة"
+              testID="payment-records-empty"
+            />
+          ) : (
+            payment_records.map((payment: PaymentRecordRecoveryEntry) => (
+              <RecordRow
+                key={payment.id}
+                testID={`payment-record-row-${payment.id}`}
+                primary={`الدورة ${payment.cycle_index + 1}`}
+                secondary={`${payment.amount} د.ت · ${
+                  payment.paid_at
+                    ? `مدفوع في ${formatArabicDate(payment.paid_at, { year: false })}`
+                    : 'غير مدفوع'
+                }`}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
     );
   }
 
-  const { membership, daily_reports, weekly_reports, payment_records } = data;
-
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
-      contentContainerStyle={{ padding: 16, gap: 16 }}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-      }
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="recovery-screen"
     >
-      {/* 1. Membership Details Card */}
-      <View
-        className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-        style={{ borderCurve: 'continuous' }}
-        testID="membership-info-card"
-      >
-        <View className="flex-row-reverse justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-800">
-          <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right">
-            بيانات العضوية
-          </Text>
-          <StatusBadge
-            status={membership.state === 'Active' ? 'نشطة' : 'محذوفة'}
-            variant={membership.state === 'Active' ? 'info' : 'error'}
-            testID="membership-state-badge"
-          />
-        </View>
-
-        <View className="flex-row-reverse justify-between items-center py-1.5 border-b border-gray-50 dark:border-gray-800/50">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-            اسم الطالب
-          </Text>
-          <Text
-            selectable
-            className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right"
-          >
-            {membership.user.full_name || 'غير محدد'}
-          </Text>
-        </View>
-
-        <View className="flex-row-reverse justify-between items-center py-1.5 border-b border-gray-50 dark:border-gray-800/50">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-            الجنس
-          </Text>
-          <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
-            {membership.user.gender === 'Male'
-              ? 'ذكر'
-              : membership.user.gender === 'Female'
-                ? 'أنثى'
-                : 'غير محدد'}
-          </Text>
-        </View>
-
-        <View className="flex-row-reverse justify-between items-center py-1.5 border-b border-gray-50 dark:border-gray-800/50">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-            الحلقة
-          </Text>
-          <Text
-            selectable
-            className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right"
-          >
-            {membership.group.name}
-          </Text>
-        </View>
-
-        <View className="flex-row-reverse justify-between items-center py-1.5 border-b border-gray-50 dark:border-gray-800/50">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-            يوم التسميع
-          </Text>
-          <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
-            {getRecitationDayName(membership.group.recitation_day)}
-          </Text>
-        </View>
-
-        <View className="flex-row-reverse justify-between items-center py-1.5 border-b border-gray-50 dark:border-gray-800/50">
-          <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-            تاريخ البدء
-          </Text>
-          <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
-            {membership.started_at}
-          </Text>
-        </View>
-
-        {membership.ended_at && (
-          <View className="flex-row-reverse justify-between items-center py-1.5">
-            <Text className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
-              تاريخ الإنهاء
-            </Text>
-            <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
-              {membership.ended_at}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* 2. Daily Reports Card */}
-      <View
-        className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-        style={{ borderCurve: 'continuous' }}
-        testID="daily-reports-card"
-      >
-        <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right pb-2 border-b border-gray-100 dark:border-gray-800">
-          التقارير اليومية المحذوفة ({daily_reports.length})
-        </Text>
-        {daily_reports.length === 0 ? (
-          <View testID="daily-reports-empty" className="py-4 items-center">
-            <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              لا توجد تقارير يومية محذوفة
-            </Text>
-          </View>
-        ) : (
-          <View className="gap-2.5">
-            {daily_reports.map((report: DailyReportRecoveryEntry) => (
-              <View
-                key={report.id}
-                testID={`daily-report-row-${report.id}`}
-                className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 gap-2"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View className="flex-row-reverse justify-between items-center">
-                  <Text className="text-sm font-bold text-gray-900 dark:text-gray-100 text-right">
-                    {report.report_date}
-                  </Text>
-                  <StatusBadge
-                    status={mapReportType(report.type)}
-                    variant={
-                      report.type === 'Normal'
-                        ? 'success'
-                        : report.type === 'Revision'
-                          ? 'info'
-                          : 'warning'
-                    }
-                  />
-                </View>
-                {report.absence_reason && (
-                  <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    سبب الغياب: {report.absence_reason}
-                  </Text>
-                )}
-                {report.deleted_at && (
-                  <Text className="text-xs text-gray-400 dark:text-gray-500 text-right">
-                    تاريخ الحذف: {report.deleted_at.split('T')[0]}
-                  </Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* 3. Weekly Reports Card */}
-      <View
-        className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-        style={{ borderCurve: 'continuous' }}
-        testID="weekly-reports-card"
-      >
-        <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right pb-2 border-b border-gray-100 dark:border-gray-800">
-          التقارير الأسبوعية المحذوفة ({weekly_reports.length})
-        </Text>
-        {weekly_reports.length === 0 ? (
-          <View testID="weekly-reports-empty" className="py-4 items-center">
-            <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              لا توجد تقارير أسبوعية محذوفة
-            </Text>
-          </View>
-        ) : (
-          <View className="gap-2.5">
-            {weekly_reports.map((report: WeeklyReportRecoveryEntry) => (
-              <View
-                key={report.id}
-                testID={`weekly-report-row-${report.id}`}
-                className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 gap-2"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View className="flex-row-reverse justify-between items-center">
-                  <Text className="text-sm font-bold text-gray-900 dark:text-gray-100 text-right">
-                    {report.week_start} إلى {report.week_end}
-                  </Text>
-                  <StatusBadge
-                    status={report.state === 'Finalised' ? 'مؤكد' : 'مفتوح'}
-                    variant={
-                      report.state === 'Finalised' ? 'success' : 'neutral'
-                    }
-                  />
-                </View>
-                <View className="flex-row-reverse justify-between">
-                  <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    حضور التسميع:{' '}
-                    {report.attended_recitation_call ? 'نعم' : 'لا'}
-                  </Text>
-                  <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    الأيام المتوقعة: {report.expected_days}
-                  </Text>
-                </View>
-                {report.deleted_at && (
-                  <Text className="text-xs text-gray-400 dark:text-gray-500 text-right">
-                    تاريخ الحذف: {report.deleted_at.split('T')[0]}
-                  </Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* 4. Payment Records Card */}
-      <View
-        className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-3"
-        style={{ borderCurve: 'continuous' }}
-        testID="payment-records-card"
-      >
-        <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right pb-2 border-b border-gray-100 dark:border-gray-800">
-          سجلات الدفع المحذوفة ({payment_records.length})
-        </Text>
-        {payment_records.length === 0 ? (
-          <View testID="payment-records-empty" className="py-4 items-center">
-            <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              لا توجد سجلات دفع محذوفة
-            </Text>
-          </View>
-        ) : (
-          <View className="gap-2.5">
-            {payment_records.map((payment: PaymentRecordRecoveryEntry) => (
-              <View
-                key={payment.id}
-                testID={`payment-record-row-${payment.id}`}
-                className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 gap-2"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View className="flex-row-reverse justify-between items-center">
-                  <Text className="text-sm font-bold text-gray-900 dark:text-gray-100 text-right">
-                    الدورة {payment.cycle_index + 1}
-                  </Text>
-                  <Text className="text-sm font-bold text-primary-600 dark:text-primary-400 text-right">
-                    {payment.amount} د.ت
-                  </Text>
-                </View>
-                <View className="flex-row-reverse justify-between">
-                  <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                    تاريخ الدفع:{' '}
-                    {payment.paid_at ? payment.paid_at.split('T')[0] : '—'}
-                  </Text>
-                  {payment.deleted_at && (
-                    <Text className="text-xs text-gray-400 dark:text-gray-500 text-right">
-                      تاريخ الحذف: {payment.deleted_at.split('T')[0]}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      <TopBar title={title} testID="recovery-top-bar" />
+      {body}
+    </View>
   );
 }

@@ -1,12 +1,32 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView } from 'react-native';
 import { Href, useRouter } from 'expo-router';
-import { DailyReportDto } from '@/shared/api/dailyReports.client';
-import { YesNoToggle } from '../components/YesNoToggle';
-import { QuranRangeField } from '../components/QuranRangeField';
-import { TimeWindowField } from '../components/TimeWindowField';
-import { AbsenceReasonPicker } from '../components/AbsenceReasonPicker';
-import { TimeWindowDraft } from '../utils/dailyReportForm';
+import { Banner } from '@/shared/components/Banner';
+import { MetricRow } from '@/shared/components/MetricRow';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { TopBar } from '@/shared/components/TopBar';
+import {
+  AyahRangeDto,
+  DailyReportDto,
+  TimeWindowDto,
+} from '@/shared/api/dailyReports.client';
+import { useSurahs } from '@/features/progress/hooks/useSurahs';
+import {
+  buildSurahIndex,
+  formatAyahRange,
+} from '@/features/progress/utils/ayahRange';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
+import {
+  ABSENCE_REASON_LABELS,
+  OTHER_REASON_NOTE,
+} from '../components/AbsenceReasonPicker';
+import { dailyReportBadge } from '../components/DailyReportRow';
+import {
+  formatArabicDate,
+  formatLocalTime,
+  formatTimeWindow,
+} from '../utils/arabicDate';
 
 export interface ReportDetailScreenProps {
   /** The already-fetched row (F-DR-07: no endpoint of its own). */
@@ -19,35 +39,66 @@ export interface ReportDetailScreenProps {
   homeHref?: Href;
 }
 
-/** Same titles as SCR-10 (UF §33: one canonical term per concept). */
-const TITLES: Record<DailyReportDto['type'], string> = {
-  Normal: 'تقرير عادي',
-  Revision: 'تقرير مراجعة',
-  Absent: 'تقرير غياب',
-};
+/** Figma SCR-15: the immutability reminder under the head row. */
+const FINAL_NOTE = 'التقارير المرسلة نهائية — لا تعديل ولا حذف.';
 
-const EMPTY_WINDOW: TimeWindowDraft = { from: null, to: null };
+const YES = 'نعم';
+const NO = 'لا';
+const UNANSWERED = '—';
 
-function toWindow(window: DailyReportDto['memo_time']): TimeWindowDraft {
-  return window ? { from: window.from, to: window.to } : EMPTY_WINDOW;
+function yesNo(value: boolean | null): string {
+  if (value === null) return UNANSWERED;
+  return value ? YES : NO;
 }
 
-const noop = () => {};
+function timeWindow(value: TimeWindowDto | null): string {
+  return value ? formatTimeWindow(value.from, value.to) : UNANSWERED;
+}
+
+/** Figma SCR-15 section card: surface, 1px border/default, radius lg, overline + 44px rows. */
+function DetailSection({
+  label,
+  testID,
+  children,
+}: {
+  label: string;
+  testID: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      testID={testID}
+      className={`w-full px-4 py-3 gap-1 rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark ${itemsStart}`}
+      style={{ borderCurve: 'continuous' }}
+    >
+      <Text
+        className={`w-full ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        accessibilityRole="header"
+      >
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
 
 /**
- * SCR-15 Report Detail (F-DR-07, UF §15 / §28): "Same layout as
- * submission form, all fields disabled". Rendered purely from the row the
- * tapping list already holds — this screen owns no query and makes no
- * request. It reuses SCR-10's field components in their disabled state
- * with the report's values, keeping the two screens visually identical
- * without duplicating the form's layout logic. There is no submit, no
- * discard prompt and no editing path (BR-22: reports are immutable).
+ * SCR-15 Report Detail (F-DR-07, UF §15 / §28; Figma 31:981): TopBar
+ * "تقرير الثلاثاء 2 سبتمبر", head row (type badge + submission time), the
+ * immutability Banner, then one section card per SCR-10 section with a
+ * read-only MetricRow per field. Rendered purely from the row the tapping
+ * list already holds — this screen owns no query and makes no request
+ * (the surah reference data is the cached `useSurahs` list). There is no
+ * submit, no discard prompt and no editing path (BR-22: reports are
+ * immutable).
  */
 export function ReportDetailScreen({
   report,
   homeHref = '/(app)/student',
 }: ReportDetailScreenProps) {
   const router = useRouter();
+  const { data: surahs } = useSurahs();
+  const surahIndex = useMemo(() => buildSurahIndex(surahs ?? []), [surahs]);
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -57,196 +108,154 @@ export function ReportDetailScreen({
     }
   };
 
+  const range = (value: AyahRangeDto | null): string =>
+    value ? formatAyahRange(surahIndex, value, { collapse: true }) : UNANSWERED;
+
+  const badge = dailyReportBadge(report);
   const hasMemo = report.memo_range !== null;
   const hasRev = report.rev_range !== null;
 
   let body: React.ReactElement;
   if (report.type === 'Absent') {
+    const reason = report.absence_reason;
     body = (
-      <AbsenceReasonPicker
-        value={report.absence_reason}
-        onChange={noop}
-        disabled
-        testID="absence-reason-picker"
-      />
+      <DetailSection label="الغياب" testID="absence-section">
+        <MetricRow
+          label="السبب"
+          value={reason ? ABSENCE_REASON_LABELS[reason] : UNANSWERED}
+          hint={reason === 'Other' ? OTHER_REASON_NOTE : undefined}
+          testID="report-detail-absence-reason"
+        />
+      </DetailSection>
     );
   } else if (report.type === 'Revision') {
     body = (
-      <View className="w-full">
-        <QuranRangeField
-          label="نطاق المراجعة"
-          rangeType="revision"
-          value={report.rev_range}
-          onChange={noop}
-          disabled
-          testID="rev-range-field"
+      <DetailSection label="المراجعة" testID="rev-section">
+        <MetricRow
+          label="النطاق"
+          value={range(report.rev_range)}
+          testID="report-detail-rev-range"
         />
-        <TimeWindowField
-          label="وقت المراجعة"
-          value={toWindow(report.rev_time)}
-          onChange={noop}
-          disabled
-          testID="rev-time-field"
+        <MetricRow
+          label="الوقت"
+          value={timeWindow(report.rev_time)}
+          testID="report-detail-rev-time"
         />
-      </View>
+      </DetailSection>
     );
   } else {
     body = (
-      <View className="w-full gap-2">
+      <>
         {/* Section A — Memorization */}
-        <View
-          className="w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-          style={{ borderCurve: 'continuous' }}
-          testID="memo-section"
-        >
-          <Text
-            className="text-base font-bold text-gray-900 dark:text-gray-100 text-right mb-3"
-            accessibilityRole="header"
-          >
-            الحفظ
-          </Text>
-          <YesNoToggle
-            question="هل حفظت آيات جديدة اليوم؟"
-            value={hasMemo}
-            onChange={noop}
-            disabled
-            testID="memo-gate"
+        <DetailSection label="الحفظ" testID="memo-section">
+          <MetricRow
+            label="حفظت آيات جديدة"
+            value={hasMemo ? YES : NO}
+            testID="report-detail-memo-gate"
           />
           {hasMemo ? (
-            <View testID="memo-details">
-              <QuranRangeField
-                label="نطاق الحفظ"
-                rangeType="memorization"
-                value={report.memo_range}
-                onChange={noop}
-                disabled
-                testID="memo-range-field"
+            <View className="w-full gap-1" testID="memo-details">
+              <MetricRow
+                label="النطاق"
+                value={range(report.memo_range)}
+                testID="report-detail-memo-range"
               />
-              <TimeWindowField
-                label="وقت الحفظ"
-                value={toWindow(report.memo_time)}
-                onChange={noop}
-                disabled
-                testID="memo-time-field"
+              <MetricRow
+                label="الوقت"
+                value={timeWindow(report.memo_time)}
+                testID="report-detail-memo-time"
               />
-              <YesNoToggle
-                question="هل أتممت التكرارات الخمسين؟"
-                value={report.completed_50_repetitions}
-                onChange={noop}
-                disabled
-                testID="completed-50-toggle"
+              <MetricRow
+                label="التكرار 50 مرة"
+                value={yesNo(report.completed_50_repetitions)}
+                testID="report-detail-completed-50"
               />
               {report.completed_50_repetitions === true ? (
-                <YesNoToggle
-                  question="هل كانت التكرارات في جلسة واحدة؟"
-                  value={report.repetitions_in_single_session}
-                  onChange={noop}
-                  disabled
-                  testID="single-session-toggle"
+                <MetricRow
+                  label="في جلسة واحدة"
+                  value={yesNo(report.repetitions_in_single_session)}
+                  testID="report-detail-single-session"
                 />
               ) : null}
             </View>
           ) : null}
-        </View>
+        </DetailSection>
 
         {/* Section B — Revision */}
-        <View
-          className="w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-          style={{ borderCurve: 'continuous' }}
-          testID="rev-section"
-        >
-          <Text
-            className="text-base font-bold text-gray-900 dark:text-gray-100 text-right mb-3"
-            accessibilityRole="header"
-          >
-            المراجعة
-          </Text>
-          <YesNoToggle
-            question="هل راجعت اليوم؟"
-            value={hasRev}
-            onChange={noop}
-            disabled
-            testID="rev-gate"
+        <DetailSection label="المراجعة" testID="rev-section">
+          <MetricRow
+            label="راجعت اليوم"
+            value={hasRev ? YES : NO}
+            testID="report-detail-rev-gate"
           />
           {hasRev ? (
-            <View testID="rev-details">
-              <QuranRangeField
-                label="نطاق المراجعة"
-                rangeType="revision"
-                value={report.rev_range}
-                onChange={noop}
-                disabled
-                testID="rev-range-field"
+            <View className="w-full gap-1" testID="rev-details">
+              <MetricRow
+                label="النطاق"
+                value={range(report.rev_range)}
+                testID="report-detail-rev-range"
               />
-              <TimeWindowField
-                label="وقت المراجعة"
-                value={toWindow(report.rev_time)}
-                onChange={noop}
-                disabled
-                testID="rev-time-field"
+              <MetricRow
+                label="الوقت"
+                value={timeWindow(report.rev_time)}
+                testID="report-detail-rev-time"
               />
             </View>
           ) : null}
-        </View>
+        </DetailSection>
 
         {/* Standalone — tafsir (ISS-12: informational, feeds no metric) */}
-        <View className="w-full px-1 pt-2" testID="tafsir-section">
-          <YesNoToggle
-            question="هل قرأت التفسير اليوم؟"
-            note="للمتابعة فقط — لا يدخل في أي مؤشر"
-            value={report.read_tafsir}
-            onChange={noop}
-            disabled
-            testID="read-tafsir-toggle"
+        <DetailSection label="التفسير" testID="tafsir-section">
+          <MetricRow
+            label="قرأت التفسير"
+            value={yesNo(report.read_tafsir)}
+            testID="report-detail-read-tafsir"
           />
-        </View>
-      </View>
+        </DetailSection>
+      </>
     );
   }
 
+  const submittedAt = formatLocalTime(report.submitted_at);
+
   return (
-    <ScrollView
-      className="flex-1 bg-white dark:bg-gray-950"
-      contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="report-detail-screen"
     >
-      <View className="w-full max-w-md self-center gap-5">
-        <View className="flex-row-reverse items-center justify-between">
-          <View className="flex-1 gap-1">
-            <Text
-              className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
-              accessibilityRole="header"
-              testID="report-detail-title"
-            >
-              {TITLES[report.type]}
-            </Text>
-            <Text
-              className="text-sm text-gray-500 dark:text-gray-400 text-right"
-              style={{ fontVariant: ['tabular-nums'] }}
-              testID="report-detail-date"
-            >
-              {`تقرير يوم ${report.report_date}`}
-            </Text>
-            <Text className="text-sm text-gray-500 dark:text-gray-400 text-right">
-              لا يمكن تعديل التقرير بعد إرساله.
-            </Text>
-          </View>
-          <Pressable
-            testID="report-detail-back-button"
-            accessibilityRole="button"
-            accessibilityLabel="العودة"
-            onPress={goBack}
-            className="min-h-[48px] min-w-[48px] items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-gray-800"
+      <TopBar
+        title={`تقرير ${formatArabicDate(report.report_date)}`}
+        onBack={goBack}
+        testID="report-detail"
+      />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+          gap: 16,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <View className={`w-full ${rowStart} items-center justify-between`}>
+          <Text
+            className={`${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+            testID="report-detail-date"
           >
-            <Text className="text-xl font-bold text-gray-800 dark:text-gray-200">
-              →
-            </Text>
-          </Pressable>
+            {submittedAt ? `أُرسل في ${submittedAt}` : report.report_date}
+          </Text>
+          <StatusBadge
+            status={badge.label}
+            variant={badge.variant}
+            testID="report-detail-type"
+          />
         </View>
 
+        <Banner tone="info" message={FINAL_NOTE} testID="report-detail-note" />
+
         {body}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

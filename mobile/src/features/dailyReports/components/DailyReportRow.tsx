@@ -1,17 +1,27 @@
 import React from 'react';
 import { View, Text, Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Icon, IconName } from '@/shared/components/Icon';
 import {
   StatusBadge,
   StatusBadgeVariant,
 } from '@/shared/components/StatusBadge';
 import {
-  AbsenceReason,
   DailyReportDto,
   DailyReportType,
 } from '@/shared/api/dailyReports.client';
+import { SurahDto } from '@/shared/api/quran.client';
+import { formatAyahRange } from '@/features/progress/utils/ayahRange';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
+import { ABSENCE_REASON_LABELS } from './AbsenceReasonPicker';
+import { formatArabicDate } from '../utils/arabicDate';
+
+export { ABSENCE_REASON_LABELS };
 
 export interface DailyReportRowProps {
   report: DailyReportDto;
+  /** Surah reference data for the summary; numbers are used while it loads. */
+  surahIndex?: Map<number, SurahDto>;
   onPress?: (report: DailyReportDto) => void;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -24,99 +34,127 @@ export const DAILY_REPORT_TYPE_LABELS: Record<DailyReportType, string> = {
   Absent: 'غياب',
 };
 
-const TYPE_BADGE_VARIANTS: Record<DailyReportType, StatusBadgeVariant> = {
-  Normal: 'info',
-  Revision: 'neutral',
-  Absent: 'warning',
+const TYPE_ICONS: Record<DailyReportType, IconName> = {
+  Normal: 'pen',
+  Revision: 'repeat',
+  Absent: 'user-x',
 };
 
-/** Same wording as the SCR-10 reason picker (UF §33 consistency). */
-export const ABSENCE_REASON_LABELS: Record<AbsenceReason, string> = {
-  Sick: 'مرض',
-  Studying: 'دراسة',
-  Other: 'سبب آخر',
-};
+const EMPTY_INDEX = new Map<number, SurahDto>();
 
 /**
- * One-line factual summary of what the report contains, derived only from
- * the row itself (no reference-data lookup). A Normal report with neither
- * section is stated as such (BR-48), never hidden.
+ * Figma SCR-14 badge per row: Normal (success) · Revision (info) · excused
+ * absence "غياب بعذر" (neutral, BR-24) · "يوم فائت" for an Other absence
+ * (error, BR-25). Dot + text, never colour alone (UF §32).
  */
-export function describeDailyReport(report: DailyReportDto): string {
+export function dailyReportBadge(report: DailyReportDto): {
+  label: string;
+  variant: StatusBadgeVariant;
+} {
+  switch (report.type) {
+    case 'Normal':
+      return { label: DAILY_REPORT_TYPE_LABELS.Normal, variant: 'success' };
+    case 'Revision':
+      return { label: DAILY_REPORT_TYPE_LABELS.Revision, variant: 'info' };
+    case 'Absent':
+      return report.absence_reason === 'Other'
+        ? { label: 'يوم فائت', variant: 'error' }
+        : { label: 'غياب بعذر', variant: 'neutral' };
+  }
+}
+
+/**
+ * One-line factual summary of what the report contains (Figma: "حفظ: البقرة
+ * 62 ← 81 · مراجعة: الفاتحة 1 ← 7"), derived only from the row itself plus
+ * the cached surah names. A Normal report with neither section is stated
+ * as such (BR-48), never hidden.
+ */
+export function describeDailyReport(
+  report: DailyReportDto,
+  surahIndex: Map<number, SurahDto> = EMPTY_INDEX,
+): string {
+  const range = (value: NonNullable<DailyReportDto['memo_range']>) =>
+    formatAyahRange(surahIndex, value, { collapse: true });
+
   switch (report.type) {
     case 'Absent':
       return report.absence_reason
         ? `غياب — ${ABSENCE_REASON_LABELS[report.absence_reason]}`
         : 'غياب';
     case 'Revision':
-      return 'مراجعة';
+      return report.rev_range ? `مراجعة: ${range(report.rev_range)}` : 'مراجعة';
     case 'Normal': {
-      const memo = report.memo_range !== null;
-      const rev = report.rev_range !== null;
-      if (memo && rev) return 'حفظ ومراجعة';
-      if (memo) return 'حفظ';
-      if (rev) return 'مراجعة فقط';
+      const memo = report.memo_range
+        ? `حفظ: ${range(report.memo_range)}`
+        : null;
+      const rev = report.rev_range
+        ? `مراجعة: ${range(report.rev_range)}`
+        : null;
+      if (memo && rev) return `${memo} · ${rev}`;
+      if (memo) return `${memo} · بدون مراجعة`;
+      if (rev) return `بدون حفظ · ${rev}`;
       return 'دون حفظ أو مراجعة';
     }
   }
 }
 
 /**
- * SCR-14 list row (UF §28 "List row"): the report date on the reading
- * side, a factual summary under it, the type badge on the far side. 48dp+
- * target; the whole row is the button (UF §32). Tap → SCR-15 read-only
- * detail rendered from this very row (F-DR-07).
+ * Figma SCR-14 daily row (31:782): surface card, 1px border/default,
+ * radius md — 36px icon tile (right), the day "الثلاثاء 2 سبتمبر" in
+ * body/md-medium over the summary in body/sm, the type StatusBadge and a
+ * chevron (left). 48dp+ target; the whole row is the button (UF §32).
+ * Tap → SCR-15 read-only detail rendered from this very row (F-DR-07).
  */
 export function DailyReportRow({
   report,
+  surahIndex,
   onPress,
   testID,
   style,
 }: DailyReportRowProps) {
   const rowTestID = testID ?? `daily-report-row-${report.id}`;
-  const typeLabel = DAILY_REPORT_TYPE_LABELS[report.type];
-  const summary = describeDailyReport(report);
+  const badge = dailyReportBadge(report);
+  const summary = describeDailyReport(report, surahIndex);
+  const day = formatArabicDate(report.report_date);
 
   return (
     <Pressable
       testID={rowTestID}
       accessibilityRole="button"
-      accessibilityLabel={`تقرير ${report.report_date}: ${typeLabel}. ${summary}`}
+      accessibilityLabel={`تقرير ${day}: ${badge.label}. ${summary}`}
       onPress={() => onPress?.(report)}
-      className="flex-row-reverse items-center justify-between min-h-[64px] px-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 active:border-primary dark:active:border-primary-500 gap-3"
+      className={`w-full ${rowStart} items-center gap-3 px-4 py-3.5 min-h-[64px] rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark active:opacity-80`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
-      <View className="flex-1 gap-1">
+      <View
+        className="w-9 h-9 rounded-sm bg-subtle dark:bg-subtle-dark items-center justify-center"
+        style={{ borderCurve: 'continuous' }}
+      >
+        <Icon name={TYPE_ICONS[report.type]} size={18} tone="secondary" />
+      </View>
+      <View className={`flex-1 gap-0.5 ${itemsStart}`}>
         <Text
-          className="text-base font-bold text-gray-900 dark:text-gray-100 text-right"
-          style={{ fontVariant: ['tabular-nums'] }}
+          className={`w-full ${typography.bodyMdMedium} text-right text-fg dark:text-fg-dark`}
           maxFontSizeMultiplier={1.6}
           testID={`${rowTestID}-date`}
         >
-          {report.report_date}
+          {day}
         </Text>
         <Text
-          className="text-sm text-gray-600 dark:text-gray-400 text-right"
+          className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          maxFontSizeMultiplier={1.6}
           testID={`${rowTestID}-summary`}
         >
           {summary}
         </Text>
       </View>
-      <View className="flex-row-reverse items-center gap-2">
-        <StatusBadge
-          status={typeLabel}
-          variant={TYPE_BADGE_VARIANTS[report.type]}
-          testID={`${rowTestID}-type`}
-        />
-        {/* Directional chevron: "advance" is leftward in RTL (UF §31). */}
-        <Text
-          className="text-lg text-gray-400 dark:text-gray-600"
-          accessibilityElementsHidden
-          importantForAccessibility="no"
-        >
-          ‹
-        </Text>
-      </View>
+      <StatusBadge
+        status={badge.label}
+        variant={badge.variant}
+        testID={`${rowTestID}-type`}
+      />
+      {/* Directional chevron: "advance" is leftward in RTL (UF §31). */}
+      <Icon name="chevron-left" size={18} tone="tertiary" />
     </Pressable>
   );
 }

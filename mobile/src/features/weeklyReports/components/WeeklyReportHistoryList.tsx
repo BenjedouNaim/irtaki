@@ -33,6 +33,7 @@ export function WeeklyReportHistoryList({
         <WeeklyReportRow report={report} onPress={onOpenReport} />
       )}
       emptyMessage={EMPTY_MESSAGE}
+      emptyIcon="book"
       testID={testID}
     />
   );

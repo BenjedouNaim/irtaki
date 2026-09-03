@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  KeyboardAvoidingView,
-  ScrollView,
-} from 'react-native';
+import { View, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
+import { Banner } from '@/shared/components/Banner';
+import { TopBar } from '@/shared/components/TopBar';
+import { itemsStart } from '@/shared/theme/rtl';
+import { TextInputField } from '@/features/auth/components/TextInputField';
+import { AuthIntro } from '@/features/auth/components/AuthIntro';
+import { OutcomeState } from '@/features/auth/components/OutcomeState';
 import { confirmPasswordReset } from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
 
@@ -27,12 +27,16 @@ export interface ForgotPasswordConfirmScreenProps {
   token?: string;
   onSuccess?: () => void;
   onNavigateToRequest?: () => void;
+  /** TopBar back control (the screen is entered from a deep link). */
+  onBack?: () => void;
 }
 
+/** SCR-04 Reset password — Figma 21:220 (confirm) · 21:267 (expired token). */
 export function ForgotPasswordConfirmScreen({
   token,
   onSuccess,
   onNavigateToRequest,
+  onBack,
 }: ForgotPasswordConfirmScreenProps) {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ password?: string }>({});
@@ -41,8 +45,6 @@ export function ForgotPasswordConfirmScreen({
     !token || token.trim().length === 0,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const showPasswordLengthHint = Boolean(password) && password.length < 8;
 
   const handleSubmit = async () => {
     if (!token) {
@@ -111,90 +113,77 @@ export function ForgotPasswordConfirmScreen({
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-white dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="forgot-password-confirm-screen"
     >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          paddingVertical: 32,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="items-center mb-8">
-          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
-            إرتقِ
-          </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
-            تعيين كلمة مرور جديدة
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            أدخل كلمة المرور الجديدة لحسابك
-          </Text>
-        </View>
+      <TopBar
+        title="كلمة مرور جديدة"
+        onBack={onBack}
+        testID="forgot-password-confirm-top-bar"
+      />
 
-        {generalError ? (
-          <View
-            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
-            testID="forgot-password-confirm-general-error"
-          >
-            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
-              {generalError}
-            </Text>
-          </View>
-        ) : null}
+      {isTokenInvalid ? (
+        <OutcomeState
+          icon="alert"
+          tone="error"
+          title="انتهت صلاحية الرابط"
+          body="هذا الرابط لم يعد صالحًا. اطلب رابطًا جديدًا للمتابعة."
+          testID="forgot-password-invalid-token-state"
+        >
+          {onNavigateToRequest ? (
+            <Button
+              label="طلب رابط جديد"
+              onPress={onNavigateToRequest}
+              className="w-full"
+              testID="forgot-password-request-new-link-button"
+            />
+          ) : null}
+        </OutcomeState>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 16,
+            paddingBottom: 32,
+            gap: 32,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <AuthIntro
+            title="اختر كلمة مرور جديدة"
+            subtitle="سيتم تسجيل خروجك من جميع الأجهزة بعد الحفظ."
+          />
 
-        {isTokenInvalid ? (
-          <View
-            className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-xl p-5 mb-6"
-            style={{ borderCurve: 'continuous' }}
-            testID="forgot-password-invalid-token-state"
-          >
-            <Text className="text-amber-800 dark:text-amber-200 text-base font-semibold text-center mb-2">
-              الرابط غير صالح أو منتهي الصلاحية
-            </Text>
-            <Text className="text-amber-700 dark:text-amber-300 text-sm text-center leading-relaxed mb-4">
-              انتهت صلاحية هذا الرابط أو تم استخدامه مسبقاً. يرجى طلب رابط جديد
-              لإعادة تعيين كلمة المرور.
-            </Text>
-            {onNavigateToRequest ? (
-              <Button
-                label="طلب رابط جديد"
-                onPress={onNavigateToRequest}
-                testID="forgot-password-request-new-link-button"
-              />
-            ) : null}
-          </View>
-        ) : (
-          <View className="w-full">
+          {generalError ? (
+            <Banner
+              message={generalError}
+              tone="error"
+              testID="forgot-password-confirm-general-error"
+            />
+          ) : null}
+
+          <View className={`w-full ${itemsStart}`}>
             <FormField
               label="كلمة المرور الجديدة"
               required
-              helpText={
-                showPasswordLengthHint
-                  ? 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل'
-                  : undefined
-              }
+              helpText="8 أحرف على الأقل"
               error={errors.password}
+              disabled={isSubmitting}
               testID="forgot-password-confirm-password-field"
+              style={{ marginBottom: 0 }}
             >
-              <TextInput
+              <TextInputField
                 testID="forgot-password-confirm-password-input"
-                className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                  errors.password
-                    ? 'border-destructive bg-white dark:bg-gray-950'
-                    : 'border-gray-300 dark:border-gray-700'
-                }`}
-                style={{ borderCurve: 'continuous' }}
+                secure
                 placeholder="••••••••"
-                placeholderTextColor="#9ca3af"
-                secureTextEntry
+                textContentType="newPassword"
+                autoComplete="new-password"
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit}
+                error={Boolean(errors.password)}
+                disabled={isSubmitting}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -202,21 +191,19 @@ export function ForgotPasswordConfirmScreen({
                     setErrors((prev) => ({ ...prev, password: undefined }));
                   }
                 }}
-                textAlign="right"
               />
             </FormField>
-
-            <Button
-              label="تعيين كلمة المرور"
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              testID="forgot-password-confirm-submit-button"
-              className="mt-2"
-            />
           </View>
-        )}
-      </ScrollView>
+
+          <Button
+            label="حفظ كلمة المرور"
+            onPress={handleSubmit}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            testID="forgot-password-confirm-submit-button"
+          />
+        </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }

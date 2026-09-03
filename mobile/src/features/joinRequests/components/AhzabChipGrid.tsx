@@ -1,28 +1,59 @@
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Chip } from '@/shared/components/Chip';
+import { Icon } from '@/shared/components/Icon';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 
 export interface AhzabChipGridProps {
   selectedAhzab: number[];
   onChange?: (selected: number[]) => void;
+  /** Applicant Detail: filled/empty compact cells, no interaction (UF §19). */
   readOnly?: boolean;
   minRequired?: number;
+  /** Interactive mode: field label rendered above the grid with the counter. */
+  label?: string;
+  required?: boolean;
+  /** Inline error (422) — icon + text, never colour alone (UF §32). */
+  error?: string;
   testID?: string;
 }
 
 const TOTAL_AHZAB = 60;
 const ALL_AHZAB = Array.from({ length: TOTAL_AHZAB }, (_, i) => i + 1);
 
+/** Figma AhzabGrid (23:363): 6 chips per row; Applicant Detail grid (35:261): 10 per row. */
+const INTERACTIVE_PER_ROW = 6;
+const READ_ONLY_PER_ROW = 10;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    rows.push(items.slice(i, i + size));
+  }
+  return rows;
+}
+
+/**
+ * Ahzab multi-select (UF §19): 60 numbered toggle chips, RTL-ordered (hizb
+ * 1 rightmost), with a live "X selected · minimum 5" counter. Reused
+ * read-only on the Assistant's Applicant Detail (compact filled/empty cells).
+ */
 export function AhzabChipGrid({
   selectedAhzab,
   onChange,
   readOnly = false,
   minRequired = 5,
+  label,
+  required = false,
+  error,
   testID = 'ahzab-chip-grid',
 }: AhzabChipGridProps) {
   const selectedSet = useMemo(() => new Set(selectedAhzab), [selectedAhzab]);
   const count = selectedSet.size;
   const isMinMet = count >= minRequired;
+  const hasError = Boolean(error);
 
   const toggleHizb = useCallback(
     (hizbNumber: number) => {
@@ -48,94 +79,100 @@ export function AhzabChipGrid({
     [onChange, readOnly, selectedSet],
   );
 
-  const selectAll = useCallback(() => {
-    if (readOnly || !onChange) return;
-    onChange([...ALL_AHZAB]);
-  }, [onChange, readOnly]);
-
-  const clearAll = useCallback(() => {
-    if (readOnly || !onChange) return;
-    onChange([]);
-  }, [onChange, readOnly]);
+  const rows = chunk(
+    ALL_AHZAB,
+    readOnly ? READ_ONLY_PER_ROW : INTERACTIVE_PER_ROW,
+  );
 
   return (
-    <View className="w-full gap-3" testID={testID}>
-      {/* Header with counter and quick actions */}
-      <View className="flex-row items-center justify-between">
-        {!readOnly && (
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={selectAll}
-              testID="ahzab-select-all"
-              className="px-2.5 py-1 rounded-md bg-gray-100 dark:bg-gray-800 active:opacity-70"
-            >
-              <Text className="text-xs text-primary dark:text-primary-400 font-semibold">
-                تحديد الكل
+    <View
+      className={`w-full ${readOnly ? 'gap-1.5' : 'gap-2'} ${itemsStart}`}
+      testID={testID}
+    >
+      {!readOnly ? (
+        <View
+          className={`${rowStart} items-center justify-between w-full mb-2`}
+        >
+          {label ? (
+            <View className={`${rowStart} items-center gap-1`}>
+              <Text
+                className={`${typography.labelMd} text-right text-fg dark:text-fg-dark`}
+              >
+                {label}
               </Text>
-            </Pressable>
-            <Pressable
-              onPress={clearAll}
-              testID="ahzab-clear-all"
-              className="px-2.5 py-1 rounded-md bg-gray-100 dark:bg-gray-800 active:opacity-70"
-            >
-              <Text className="text-xs text-gray-600 dark:text-gray-400 font-semibold">
-                مسح
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        <View className="flex-row items-center gap-1.5 ml-auto">
+              {required ? (
+                <Text
+                  className={`${typography.labelMd} ${
+                    hasError
+                      ? 'text-fg-error'
+                      : 'text-fg-tertiary dark:text-fg-tertiary-dark'
+                  }`}
+                  accessibilityLabel="مطلوب"
+                >
+                  *
+                </Text>
+              ) : null}
+            </View>
+          ) : (
+            <View />
+          )}
           <Text
-            className={`text-xs font-bold ${
+            className={`${typography.labelSm} text-left ${
               isMinMet
-                ? 'text-primary dark:text-primary-400'
-                : 'text-amber-600 dark:text-amber-400'
+                ? 'text-fg-success'
+                : 'text-fg-secondary dark:text-fg-secondary-dark'
             }`}
             testID="ahzab-counter"
+            accessibilityLiveRegion="polite"
+            maxFontSizeMultiplier={1.5}
           >
-            {count} / {TOTAL_AHZAB} حزباً
+            {`${count} محددة · الحد الأدنى ${minRequired}`}
           </Text>
-          {!isMinMet && (
-            <Text className="text-xs text-amber-600 dark:text-amber-400">
-              (الحد الأدنى {minRequired})
-            </Text>
-          )}
         </View>
-      </View>
+      ) : null}
 
-      {/* 60 Chips Grid */}
-      <View className="flex-row flex-wrap gap-1.5 justify-start">
-        {ALL_AHZAB.map((hizb) => {
-          const isSelected = selectedSet.has(hizb);
-
-          return (
-            <Pressable
+      {rows.map((row, rowIndex) => (
+        <View
+          key={rowIndex}
+          className={`${rowStart} items-start w-full ${
+            readOnly ? 'gap-1' : 'justify-between'
+          }`}
+        >
+          {row.map((hizb) => (
+            <Chip
               key={hizb}
-              testID={`ahzab-chip-${hizb}`}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isSelected }}
+              label={String(hizb)}
+              type="ahzab"
+              selected={selectedSet.has(hizb)}
+              readOnly={readOnly}
+              compact={readOnly}
               accessibilityLabel={`حزب ${hizb}`}
-              disabled={readOnly}
               onPress={() => toggleHizb(hizb)}
-              className={`w-9 h-9 items-center justify-center rounded-lg border ${
-                isSelected
-                  ? 'bg-primary border-primary dark:bg-primary-600 dark:border-primary-500'
-                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'
-              } active:opacity-80`}
-              style={{ borderCurve: 'continuous' }}
-            >
-              <Text
-                className={`text-xs font-bold ${
-                  isSelected ? 'text-white' : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                {hizb}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+              testID={`ahzab-chip-${hizb}`}
+            />
+          ))}
+        </View>
+      ))}
+
+      {hasError ? (
+        <View
+          className={`${rowStart} items-center gap-1 w-full`}
+          testID={`${testID}-error`}
+          accessibilityRole="alert"
+        >
+          <Icon
+            name="alert"
+            size={16}
+            tone="error"
+            accessibilityLabel="تنبيه"
+          />
+          <Text
+            className={`flex-1 ${typography.bodySm} text-right text-fg-error`}
+          >
+            {error}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

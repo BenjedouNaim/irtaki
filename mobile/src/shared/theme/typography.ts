@@ -16,6 +16,8 @@ export const fontFamilies = {
 } as const;
 
 export const typography = {
+  /** display/lg 44/52 SemiBold −0.5 — the brand wordmark on the auth screens */
+  displayLg: 'font-sans-semibold text-display-lg',
   /** heading/xl 28/40 SemiBold — hero numbers, screen-level counts */
   headingXl: 'font-sans-semibold text-heading-xl',
   /** heading/lg 22/34 SemiBold — tab-root titles */
@@ -40,6 +42,8 @@ export const typography = {
   labelSm: 'font-sans-medium text-label-sm',
   /** caption 12/18 Regular — tile captions, ring caption */
   caption: 'font-sans text-caption',
+  /** overline 11/16 SemiBold +0.8 — section labels above card groups */
+  overline: 'font-sans-semibold text-overline',
 } as const;
 
 export type TypographyToken = keyof typeof typography;
@@ -49,6 +53,12 @@ export type TypographyToken = keyof typeof typography;
  * text style imperatively (measured layouts, `adjustsFontSizeToFit` blocks).
  */
 export const typeStyles: Record<TypographyToken, TextStyle> = {
+  displayLg: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 44,
+    lineHeight: 52,
+    letterSpacing: -0.5,
+  },
   headingXl: {
     fontFamily: fontFamilies.semiBold,
     fontSize: 28,
@@ -86,4 +96,10 @@ export const typeStyles: Record<TypographyToken, TextStyle> = {
     letterSpacing: 0.2,
   },
   caption: { fontFamily: fontFamilies.regular, fontSize: 12, lineHeight: 18 },
+  overline: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 0.8,
+  },
 };

@@ -1,6 +1,9 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { WeeklyReportDetailScreen } from '../WeeklyReportDetailScreen';
+import {
+  WeeklyReportDetailScreen,
+  describeFinalisation,
+} from '../WeeklyReportDetailScreen';
 import { WeeklyReportDto } from '@/shared/api/weeklyReports.client';
 
 // No endpoint of its own: every transport is a mock that fails loudly.
@@ -46,22 +49,22 @@ const report: WeeklyReportDto = {
   finalised_by: 'Student',
 };
 
-describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03)', () => {
+describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03, Figma 50:989)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
   });
 
-  it('renders SCR-12 layout read-only from the row: header, week range, badge and the six metric rows', () => {
+  it('renders the week range as the title, the finalisation head row and the six metric rows read-only from the row', () => {
     render(<WeeklyReportDetailScreen report={report} />);
 
     expect(
       screen.getByTestId('weekly-report-detail-title').props.children,
-    ).toBe('التقرير الأسبوعي');
+    ).toBe('أسبوع 15 — 21 أوت');
+    expect(screen.getByText('مؤكَّد')).toBeTruthy();
     expect(
-      screen.getByTestId('weekly-report-detail-week-range').props.children,
-    ).toBe('من 2026-08-15 إلى 2026-08-21');
-    expect(screen.getByText('معتمد')).toBeTruthy();
+      screen.getByTestId('weekly-report-detail-finalised-at').props.children,
+    ).toMatch(/^أُكِّد الجمعة 21 أوت \d{2}:\d{2}$/);
     expect(
       screen.getByTestId('metric-expected-days-value').props.children,
     ).toBe('6');
@@ -83,26 +86,21 @@ describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03)', () => {
     ).toBe('5');
   });
 
-  it('shows SCR-12 Yes/No gate disabled with the recorded answer and the immutability note, with no confirm control', () => {
+  it('shows the recorded attendance as a read-only row and the auto-close reminder, with no confirm control', () => {
     render(<WeeklyReportDetailScreen report={report} />);
 
-    expect(screen.getByTestId('attended-toggle')).toBeTruthy();
     expect(
-      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
-    ).toEqual({ selected: true, disabled: true });
+      screen.getByTestId('metric-attended-recitation-call-value').props
+        .children,
+    ).toBe('نعم');
     expect(
-      screen.getByTestId('attended-toggle-no').props.accessibilityState,
-    ).toEqual({ selected: false, disabled: true });
-    expect(
-      screen.getByText('تم اعتماد هذا التقرير ولا يمكن تعديله.'),
-    ).toBeTruthy();
+      screen.getByTestId('weekly-report-detail-finalised-note-message').props
+        .children,
+    ).toBe(
+      "إن لم يُؤكَّد التقرير في يوم التسميع، يُغلق تلقائيًا في منتصف الليل بحالة 'لم يحضر'.",
+    );
     expect(screen.queryByTestId('confirm-weekly-report-button')).toBeNull();
-
-    // Disabled: a tap changes nothing.
-    fireEvent.press(screen.getByTestId('attended-toggle-no'));
-    expect(
-      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
-    ).toEqual({ selected: true, disabled: true });
+    expect(screen.queryByTestId('attended-toggle')).toBeNull();
 
     screen.unmount();
     render(
@@ -115,21 +113,30 @@ describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03)', () => {
       />,
     );
     expect(
-      screen.getByTestId('attended-toggle-no').props.accessibilityState,
-    ).toEqual({ selected: true, disabled: true });
+      screen.getByTestId('metric-attended-recitation-call-value').props
+        .children,
+    ).toBe('لا');
+    expect(screen.getByText('أُغلق تلقائيًا')).toBeTruthy();
     expect(
-      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
-    ).toEqual({ selected: false, disabled: true });
+      screen.getByTestId('weekly-report-detail-finalised-at').props.children,
+    ).toMatch(/^أُغلق تلقائيًا الجمعة 21 أوت/);
+  });
+
+  it('describes the finalisation from the row alone', () => {
+    expect(describeFinalisation({ ...report, finalised_at: null })).toBe('');
+    expect(
+      describeFinalisation({ ...report, finalised_by: 'Scheduler' }),
+    ).toMatch(/^أُغلق تلقائيًا /);
   });
 
   it('goes back from the top-right control (UF §31) and falls back to Home without history', () => {
     render(<WeeklyReportDetailScreen report={report} />);
-    fireEvent.press(screen.getByTestId('weekly-report-detail-back-button'));
+    fireEvent.press(screen.getByTestId('weekly-report-detail-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
 
     mockCanGoBack.mockReturnValue(false);
-    fireEvent.press(screen.getByTestId('weekly-report-detail-back-button'));
+    fireEvent.press(screen.getByTestId('weekly-report-detail-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
   });
 });

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { WeeklyReportDetailScreen } from '@/features/weeklyReports/screens/WeeklyReportDetailScreen';
 import { useCachedWeeklyReport } from '@/features/weeklyReports/hooks/useCachedWeeklyReport';
 
@@ -21,18 +22,21 @@ export default function WeeklyReportDetailRoute() {
   if (!report) {
     return (
       <View
-        className="flex-1 items-center justify-center p-5 gap-4 bg-white dark:bg-gray-950"
+        className="flex-1 justify-center px-4 bg-canvas dark:bg-canvas-dark"
         testID="weekly-report-detail-unavailable"
       >
-        <Text className="text-base text-gray-700 dark:text-gray-300 text-center">
-          هذا التقرير غير متاح حالياً. افتحه من سجل التقارير.
-        </Text>
-        <Button
-          label="فتح سجل التقارير"
-          variant="outline"
-          onPress={() => router.replace('/(app)/student/reports/history')}
-          testID="weekly-report-detail-open-history-button"
-        />
+        <EmptyState
+          message="هذا التقرير غير متاح حالياً. افتحه من سجل التقارير."
+          icon="book"
+        >
+          <Button
+            label="فتح سجل التقارير"
+            variant="outline"
+            onPress={() => router.replace('/(app)/student/reports/history')}
+            testID="weekly-report-detail-open-history-button"
+            className="mt-2"
+          />
+        </EmptyState>
       </View>
     );
   }

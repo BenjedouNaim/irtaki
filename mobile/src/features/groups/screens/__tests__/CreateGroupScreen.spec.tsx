@@ -15,12 +15,16 @@ jest.mock('expo-router', () => ({
     push: jest.fn(),
     back: jest.fn(),
   }),
+  router: { back: jest.fn() },
 }));
 
-describe('CreateGroupScreen (SCR-28)', () => {
+describe('CreateGroupScreen (SCR-28, Figma 39:230)', () => {
+  const TEACHER_ID = '11111111-1111-1111-1111-111111111111';
+  const ASSISTANT_ID = '33333333-3333-3333-3333-333333333333';
+
   const mockTeachers: usersApi.UserListItem[] = [
     {
-      id: '11111111-1111-1111-1111-111111111111',
+      id: TEACHER_ID,
       email: 'teacher1@test.com',
       full_name: 'الشيخ محمد المنصوري',
       role: 'Teacher',
@@ -35,7 +39,7 @@ describe('CreateGroupScreen (SCR-28)', () => {
 
   const mockAssistants: usersApi.UserListItem[] = [
     {
-      id: '33333333-3333-3333-3333-333333333333',
+      id: ASSISTANT_ID,
       email: 'assistant1@test.com',
       full_name: 'الأستاذ سامي المهدوي',
       role: 'Assistant',
@@ -61,21 +65,53 @@ describe('CreateGroupScreen (SCR-28)', () => {
     });
   });
 
-  it('renders form fields, title, and loads staff options', async () => {
-    const { getByText, getByTestId, findByText } = render(
+  /** Picks a teacher and an assistant through the picker sheets. */
+  async function chooseStaff(
+    findByTestId: (id: string) => Promise<any>,
+    getByTestId: (id: string) => any,
+  ) {
+    fireEvent.press(await findByTestId('teacher-picker'));
+    await act(async () => {
+      fireEvent.press(getByTestId(`teacher-option-${TEACHER_ID}`));
+    });
+    fireEvent.press(getByTestId('assistant-picker'));
+    await act(async () => {
+      fireEvent.press(getByTestId(`assistant-option-${ASSISTANT_ID}`));
+    });
+  }
+
+  it('renders the heading, the fields, the day letters (Saturday first) and loads the staff pickers', async () => {
+    const { getByText, getByTestId, findByTestId, queryByText } = render(
       <CreateGroupScreen />,
     );
 
-    expect(getByText('إنشاء حلقة جديدة')).toBeTruthy();
+    expect(getByTestId('create-group-top-bar-title').props.children).toBe(
+      'مجموعة جديدة',
+    );
+    expect(getByText('إعداد المجموعة')).toBeTruthy();
+    expect(
+      getByText(
+        'تُنشأ المجموعة مغلقة التسجيل ونشطة. يوم التسميع لا يُعدَّل لاحقًا.',
+      ),
+    ).toBeTruthy();
     expect(getByTestId('group-name-input')).toBeTruthy();
-    expect(getByTestId('gender-male-option')).toBeTruthy();
-    expect(getByTestId('gender-female-option')).toBeTruthy();
+    expect(getByText('يجب أن يكون فريدًا')).toBeTruthy();
+    expect(getByTestId('gender-Male')).toBeTruthy();
+    expect(getByTestId('gender-Female')).toBeTruthy();
+    expect(getByText('س')).toBeTruthy();
+    expect(getByText('ج')).toBeTruthy();
+    expect(getByTestId('staff-loading-skeleton')).toBeTruthy();
     expect(getByTestId('create-group-submit-button')).toBeTruthy();
 
-    // Staff loaded
-    expect(await findByText('الشيخ محمد المنصوري')).toBeTruthy();
-    expect(await findByText('الأستاذ سامي المهدوي')).toBeTruthy();
-    expect(await findByText('assistant2@test.com')).toBeTruthy(); // Email fallback
+    // Staff loaded → pickers with placeholders; candidates live in the sheet.
+    expect(await findByTestId('teacher-picker')).toBeTruthy();
+    expect(getByText('اختر المعلّم')).toBeTruthy();
+    expect(getByText('اختر المساعد')).toBeTruthy();
+    expect(queryByText('الشيخ محمد المنصوري')).toBeNull();
+
+    fireEvent.press(getByTestId('assistant-picker'));
+    expect(getByText('الأستاذ سامي المهدوي')).toBeTruthy();
+    expect(getByText('assistant2@test.com')).toBeTruthy(); // Email fallback
   });
 
   it('displays client-side validation errors when submitting with empty fields', async () => {
@@ -85,14 +121,24 @@ describe('CreateGroupScreen (SCR-28)', () => {
       fireEvent.press(getByTestId('create-group-submit-button'));
     });
 
-    expect(await findByText('اسم الحلقة مطلوب')).toBeTruthy();
-    expect(await findByText('يرجى تحديد الفئة المستهدفة')).toBeTruthy();
+    expect(await findByText('اسم المجموعة مطلوب')).toBeTruthy();
+    expect(await findByText('يرجى تحديد الجنس')).toBeTruthy();
     expect(await findByText('يرجى تحديد يوم التسميع')).toBeTruthy();
-    expect(await findByText('يرجى اختيار المعلم المشرف')).toBeTruthy();
-    expect(await findByText('يرجى اختيار المساعد الإداري')).toBeTruthy();
+    expect(await findByText('يرجى اختيار المعلّم')).toBeTruthy();
+    expect(await findByText('يرجى اختيار المساعد')).toBeTruthy();
   });
 
-  it('handles 409 GROUP_NAME_TAKEN by displaying general error banner (UF.md §21)', async () => {
+  it('shows the fixed-day helper once a day is chosen', async () => {
+    const { getByTestId, getByText } = render(<CreateGroupScreen />);
+
+    fireEvent.press(getByTestId('recitation-day-option-6'));
+    expect(getByText('السبت — يُثبَّت عند الإنشاء')).toBeTruthy();
+    expect(
+      getByTestId('recitation-day-option-6').props.accessibilityState.selected,
+    ).toBe(true);
+  });
+
+  it('handles 409 GROUP_NAME_TAKEN by displaying the error banner (UF.md §21)', async () => {
     jest.spyOn(groupsApi, 'createGroup').mockRejectedValueOnce(
       new ApiError({
         statusCode: 409,
@@ -101,28 +147,20 @@ describe('CreateGroupScreen (SCR-28)', () => {
       }),
     );
 
-    const { getByTestId, findByText } = render(<CreateGroupScreen />);
+    const { getByTestId, findByText, findByTestId } = render(
+      <CreateGroupScreen />,
+    );
 
-    // Fill form
     await act(async () => {
       fireEvent.changeText(
         getByTestId('group-name-input'),
         'حلقة مستخدمة مسبقاً',
       );
-      fireEvent.press(getByTestId('gender-male-option'));
+      fireEvent.press(getByTestId('gender-Male'));
       fireEvent.press(getByTestId('recitation-day-option-5'));
     });
 
-    // Wait for staff options to load and select
-    await findByText('الشيخ محمد المنصوري');
-    await act(async () => {
-      fireEvent.press(
-        getByTestId('teacher-option-11111111-1111-1111-1111-111111111111'),
-      );
-      fireEvent.press(
-        getByTestId('assistant-option-33333333-3333-3333-3333-333333333333'),
-      );
-    });
+    await chooseStaff(findByTestId, getByTestId);
 
     await act(async () => {
       fireEvent.press(getByTestId('create-group-submit-button'));
@@ -148,27 +186,20 @@ describe('CreateGroupScreen (SCR-28)', () => {
       }),
     );
 
-    const { getByTestId, findByText } = render(<CreateGroupScreen />);
+    const { getByTestId, findByText, findByTestId } = render(
+      <CreateGroupScreen />,
+    );
 
-    // Fill form
     await act(async () => {
       fireEvent.changeText(
         getByTestId('group-name-input'),
         'حلقة قالون الجديدة',
       );
-      fireEvent.press(getByTestId('gender-male-option'));
+      fireEvent.press(getByTestId('gender-Male'));
       fireEvent.press(getByTestId('recitation-day-option-3'));
     });
 
-    await findByText('الشيخ محمد المنصوري');
-    await act(async () => {
-      fireEvent.press(
-        getByTestId('teacher-option-11111111-1111-1111-1111-111111111111'),
-      );
-      fireEvent.press(
-        getByTestId('assistant-option-33333333-3333-3333-3333-333333333333'),
-      );
-    });
+    await chooseStaff(findByTestId, getByTestId);
 
     await act(async () => {
       fireEvent.press(getByTestId('create-group-submit-button'));
@@ -188,40 +219,34 @@ describe('CreateGroupScreen (SCR-28)', () => {
         enrollment_status: 'Closed',
         lifecycle_state: 'Active',
         teacher: {
-          id: '11111111-1111-1111-1111-111111111111',
+          id: TEACHER_ID,
           full_name: 'الشيخ محمد المنصوري',
         },
         assistant: {
-          id: '33333333-3333-3333-3333-333333333333',
+          id: ASSISTANT_ID,
           full_name: 'الأستاذ سامي المهدوي',
         },
       },
     });
 
     const onSuccess = jest.fn();
-    const { getByTestId, findByText } = render(
+    const { getByTestId, findByTestId, getByText } = render(
       <CreateGroupScreen onSuccess={onSuccess} />,
     );
 
-    // Fill form
     await act(async () => {
       fireEvent.changeText(
         getByTestId('group-name-input'),
         'حلقة قالون النموذجية',
       );
-      fireEvent.press(getByTestId('gender-male-option'));
+      fireEvent.press(getByTestId('gender-Male'));
       fireEvent.press(getByTestId('recitation-day-option-5'));
     });
 
-    await findByText('الشيخ محمد المنصوري');
-    await act(async () => {
-      fireEvent.press(
-        getByTestId('teacher-option-11111111-1111-1111-1111-111111111111'),
-      );
-      fireEvent.press(
-        getByTestId('assistant-option-33333333-3333-3333-3333-333333333333'),
-      );
-    });
+    await chooseStaff(findByTestId, getByTestId);
+    // The chosen staff now show on the picker rows.
+    expect(getByText('الشيخ محمد المنصوري')).toBeTruthy();
+    expect(getByText('الأستاذ سامي المهدوي')).toBeTruthy();
 
     await act(async () => {
       fireEvent.press(getByTestId('create-group-submit-button'));
@@ -232,8 +257,8 @@ describe('CreateGroupScreen (SCR-28)', () => {
         name: 'حلقة قالون النموذجية',
         gender: 'Male',
         recitation_day: 5,
-        teacher_id: '11111111-1111-1111-1111-111111111111',
-        assistant_id: '33333333-3333-3333-3333-333333333333',
+        teacher_id: TEACHER_ID,
+        assistant_id: ASSISTANT_ID,
       });
       expect(onSuccess).toHaveBeenCalledWith(createdGroupId);
     });
@@ -256,14 +281,16 @@ describe('CreateGroupScreen (SCR-28)', () => {
         return Promise.resolve({ data: mockAssistants });
       });
 
-    const { getByTestId, findByText } = render(<CreateGroupScreen />);
+    const { getByTestId, findByText, findByTestId } = render(
+      <CreateGroupScreen />,
+    );
 
     expect(await findByText('فشل تحميل الكادر')).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(getByTestId('retry-staff-button'));
+      fireEvent.press(getByTestId('staff-error-retry-button'));
     });
 
-    expect(await findByText('الشيخ محمد المنصوري')).toBeTruthy();
+    expect(await findByTestId('teacher-picker')).toBeTruthy();
   });
 });

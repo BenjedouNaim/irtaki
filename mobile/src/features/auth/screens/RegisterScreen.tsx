@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
-  Pressable,
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
+import { Banner } from '@/shared/components/Banner';
+import { TopBar } from '@/shared/components/TopBar';
+import { itemsStart } from '@/shared/theme/rtl';
+import { TextInputField } from '@/features/auth/components/TextInputField';
+import { AuthFooterLink } from '@/features/auth/components/AuthFooterLink';
+import { AuthIntro } from '@/features/auth/components/AuthIntro';
 import { registerUser } from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
 import { useAuthStore, storeRefreshToken } from '@/shared/auth/authStore';
@@ -33,6 +37,7 @@ export interface RegisterScreenProps {
   onRegisterSuccess?: (role: string) => void;
 }
 
+/** SCR-02 Register — Figma 20:138. */
 export function RegisterScreen({
   onNavigateToLogin,
   onRegisterSuccess,
@@ -45,7 +50,7 @@ export function RegisterScreen({
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showPasswordLengthHint = Boolean(password) && password.length < 8;
+  const passwordInputRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
     setGeneralError(null);
@@ -115,63 +120,58 @@ export function RegisterScreen({
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-white dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="register-screen"
     >
+      <TopBar
+        title="إنشاء حساب"
+        onBack={onNavigateToLogin}
+        testID="register-top-bar"
+      />
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          paddingVertical: 32,
+          paddingHorizontal: 16,
+          paddingBottom: 32,
+          gap: 32,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="items-center mb-8">
-          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
-            إرتقِ
-          </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
-            إنشاء حساب جديد
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            أدخل بريدك الإلكتروني وكلمة المرور للبدء
-          </Text>
-        </View>
+        <AuthIntro
+          title="ابدأ من هنا"
+          subtitle="البريد وكلمة المرور فقط — تُستكمل بياناتك عند طلب الانضمام لمجموعة."
+        />
 
         {generalError ? (
-          <View
-            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
+          <Banner
+            message={generalError}
+            tone="error"
             testID="register-general-error"
-          >
-            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
-              {generalError}
-            </Text>
-          </View>
+          />
         ) : null}
 
-        <View className="w-full">
+        <View className={`w-full gap-5 ${itemsStart}`}>
           <FormField
             label="البريد الإلكتروني"
             required
             error={errors.email}
+            disabled={isSubmitting}
             testID="register-email-field"
+            style={{ marginBottom: 0 }}
           >
-            <TextInput
+            <TextInputField
               testID="register-email-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.email
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
-              style={{ borderCurve: 'continuous' }}
-              placeholder="example@domain.com"
-              placeholderTextColor="#9ca3af"
+              ltr
+              placeholder="name@example.com"
               keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isSubmitting}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              error={Boolean(errors.email)}
+              disabled={isSubmitting}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -179,35 +179,31 @@ export function RegisterScreen({
                   setErrors((prev) => ({ ...prev, email: undefined }));
                 }
               }}
-              textAlign="right"
             />
           </FormField>
 
           <FormField
             label="كلمة المرور"
             required
-            helpText={
-              showPasswordLengthHint
-                ? 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل'
-                : undefined
-            }
+            helpText="8 أحرف على الأقل"
             error={errors.password}
+            disabled={isSubmitting}
             testID="register-password-field"
+            style={{ marginBottom: 0 }}
           >
-            <TextInput
+            <TextInputField
+              ref={passwordInputRef}
               testID="register-password-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.password
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
-              style={{ borderCurve: 'continuous' }}
+              secure
               placeholder="••••••••"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry
+              textContentType="newPassword"
+              autoComplete="new-password"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isSubmitting}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+              error={Boolean(errors.password)}
+              disabled={isSubmitting}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -215,35 +211,26 @@ export function RegisterScreen({
                   setErrors((prev) => ({ ...prev, password: undefined }));
                 }
               }}
-              textAlign="right"
             />
           </FormField>
-
-          <Button
-            label="إنشاء الحساب"
-            onPress={handleSubmit}
-            loading={isSubmitting}
-            disabled={isSubmitting}
-            testID="register-submit-button"
-            className="mt-2"
-          />
         </View>
 
+        <Button
+          label="إنشاء الحساب"
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          testID="register-submit-button"
+        />
+
         {onNavigateToLogin ? (
-          <View className="flex-row-reverse justify-center items-center mt-6">
-            <Text className="text-sm text-gray-500 dark:text-gray-400">
-              لديك حساب بالفعل؟{' '}
-            </Text>
-            <Pressable
-              onPress={onNavigateToLogin}
-              disabled={isSubmitting}
-              testID="register-login-link"
-            >
-              <Text className="text-sm font-bold text-primary dark:text-primary-400">
-                تسجيل الدخول
-              </Text>
-            </Pressable>
-          </View>
+          <AuthFooterLink
+            prompt="لديك حساب بالفعل؟"
+            linkLabel="تسجيل الدخول"
+            onPress={onNavigateToLogin}
+            disabled={isSubmitting}
+            testID="register-login-link"
+          />
         ) : null}
       </ScrollView>
     </KeyboardAvoidingView>

@@ -1,5 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
+import { Icon } from '@/shared/components/Icon';
+import { SegmentedControl } from '@/shared/components/SegmentedControl';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
 
 export interface YesNoToggleProps {
   /** The question is the label (UF §20 "Yes/No gate question"). */
@@ -13,10 +17,18 @@ export interface YesNoToggleProps {
   testID?: string;
 }
 
+type YesNo = 'yes' | 'no';
+
+const OPTIONS: Array<{ label: string; value: YesNo }> = [
+  { label: 'نعم', value: 'yes' },
+  { label: 'لا', value: 'no' },
+];
+
 /**
- * Segmented Yes/No control with no default selection (UF §15). Each option
- * carries the question in its accessibility label — never "Yes"/"No" alone
- * (UF §32). 48dp targets; leading option on the right (RTL, UF §31).
+ * Figma gate question: label/lg question over a 2-segment SegmentedControl
+ * (7:28) with no default selection (UF §15). Each option carries the
+ * question in its accessibility label — never "Yes"/"No" alone (UF §32).
+ * Leading option ("نعم") on the right (UF §31).
  */
 export function YesNoToggle({
   question,
@@ -27,62 +39,49 @@ export function YesNoToggle({
   error,
   testID = 'yes-no-toggle',
 }: YesNoToggleProps) {
-  const options: Array<{ label: string; selected: boolean; next: boolean }> = [
-    { label: 'نعم', selected: value === true, next: true },
-    { label: 'لا', selected: value === false, next: false },
-  ];
+  const selected: YesNo | null = value === null ? null : value ? 'yes' : 'no';
 
   return (
-    <View className="w-full mb-4 gap-2" testID={testID}>
-      <Text className="text-sm font-semibold text-gray-700 dark:text-gray-200 text-right">
+    <View className={`w-full gap-2 ${itemsStart}`}>
+      <Text
+        className={`w-full ${typography.labelLg} text-right ${
+          disabled ? 'text-fg-disabled' : 'text-fg dark:text-fg-dark'
+        }`}
+      >
         {question}
       </Text>
       {note ? (
-        <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
+        <Text
+          className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        >
           {note}
         </Text>
       ) : null}
-      <View
-        className="flex-row-reverse rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
-        style={{ borderCurve: 'continuous' }}
-        accessibilityRole="radiogroup"
-      >
-        {options.map((option) => (
-          <Pressable
-            key={option.label}
-            testID={`${testID}-${option.next ? 'yes' : 'no'}`}
-            accessibilityRole="radio"
-            accessibilityLabel={`${question} ${option.label}`}
-            accessibilityState={{ selected: option.selected, disabled }}
-            disabled={disabled}
-            onPress={() => onChange(option.next)}
-            className={`flex-1 min-h-[48px] items-center justify-center ${
-              option.selected
-                ? 'bg-primary dark:bg-primary-600'
-                : 'bg-white dark:bg-gray-900'
-            } ${disabled ? 'opacity-50' : ''}`}
-          >
-            <Text
-              className={`text-base font-semibold ${
-                option.selected
-                  ? 'text-white'
-                  : 'text-gray-800 dark:text-gray-200'
-              }`}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <SegmentedControl<YesNo>
+        options={OPTIONS}
+        value={selected}
+        onChange={(next) => onChange(next === 'yes')}
+        disabled={disabled}
+        accessibilityLabel={question}
+        testID={testID}
+      />
       {error ? (
         <View
-          className="flex-row-reverse items-center gap-1"
+          className={`${rowStart} items-center gap-1 w-full`}
           testID={`${testID}-error`}
+          accessibilityRole="alert"
         >
-          <Text className="text-xs" accessibilityLabel="تنبيه">
-            ⚠️
+          <Icon
+            name="alert"
+            size={16}
+            tone="error"
+            accessibilityLabel="تنبيه"
+          />
+          <Text
+            className={`flex-1 ${typography.bodySm} text-right text-fg-error`}
+          >
+            {error}
           </Text>
-          <Text className="text-xs text-destructive text-right">{error}</Text>
         </View>
       ) : null}
     </View>

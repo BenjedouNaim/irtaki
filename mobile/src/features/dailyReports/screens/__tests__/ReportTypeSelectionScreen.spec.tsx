@@ -38,7 +38,7 @@ function renderScreen(
   );
 }
 
-describe('ReportTypeSelectionScreen (SCR-09, F-DR-01)', () => {
+describe('ReportTypeSelectionScreen (SCR-09, F-DR-01, Figma 26:331)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -67,14 +67,18 @@ describe('ReportTypeSelectionScreen (SCR-09, F-DR-01)', () => {
     renderScreen();
 
     expect(await screen.findByTestId('report-type-cards')).toBeTruthy();
-    expect(screen.getByText('اختر نوع التقرير')).toBeTruthy();
+    expect(screen.getByText('ما نوع تقرير اليوم؟')).toBeTruthy();
     expect(screen.getByText('تقرير عادي')).toBeTruthy();
-    expect(screen.getByText('تقرير مراجعة')).toBeTruthy();
-    expect(screen.getByText('تقرير غياب')).toBeTruthy();
+    expect(screen.getByText('مراجعة فقط')).toBeTruthy();
+    expect(screen.getByText('غياب')).toBeTruthy();
 
-    const cards = screen.getAllByRole('button');
-    expect(cards).toHaveLength(3);
+    const cards = [
+      'report-type-card-normal',
+      'report-type-card-revision',
+      'report-type-card-absent',
+    ].map((id) => screen.getByTestId(id));
     cards.forEach((card) => {
+      expect(card.props.accessibilityRole).toBe('button');
       expect(card.props.accessibilityState?.selected).toBeFalsy();
     });
     expect(screen.queryByTestId('report-type-selection-blocked')).toBeNull();
@@ -99,8 +103,11 @@ describe('ReportTypeSelectionScreen (SCR-09, F-DR-01)', () => {
   it.each([
     ['already_submitted', 'تم إرسال تقرير اليوم مسبقاً.'],
     ['recitation_day', 'اليوم هو يوم التسميع، ولا يُرسل فيه تقرير يومي.'],
-    ['group_archived', 'حلقتك لم تعد نشطة.'],
-    ['membership_inactive', 'عضويتك في الحلقة غير نشطة.'],
+    ['group_archived', 'مجموعتك لم تعد نشطة. لا يمكن إرسال التقارير حاليًا.'],
+    [
+      'membership_inactive',
+      'عضويتك في الحلقة غير نشطة. لا يمكن إرسال التقارير حاليًا.',
+    ],
   ] as const)(
     'is gated on can_submit: hides the cards and shows the server reason for %s',
     async (blockReason, message) => {
@@ -110,11 +117,13 @@ describe('ReportTypeSelectionScreen (SCR-09, F-DR-01)', () => {
 
       renderScreen({ onSelectType: jest.fn() });
 
-      const blocked = await screen.findByTestId(
-        'report-type-selection-blocked',
-      );
-      expect(blocked.props.accessibilityRole).toBe('alert');
-      expect(screen.getByText('لا يمكن إرسال تقرير اليوم')).toBeTruthy();
+      expect(
+        await screen.findByTestId('report-type-selection-blocked'),
+      ).toBeTruthy();
+      expect(
+        screen.getByTestId('report-type-selection-blocked-banner').props
+          .accessibilityRole,
+      ).toBe('alert');
       expect(screen.getByText(message)).toBeTruthy();
       expect(screen.getByLabelText('تنبيه')).toBeTruthy();
       expect(screen.queryByTestId('report-type-cards')).toBeNull();
@@ -162,7 +171,9 @@ describe('ReportTypeSelectionScreen (SCR-09, F-DR-01)', () => {
     expect(screen.queryByText(/relation/)).toBeNull();
     expect(screen.getByLabelText('تنبيه')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('report-type-selection-retry-button'));
+    fireEvent.press(
+      screen.getByTestId('report-type-selection-error-retry-button'),
+    );
     expect(await screen.findByTestId('report-type-cards')).toBeTruthy();
     expect(spy).toHaveBeenCalledTimes(2);
   });

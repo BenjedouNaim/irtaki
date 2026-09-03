@@ -32,7 +32,7 @@ describe('QuranRangeField (UF §20 range selector → SCR-11 sheet)', () => {
       />,
     );
     expect(screen.getByText(/نطاق الحفظ/)).toBeTruthy();
-    expect(screen.getByText('اضغط لاختيار النطاق')).toBeTruthy();
+    expect(screen.getByText('اختر النطاق')).toBeTruthy();
     expect(screen.queryByTestId('memo-range-field-sheet')).toBeNull();
   });
 
@@ -46,9 +46,9 @@ describe('QuranRangeField (UF §20 range selector → SCR-11 sheet)', () => {
         testID="memo-range-field"
       />,
     );
-    expect(screen.getByTestId('memo-range-field-summary').props.children).toBe(
-      'من سورة البقرة آية 1 إلى سورة البقرة آية 20',
-    );
+    expect(
+      screen.getByTestId('memo-range-field-trigger-value').props.children,
+    ).toBe('البقرة 1 ← البقرة 20');
   });
 
   it('opens the shared Quran Range Picker and reports the confirmed range', () => {
@@ -67,7 +67,7 @@ describe('QuranRangeField (UF §20 range selector → SCR-11 sheet)', () => {
     expect(screen.getByTestId('rev-range-field-sheet')).toBeTruthy();
     expect(
       screen.getByTestId('rev-range-field-sheet-title').props.children,
-    ).toBe('نطاق المراجعة');
+    ).toBe('من — اختر السورة');
 
     // FROM: surah 1, ayah 1 → TO: surah 1, ayah 7 (SCR-11 four steps).
     fireEvent.press(screen.getByTestId('surah-row-1'));

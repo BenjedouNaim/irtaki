@@ -11,6 +11,11 @@ export interface ChipProps {
   selected?: boolean;
   /** Ahzab read-only mode (Applicant Detail): filled/empty, no interaction. */
   readOnly?: boolean;
+  /**
+   * Ahzab compact cell (Applicant Detail read-only grid, 10 per row):
+   * 28px tall, fills its column, label/sm text.
+   */
+  compact?: boolean;
   onPress?: () => void;
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -31,6 +36,7 @@ export function Chip({
   type = 'ahzab',
   selected = false,
   readOnly = false,
+  compact = false,
   onPress,
   disabled = false,
   accessibilityLabel,
@@ -38,7 +44,11 @@ export function Chip({
   style,
 }: ChipProps) {
   const isAhzab = type === 'ahzab';
-  const shape = isAhzab ? 'w-12 h-11 rounded-sm' : 'h-9 px-4 rounded-full';
+  const shape = isAhzab
+    ? compact
+      ? 'flex-1 min-w-px h-7 rounded-sm'
+      : 'w-12 h-11 rounded-sm'
+    : 'h-9 px-4 rounded-full';
   const fill = selected
     ? 'bg-primary dark:bg-primary-dark'
     : 'bg-surface dark:bg-surface-dark border border-line dark:border-line-dark';
@@ -52,7 +62,7 @@ export function Chip({
     <Text
       numberOfLines={1}
       maxFontSizeMultiplier={1.4}
-      className={`${typography.labelMd} text-center ${text}`}
+      className={`${compact ? typography.labelSm : typography.labelMd} text-center ${text}`}
     >
       {label}
     </Text>

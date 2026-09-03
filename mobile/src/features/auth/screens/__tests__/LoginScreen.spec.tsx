@@ -25,7 +25,8 @@ describe('LoginScreen (SCR-01)', () => {
       <LoginScreen />,
     );
 
-    expect(getByText('إرتقِ')).toBeTruthy();
+    expect(getByText('ارتقِ')).toBeTruthy();
+    expect(getByText('سجّل الدخول لمتابعة رحلة الحفظ')).toBeTruthy();
     expect(getAllByText('تسجيل الدخول').length).toBeGreaterThanOrEqual(1);
     expect(getByTestId('login-email-input')).toBeTruthy();
     expect(getByTestId('login-password-input')).toBeTruthy();
@@ -87,7 +88,9 @@ describe('LoginScreen (SCR-01)', () => {
     expect(
       await findByText('البريد الإلكتروني أو كلمة المرور غير صحيحة'),
     ).toBeTruthy();
+    // Figma 20:55 — Banner (error tone) with the circle-x glyph, never colour alone
     expect(getByTestId('login-general-error')).toBeTruthy();
+    expect(getByTestId('login-general-error-icon')).toBeTruthy();
     expect(getByTestId('login-password-input').props.value).toBe('');
   });
 
@@ -191,12 +194,48 @@ describe('LoginScreen (SCR-01)', () => {
 
   it('displays success banner when successMessage prop is provided', async () => {
     const { getByTestId, findByText } = await render(
-      <LoginScreen successMessage="تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول." />,
+      <LoginScreen successMessage="تم تغيير كلمة المرور بنجاح" />,
     );
 
-    expect(
-      await findByText('تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.'),
-    ).toBeTruthy();
+    expect(await findByText('تم تغيير كلمة المرور بنجاح')).toBeTruthy();
     expect(getByTestId('login-success-banner')).toBeTruthy();
+  });
+
+  it('masks the password and toggles visibility with the trailing eye control (Figma FormField TrailingIcon)', async () => {
+    const { getByTestId, getByLabelText } = await render(<LoginScreen />);
+
+    const input = getByTestId('login-password-input');
+    expect(input.props.secureTextEntry).toBe(true);
+    expect(input.props.textAlign).toBe('left');
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('إظهار كلمة المرور'));
+    });
+
+    expect(getByTestId('login-password-input').props.secureTextEntry).toBe(
+      false,
+    );
+    expect(getByLabelText('إخفاء كلمة المرور')).toBeTruthy();
+  });
+
+  it('marks the email field focused (brand border) while editing', async () => {
+    const { getByTestId } = await render(<LoginScreen />);
+
+    const input = getByTestId('login-email-input');
+    expect(input.props.className).toContain('border-line ');
+
+    await act(async () => {
+      fireEvent(input, 'focus');
+    });
+    expect(getByTestId('login-email-input').props.className).toContain(
+      'border-line-brand',
+    );
+
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    expect(getByTestId('login-email-input').props.className).not.toContain(
+      'border-line-brand',
+    );
   });
 });

@@ -1,11 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useForm } from 'react-hook-form';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { TopBar } from '@/shared/components/TopBar';
 import { ApiError } from '@/shared/api/types';
 import { DailyReportType } from '@/shared/api/dailyReports.client';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart } from '@/shared/theme/rtl';
 import { useSubmitDailyReport } from '../hooks/useSubmitDailyReport';
 import {
   buildSubmitPayload,
@@ -16,6 +20,7 @@ import {
   SERVER_FIELD_TO_FORM_FIELD,
   timeWindowError,
 } from '../utils/dailyReportForm';
+import { formatArabicDate } from '../utils/arabicDate';
 import { YesNoToggle } from '../components/YesNoToggle';
 import { QuranRangeField } from '../components/QuranRangeField';
 import { TimeWindowField } from '../components/TimeWindowField';
@@ -34,11 +39,21 @@ const SERVER_ERROR_MESSAGE =
 const BACKDATED_MESSAGE =
   'انتهى اليوم ولم يعد بالإمكان إرسال هذا التقرير. ستُعاد تهيئة الشاشة الرئيسية.';
 const FIELD_ERRORS_MESSAGE = 'يرجى تصحيح الأخطاء الموضحة في الحقول';
+/** Figma SCR-10 · Normal: the immutability reminder above the submit CTA. */
+const IMMUTABLE_NOTE = 'لا يمكن تعديل التقرير أو حذفه بعد الإرسال.';
 
-const TITLES: Record<DailyReportType, string> = {
+/** One canonical term per report type (UF §33) — same as the SCR-09 cards. */
+export const DAILY_REPORT_TITLES: Record<DailyReportType, string> = {
   Normal: 'تقرير عادي',
-  Revision: 'تقرير مراجعة',
-  Absent: 'تقرير غياب',
+  Revision: 'مراجعة فقط',
+  Absent: 'غياب',
+};
+
+/** Figma SCR-10 heading line per type. */
+const SUBTITLES: Record<DailyReportType, string> = {
+  Normal: 'يومُ حفظ. أجب عن سؤالي البوابة ثم املأ ما ينطبق.',
+  Revision: 'يوم مراجعة. الحقول الأربعة مطلوبة.',
+  Absent: 'اختر سببًا واحدًا. لا يُطلب أي تفصيل نصي.',
 };
 
 /**
@@ -46,23 +61,51 @@ const TITLES: Record<DailyReportType, string> = {
  * `retry` keeps the form (data preserved, UF §24); `home` discards it and
  * sends the student back for Home to re-evaluate fresh.
  */
-interface Banner {
+interface SubmissionBanner {
   message: string;
   action: 'retry' | 'home';
 }
 
+/** Figma form section card: surface, 1px border/default, radius lg, overline label. */
+export function FormSection({
+  label,
+  testID,
+  children,
+}: {
+  label: string;
+  testID?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      testID={testID}
+      className={`w-full px-4 py-5 gap-5 rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark ${itemsStart}`}
+      style={{ borderCurve: 'continuous' }}
+    >
+      <Text
+        className={`w-full ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        accessibilityRole="header"
+      >
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
 /**
- * SCR-10 Daily Report Form (F-DR-02, UF §15 / §28). Progressive disclosure
- * per type: Normal shows two independent gated sections (memorisation,
- * revision) plus the standalone tafsir toggle; Absent shows the reason only;
- * Revision shows range + time with no gate (BR-28a). Reachable from SCR-09
- * with the chosen type. No confirmation on submit (UF §25); a discard prompt
- * only when fields were touched.
+ * SCR-10 Daily Report Form (F-DR-02, UF §15 / §28; Figma 26:414 / 26:546 /
+ * 26:600). Progressive disclosure per type: Normal shows two independent
+ * gated section cards (memorisation, revision) plus the standalone tafsir
+ * card; Absent shows the reason picker only; Revision shows range + time
+ * with no gate (BR-28a). Reachable from SCR-09 with the chosen type. No
+ * confirmation on submit (UF §25); a light discard dialog (50:929) only
+ * when fields were touched.
  */
 export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
   const router = useRouter();
   const [reportDate] = useState(() => localTodayIsoDate());
-  const [banner, setBanner] = useState<Banner | null>(null);
+  const [banner, setBanner] = useState<SubmissionBanner | null>(null);
   const [discardVisible, setDiscardVisible] = useState(false);
   const submission = useSubmitDailyReport();
 
@@ -105,6 +148,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
   }, [router, goHome]);
 
   const requestClose = () => {
+    if (isSubmitting) return;
     if (isDirty) {
       setDiscardVisible(true);
     } else {
@@ -189,7 +233,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
 
     if (type === 'Revision') {
       return (
-        <View className="w-full">
+        <FormSection label="المراجعة" testID="rev-section">
           <QuranRangeField
             label="نطاق المراجعة"
             rangeType="revision"
@@ -209,24 +253,14 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
             error={revTimeError}
             testID="rev-time-field"
           />
-        </View>
+        </FormSection>
       );
     }
 
     return (
-      <View className="w-full gap-2">
+      <View className="w-full gap-6">
         {/* Section A — Memorization */}
-        <View
-          className="w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-          style={{ borderCurve: 'continuous' }}
-          testID="memo-section"
-        >
-          <Text
-            className="text-base font-bold text-gray-900 dark:text-gray-100 text-right mb-3"
-            accessibilityRole="header"
-          >
-            الحفظ
-          </Text>
+        <FormSection label="الحفظ" testID="memo-section">
           <YesNoToggle
             question="هل حفظت آيات جديدة اليوم؟"
             value={values.memoGate === null ? null : values.memoGate === 'yes'}
@@ -235,7 +269,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
             testID="memo-gate"
           />
           {values.memoGate === 'yes' ? (
-            <View testID="memo-details">
+            <View className="w-full gap-5" testID="memo-details">
               <QuranRangeField
                 label="نطاق الحفظ"
                 rangeType="memorization"
@@ -256,7 +290,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
                 testID="memo-time-field"
               />
               <YesNoToggle
-                question="هل أتممت التكرارات الخمسين؟"
+                question="هل أتممت التكرار 50 مرة؟"
                 value={values.completed_50_repetitions}
                 onChange={(yes) => {
                   set('completed_50_repetitions', yes);
@@ -270,7 +304,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
               />
               {values.completed_50_repetitions === true ? (
                 <YesNoToggle
-                  question="هل كانت التكرارات في جلسة واحدة؟"
+                  question="في جلسة واحدة؟"
                   value={values.repetitions_in_single_session}
                   onChange={(yes) => set('repetitions_in_single_session', yes)}
                   disabled={isSubmitting}
@@ -280,20 +314,10 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
               ) : null}
             </View>
           ) : null}
-        </View>
+        </FormSection>
 
         {/* Section B — Revision */}
-        <View
-          className="w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-          style={{ borderCurve: 'continuous' }}
-          testID="rev-section"
-        >
-          <Text
-            className="text-base font-bold text-gray-900 dark:text-gray-100 text-right mb-3"
-            accessibilityRole="header"
-          >
-            المراجعة
-          </Text>
+        <FormSection label="المراجعة" testID="rev-section">
           <YesNoToggle
             question="هل راجعت اليوم؟"
             value={values.revGate === null ? null : values.revGate === 'yes'}
@@ -302,7 +326,7 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
             testID="rev-gate"
           />
           {values.revGate === 'yes' ? (
-            <View testID="rev-details">
+            <View className="w-full gap-5" testID="rev-details">
               <QuranRangeField
                 label="نطاق المراجعة"
                 rangeType="revision"
@@ -324,85 +348,80 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
               />
             </View>
           ) : null}
-        </View>
+        </FormSection>
 
         {/* Standalone — tafsir (ISS-12: informational, feeds no metric) */}
-        <View className="w-full px-1 pt-2" testID="tafsir-section">
+        <FormSection label="التفسير" testID="tafsir-section">
           <YesNoToggle
             question="هل قرأت التفسير اليوم؟"
-            note="للمتابعة فقط — لا يدخل في أي مؤشر"
             value={values.read_tafsir}
             onChange={(yes) => set('read_tafsir', yes)}
             disabled={isSubmitting}
             error={fieldError('read_tafsir')}
             testID="read-tafsir-toggle"
           />
-        </View>
+        </FormSection>
       </View>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, values, isSubmitting, errors, memoTimeError, revTimeError, set]);
 
+  const heading =
+    type === 'Absent' ? 'سبب الغياب' : formatArabicDate(reportDate);
+
   return (
-    <ScrollView
-      className="flex-1 bg-white dark:bg-gray-950"
-      contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="daily-report-form-screen"
     >
-      <View className="w-full max-w-md self-center gap-5">
-        <View className="flex-row-reverse items-center justify-between">
-          <View className="flex-1 gap-1">
-            <Text
-              className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
-              accessibilityRole="header"
-              testID="daily-report-form-title"
-            >
-              {TITLES[type]}
-            </Text>
-            <Text className="text-sm text-gray-500 dark:text-gray-400 text-right">
-              تقرير اليوم يُرسل مرة واحدة ولا يمكن تعديله بعد الإرسال.
-            </Text>
-          </View>
-          <Pressable
-            testID="daily-report-form-cancel-button"
-            accessibilityRole="button"
-            accessibilityLabel="إلغاء والعودة"
-            disabled={isSubmitting}
-            onPress={requestClose}
-            className="min-h-[48px] min-w-[48px] items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-gray-800"
+      <TopBar
+        title={DAILY_REPORT_TITLES[type]}
+        onBack={requestClose}
+        testID="daily-report-form-top-bar"
+      />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 24,
+          gap: 24,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className={`w-full gap-1 ${itemsStart}`}>
+          <Text
+            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+            accessibilityRole="header"
+            testID="daily-report-form-title"
           >
-            <Text className="text-xl font-bold text-gray-800 dark:text-gray-200">
-              →
-            </Text>
-          </Pressable>
+            {heading}
+          </Text>
+          <Text
+            className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+            testID="daily-report-form-subtitle"
+          >
+            {SUBTITLES[type]}
+          </Text>
         </View>
 
         {banner ? (
-          <View
-            testID="daily-report-form-banner"
-            accessibilityRole="alert"
-            className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-4 gap-3"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <View className="flex-row-reverse items-center gap-2">
-              <Text accessibilityLabel="تنبيه" className="text-base">
-                ⚠️
-              </Text>
-              <Text
-                className="flex-1 text-destructive-800 dark:text-destructive-200 text-sm text-right leading-relaxed"
-                testID="daily-report-form-banner-message"
-              >
-                {banner.message}
-              </Text>
-            </View>
+          <View className="w-full gap-3">
+            <Banner
+              tone="error"
+              icon={banner.action === 'home' ? 'alert' : undefined}
+              message={banner.message}
+              testID="daily-report-form-banner"
+            />
             {banner.action === 'home' ? (
               <Button
                 label="العودة إلى الرئيسية"
                 variant="outline"
                 onPress={goHome}
                 testID="daily-report-form-home-button"
+                className="w-full"
               />
             ) : null}
           </View>
@@ -411,6 +430,16 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
         {banner?.action === 'home' ? null : (
           <>
             {body}
+
+            {type === 'Normal' ? (
+              <Banner
+                tone="info"
+                message={IMMUTABLE_NOTE}
+                testID="daily-report-form-immutable-note"
+              />
+            ) : (
+              <View className="flex-1" />
+            )}
 
             <Button
               label="إرسال التقرير"
@@ -423,14 +452,15 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
             />
           </>
         )}
-      </View>
+      </ScrollView>
 
       <ConfirmationDialog
         visible={discardVisible}
+        weight="light"
         title="تجاهل هذا التقرير؟"
-        message="لن يُحفظ ما أدخلته؛ يمكنك إرسال تقرير اليوم لاحقاً قبل منتصف الليل."
+        message="لا توجد مسودّات — ما أدخلته سيُفقد."
         confirmLabel="تجاهل"
-        cancelLabel="متابعة الإدخال"
+        cancelLabel="إلغاء"
         onConfirm={() => {
           setDiscardVisible(false);
           goBack();
@@ -438,6 +468,6 @@ export function DailyReportFormScreen({ type }: DailyReportFormScreenProps) {
         onCancel={() => setDiscardVisible(false)}
         testID="discard-report-dialog"
       />
-    </ScrollView>
+    </View>
   );
 }
