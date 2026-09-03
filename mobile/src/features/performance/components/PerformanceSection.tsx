@@ -16,11 +16,19 @@ import {
   PerformanceDto,
   PerformancePeriod,
 } from '@/shared/api/performance.client';
+import { useMembershipPerformance } from '@/features/performance/hooks/useMembershipPerformance';
 import { useMyPerformance } from '@/features/performance/hooks/useMyPerformance';
 import { typography } from '@/shared/theme/typography';
 import { itemsStart, rowStart } from '@/shared/theme/rtl';
 
 export interface PerformanceSectionProps {
+  /**
+   * SCR-24 (F-PERF-03): read this membership through API-039 instead of the
+   * caller's own API-037. The payload is identical (APIS §10.9 "same shape
+   * as `/me/performance`"), so the whole section renders unchanged — the
+   * only difference is whose dashboard it is. Omitted on SCR-13.
+   */
+  membershipId?: string;
   /**
    * Rendered between the commitment-score card and the day-breakdown card —
    * the slot Figma 30:553 fills with the memorization card (F-PRG-02's
@@ -76,8 +84,9 @@ const NO_TREND_NOTE = 'لا يوجد خط اتجاه في هذه النسخة';
 /**
  * Maps a query error to the user-facing Arabic message per UF §24's table.
  * `5xx` and network failures show generic copy; the server string is never
- * shown. `401` is refreshed silently by the API client; `403` is unreachable
- * for a Student on their own route. Any remaining `4xx` carries the exception
+ * shown. `401` is refreshed silently by the API client; `403`/`404` are
+ * unreachable — a Student is on their own route and navigation never offers
+ * an out-of-scope student (UF §8). Any remaining `4xx` carries the exception
  * filter's Arabic message, as elsewhere.
  */
 function describeError(error: unknown): string {
@@ -125,24 +134,38 @@ const CARD =
   'w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark';
 
 /**
- * SCR-13's Performance section (F-PERF-01, UF §17; Figma 30:553): the period
- * selector, the commitment-score card, the day-breakdown donut, the
- * repetition-quality and recitation-attendance tiles and the days-since row.
- * Assembles around F-PRG-02's memorization card, passed as `children`.
+ * The Performance section of SCR-13 (F-PERF-01, UF §17; Figma 30:553) AND of
+ * SCR-24 (F-PERF-03; Figma 38:160), which UF §28 gives "the same layout as
+ * the Progress Tab": the period selector, the commitment-score card, the
+ * day-breakdown donut, the repetition-quality and recitation-attendance
+ * tiles and the days-since row. Assembles around the memorization card,
+ * passed as `children`.
  *
- * Every rate arrives nullable from API-037 and renders "بيانات غير كافية",
+ * `membershipId` switches the source route from API-037 to API-039 and
+ * changes nothing else — the two payloads are one shape (APIS §10.9).
+ *
+ * Every rate arrives nullable from API-037/039 and renders "بيانات غير كافية",
  * never `0%` (DEC-B04 / API-X07). `repetition_quality` and
  * `attendance_rate` are shown standalone, never folded into the score
  * (SAS §18.3).
  */
 export function PerformanceSection({
+  membershipId,
   children,
   testID = 'performance-section',
   className,
   style,
 }: PerformanceSectionProps) {
   const [period, setPeriod] = useState<PerformancePeriod>('week');
-  const { data, isLoading, isError, error, refetch } = useMyPerformance(period);
+  // Exactly one of the two runs: the section is the SAME component on SCR-13
+  // and SCR-24 (F-PERF-03 adds no new one), only its source route differs.
+  const ownQuery = useMyPerformance(period, { enabled: !membershipId });
+  const membershipQuery = useMembershipPerformance(membershipId ?? '', period, {
+    enabled: Boolean(membershipId),
+  });
+  const { data, isLoading, isError, error, refetch } = membershipId
+    ? membershipQuery
+    : ownQuery;
 
   const showSkeleton = isLoading && !data;
   const showError = isError && !data;

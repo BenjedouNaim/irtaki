@@ -324,7 +324,7 @@ describe('RosterScreen (F-MEM-02)', () => {
       );
     });
 
-    it('hands a tapped student to onStudentPress (→ SCR-25)', async () => {
+    it('hands a tapped student, with the roster fields SCR-24 shows, to onStudentPress', async () => {
       jest
         .spyOn(membershipsApi, 'getGroupMemberships')
         .mockResolvedValueOnce({ data: mockRoster });
@@ -343,6 +343,11 @@ describe('RosterScreen (F-MEM-02)', () => {
 
       expect(onStudentPress).toHaveBeenCalledWith(
         mockGroupPerformance.students[0],
+        {
+          gender: mockRoster[0].user.gender,
+          startedAt: mockRoster[0].started_at,
+          groupName: mockGroup.name,
+        },
       );
       expect(mockPush).not.toHaveBeenCalled();
     });

@@ -28,6 +28,18 @@ import {
   STUDENT_COUNT_FORMS,
 } from '@/shared/utils/format';
 
+/**
+ * What SCR-23 already knows about a student row and SCR-24 shows in its
+ * header (Figma 38:197). No endpoint returns a single membership to staff,
+ * so the fields travel with the tap rather than being re-fetched; a field
+ * the roster did not carry stays null and is simply not rendered (UF §8).
+ */
+export interface RosterStudentContext {
+  gender: string | null;
+  startedAt: string | null;
+  groupName: string | null;
+}
+
 export interface RosterScreenProps {
   groupId: string;
   /**
@@ -43,10 +55,14 @@ export interface RosterScreenProps {
   groupName?: string | null;
   /**
    * Teacher: student row tap on SCR-23's weakest-first list. The row leads
-   * into that student's raw daily reports (SCR-25, F-DR-06); without it the
-   * rows are not tappable — navigation never offers a missing screen (UF §8).
+   * into that student's dashboard (SCR-24, F-PERF-03 — UF §27's "Group
+   * Detail row tap"); without it the rows are not tappable — navigation
+   * never offers a missing screen (UF §8).
    */
-  onStudentPress?: (student: GroupStudentPerformanceDto) => void;
+  onStudentPress?: (
+    student: GroupStudentPerformanceDto,
+    context: RosterStudentContext,
+  ) => void;
   /**
    * Whether a Terminated row opens the Admin recovery view (SCR-31). Roles
    * without that route must pass `false` — navigation never offers an
@@ -118,6 +134,20 @@ export default function RosterScreen({
 
   const active = entries.filter((e) => e.state === 'Active');
   const removed = entries.filter((e) => e.state === 'Terminated');
+
+  /**
+   * The roster fields SCR-24 shows next to the score. API-038's member set
+   * can include a student the roster read does not (a removed member on a
+   * historical period, FR-PERF-09), so every field is optional.
+   */
+  const studentContext = (membershipId: string): RosterStudentContext => {
+    const entry = entries.find((e) => e.id === membershipId);
+    return {
+      gender: entry?.user.gender ?? null,
+      startedAt: entry?.started_at ?? null,
+      groupName: group?.name ?? null,
+    };
+  };
 
   const renderAdminRow = (item: RosterEntry) => {
     const name = item.user.full_name || 'غير محدد';
@@ -208,7 +238,12 @@ export default function RosterScreen({
             header or the enrollment toggle above it. */}
         <GroupPerformanceSection
           groupId={groupId}
-          onStudentPress={onStudentPress}
+          onStudentPress={
+            onStudentPress
+              ? (student) =>
+                  onStudentPress(student, studentContext(student.membership_id))
+              : undefined
+          }
         />
       </>
     );

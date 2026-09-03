@@ -33,10 +33,16 @@ export function myPerformanceQueryKey(
  * `custom` is not requested here: SCR-13 offers no date-range picker in the
  * Figma file, so the screen never selects it (see the section component).
  */
-export function useMyPerformance(period: PerformancePeriod = 'week') {
+export function useMyPerformance(
+  period: PerformancePeriod = 'week',
+  options: { enabled?: boolean } = {},
+) {
   const userId = useAuthStore((s) => s.userId);
   return useQuery<PerformanceDto, Error>({
     queryKey: myPerformanceQueryKey(userId, period),
     queryFn: () => getMyPerformance({ period }),
+    // SCR-24 reuses this section against API-039 instead; the own-scope
+    // query is then left un-run rather than fetching a second dashboard.
+    enabled: options.enabled ?? true,
   });
 }

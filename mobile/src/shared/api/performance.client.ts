@@ -71,6 +71,28 @@ export async function getMyPerformance(
   return response.data;
 }
 
+/**
+ * Fetches ONE student's dashboard (API-039) and unwraps the APIS §9.1
+ * envelope. The payload is `PerformanceDto` verbatim — APIS §10.9: "same
+ * shape as `/me/performance`" — so SCR-24 renders it with SCR-13's own
+ * components.
+ *
+ * Reachable by a Teacher on an assigned group, the Admin, or the Student on
+ * their OWN membership (APIS §6.1). Errors surface as `ApiError` unchanged:
+ * an out-of-scope membership is a `403 SCOPE_DENIED`, which navigation never
+ * offers (UF §8/§24).
+ */
+export async function getMembershipPerformance(
+  membershipId: string,
+  params: PerformanceParams = {},
+): Promise<PerformanceDto> {
+  const response = await apiClient.get<PerformanceResponse>(
+    `/memberships/${membershipId}/performance`,
+    { params: toQuery(params) },
+  );
+  return response.data;
+}
+
 /** One row of API-038's weakest-first student list. */
 export interface GroupStudentPerformanceDto {
   membership_id: string;

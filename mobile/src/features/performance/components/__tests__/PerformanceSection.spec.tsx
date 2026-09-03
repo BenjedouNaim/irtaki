@@ -402,4 +402,83 @@ describe('PerformanceSection (SCR-13 Performance, F-PERF-01, Figma 30:553)', () 
     expect(value.props.maxFontSizeMultiplier).toBe(1.5);
     expect(value.props.adjustsFontSizeToFit).toBe(true);
   });
+
+  describe('SCR-24 reuse: the same section against API-039 (F-PERF-03)', () => {
+    function renderForMembership() {
+      queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+      });
+      return render(
+        <QueryClientProvider client={queryClient}>
+          <PerformanceSection membershipId="membership-1" />
+        </QueryClientProvider>,
+      );
+    }
+
+    it('reads the membership route and leaves the own route un-run', async () => {
+      jest
+        .spyOn(performanceApi, 'getMembershipPerformance')
+        .mockResolvedValue(mockPerformance);
+      jest.spyOn(performanceApi, 'getMyPerformance').mockImplementation(NEVER);
+
+      renderForMembership();
+
+      await waitFor(() =>
+        expect(performanceApi.getMembershipPerformance).toHaveBeenCalledWith(
+          'membership-1',
+          { period: 'week' },
+        ),
+      );
+      expect(performanceApi.getMyPerformance).not.toHaveBeenCalled();
+    });
+
+    it('renders exactly the same cards from the identical payload (APIS §10.9)', async () => {
+      jest
+        .spyOn(performanceApi, 'getMembershipPerformance')
+        .mockResolvedValue(mockPerformance);
+
+      renderForMembership();
+
+      expect(
+        (await screen.findByTestId('performance-section-score-value')).props
+          .children,
+      ).toBe('78');
+      expect(screen.getByTestId('performance-section-donut')).toBeTruthy();
+      expect(screen.getByTestId('performance-section-quality')).toBeTruthy();
+      expect(screen.getByTestId('performance-section-days-since')).toBeTruthy();
+    });
+
+    it('carries the period change onto the membership route', async () => {
+      jest
+        .spyOn(performanceApi, 'getMembershipPerformance')
+        .mockResolvedValue(mockPerformance);
+
+      renderForMembership();
+      await screen.findByTestId('performance-section-score');
+
+      fireEvent.press(screen.getByText('3 أشهر'));
+
+      await waitFor(() =>
+        expect(performanceApi.getMembershipPerformance).toHaveBeenCalledWith(
+          'membership-1',
+          { period: '3months' },
+        ),
+      );
+    });
+
+    it('shows the generic 5xx copy, never the server message (UF §24)', async () => {
+      jest.spyOn(performanceApi, 'getMembershipPerformance').mockRejectedValue(
+        new ApiError({
+          statusCode: 503,
+          error: 'INTERNAL_ERROR',
+          message: 'upstream down',
+        }),
+      );
+
+      renderForMembership();
+
+      expect(await screen.findByText(GENERIC_SERVER_MESSAGE)).toBeTruthy();
+      expect(screen.queryByText('upstream down')).toBeNull();
+    });
+  });
 });

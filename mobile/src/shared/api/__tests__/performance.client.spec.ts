@@ -1,5 +1,6 @@
 import {
   getGroupPerformance,
+  getMembershipPerformance,
   getMyPerformance,
   GroupPerformanceDto,
   PerformanceDto,
@@ -194,6 +195,76 @@ describe('performance.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(getGroupPerformance('group-1')).rejects.toBe(error);
+    });
+  });
+
+  describe('getMembershipPerformance (API-039)', () => {
+    it('calls /memberships/{id}/performance and unwraps the §9.1 envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockPerformance });
+
+      const result = await getMembershipPerformance('membership-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/membership-1/performance',
+        { params: {} },
+      );
+      expect(result).toEqual(mockPerformance);
+    });
+
+    it('sends the ?period= filter and drops from/to on a non-custom period', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockPerformance });
+
+      await getMembershipPerformance('membership-1', {
+        period: '3months',
+        from: '2026-01-01',
+        to: '2026-01-31',
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/membership-1/performance',
+        { params: { period: '3months' } },
+      );
+    });
+
+    it('sends from/to when the period IS custom (APIS §10.9)', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockPerformance });
+
+      await getMembershipPerformance('membership-1', {
+        period: 'custom',
+        from: '2026-01-01',
+        to: '2026-01-31',
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/membership-1/performance',
+        { params: { period: 'custom', from: '2026-01-01', to: '2026-01-31' } },
+      );
+    });
+
+    it('leaves every null rate untouched — never 0 (DEC-B04)', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: {
+          ...mockPerformance,
+          commitment_score: null,
+          attendance_rate: null,
+          repetition_quality: null,
+        },
+      });
+
+      const result = await getMembershipPerformance('membership-1');
+
+      expect(result.commitment_score).toBeNull();
+      expect(result.attendance_rate).toBeNull();
+      expect(result.repetition_quality).toBeNull();
+    });
+
+    it('propagates apiClient errors unchanged', async () => {
+      const error = new Error('boom');
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(getMembershipPerformance('membership-1')).rejects.toBe(
+        error,
+      );
     });
   });
 });
