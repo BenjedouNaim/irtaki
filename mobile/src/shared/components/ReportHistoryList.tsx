@@ -44,6 +44,12 @@ export interface ReportHistoryListProps<T extends { id: string }> {
    * never shown for a 5xx, so each list names what failed to load.
    */
   serverErrorMessage?: string;
+  /**
+   * Figma "Entries" card (42:606): the rows share ONE surface card with a
+   * hairline between them, instead of each row standing as its own card.
+   * SCR-33's flat chronological list is drawn this way.
+   */
+  grouped?: boolean;
   testID: string;
 }
 
@@ -75,8 +81,9 @@ function describeError(error: unknown, serverMessage: string): string {
  * (UF §22), an appended retry banner if that page fails, a replacing
  * banner if the first page fails (UF §24, icon + text per UF §32) and the
  * UF §23 empty state. The data source and the row are the caller's — the
- * Daily and Weekly sub-tabs, and SCR-32's user directory (F-ADM-02),
- * differ only in those.
+ * Daily and Weekly sub-tabs, SCR-32's user directory (F-ADM-02) and SCR-33's
+ * audit log (F-ADM-03) differ only in those, plus whether the rows stand as
+ * separate cards or share one (`grouped`).
  */
 export function ReportHistoryList<T extends { id: string }>({
   query,
@@ -85,6 +92,7 @@ export function ReportHistoryList<T extends { id: string }>({
   emptyIcon = 'file-text',
   skeletonVariant = 'reportRow',
   serverErrorMessage = SERVER_ERROR_MESSAGE,
+  grouped = false,
   testID,
 }: ReportHistoryListProps<T>) {
   const colors = useThemeColors();
@@ -146,7 +154,29 @@ export function ReportHistoryList<T extends { id: string }>({
       data={rows}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => renderRow(item)}
-      contentContainerStyle={{ gap: 10, paddingBottom: 40 }}
+      contentContainerStyle={
+        grouped
+          ? {
+              backgroundColor: colors.bgSurface,
+              borderWidth: 1,
+              borderColor: colors.borderDefault,
+              borderRadius: 18,
+              borderCurve: 'continuous',
+              paddingHorizontal: 16,
+              overflow: 'hidden',
+            }
+          : { gap: 10, paddingBottom: 40 }
+      }
+      ItemSeparatorComponent={
+        grouped
+          ? () => (
+              <View
+                testID={`${testID}-separator`}
+                className="h-px w-full bg-line dark:bg-line-dark"
+              />
+            )
+          : undefined
+      }
       onEndReached={loadMore}
       onEndReachedThreshold={0.4}
       refreshControl={

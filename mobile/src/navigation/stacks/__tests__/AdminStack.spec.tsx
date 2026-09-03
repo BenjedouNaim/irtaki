@@ -33,11 +33,11 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
     ).toBeTruthy();
     expect(screen.getByText('الطاقم والمستخدمون')).toBeTruthy();
     expect(screen.getByText('ترقية مستخدم إلى معلّم أو مساعد')).toBeTruthy();
-    // The Audit Log screen does not exist yet — no row leads there.
-    expect(screen.queryByText('سجل التدقيق')).toBeNull();
+    expect(screen.getByText('سجل التدقيق')).toBeTruthy();
+    expect(screen.getByText('الإجراءات الثلاثة المسجّلة')).toBeTruthy();
   });
 
-  it('routes to the groups list, the user directory and the profile', () => {
+  it('routes to the groups list, the user directory, the audit log and the profile', () => {
     render(<AdminStack />);
 
     fireEvent.press(screen.getByTestId('admin-groups-button'));
@@ -45,6 +45,10 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
 
     fireEvent.press(screen.getByTestId('admin-users-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/admin/users');
+
+    // UF §27: the audit log is reached from Admin Home ("Home → Audit Log").
+    fireEvent.press(screen.getByTestId('admin-audit-button'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/admin/audit');
 
     fireEvent.press(screen.getByTestId('profile-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/profile');

@@ -13,9 +13,8 @@ import {
 /**
  * SCR-26 Admin Home (Figma 39:2, UF §10 "Menu hub"). The four MetricTiles
  * of the frame (staff, groups, pending recoveries, students) are dashboard
- * aggregates the app does not fetch yet, and the Audit Log row leads to a
- * screen that does not exist yet — both are left out rather than faked
- * (UF §8: never offer an out-of-scope screen).
+ * aggregates the app does not fetch yet, so they are left out rather than
+ * faked (UF §8: never offer an out-of-scope screen).
  */
 export function AdminStack() {
   const router = useRouter();
@@ -71,6 +70,13 @@ export function AdminStack() {
             leadingIcon="users"
             onPress={() => router.push('/(app)/admin/users' as any)}
             testID="admin-users-button"
+          />
+          <ListRow
+            title="سجل التدقيق"
+            subtitle="الإجراءات الثلاثة المسجّلة"
+            leadingIcon="history"
+            onPress={() => router.push('/(app)/admin/audit' as any)}
+            testID="admin-audit-button"
           />
           <ListRow
             title="الملف الشخصي"
