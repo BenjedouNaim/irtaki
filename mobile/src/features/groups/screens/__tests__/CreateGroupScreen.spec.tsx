@@ -18,6 +18,9 @@ jest.mock('expo-router', () => ({
   router: { back: jest.fn() },
 }));
 
+/** The single-page `GET /users` envelope the staff picker reads (APIS §9.2). */
+const NO_MORE = { next_cursor: null, has_more: false };
+
 describe('CreateGroupScreen (SCR-28, Figma 39:230)', () => {
   const TEACHER_ID = '11111111-1111-1111-1111-111111111111';
   const ASSISTANT_ID = '33333333-3333-3333-3333-333333333333';
@@ -56,12 +59,12 @@ describe('CreateGroupScreen (SCR-28, Figma 39:230)', () => {
     jest.clearAllMocks();
     jest.spyOn(usersApi, 'listUsersByRole').mockImplementation((role) => {
       if (role === 'Teacher') {
-        return Promise.resolve({ data: mockTeachers });
+        return Promise.resolve({ data: mockTeachers, pagination: NO_MORE });
       }
       if (role === 'Assistant') {
-        return Promise.resolve({ data: mockAssistants });
+        return Promise.resolve({ data: mockAssistants, pagination: NO_MORE });
       }
-      return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: [], pagination: NO_MORE });
     });
   });
 
@@ -276,9 +279,9 @@ describe('CreateGroupScreen (SCR-28, Figma 39:230)', () => {
       )
       .mockImplementation((role) => {
         if (role === 'Teacher') {
-          return Promise.resolve({ data: mockTeachers });
+          return Promise.resolve({ data: mockTeachers, pagination: NO_MORE });
         }
-        return Promise.resolve({ data: mockAssistants });
+        return Promise.resolve({ data: mockAssistants, pagination: NO_MORE });
       });
 
     const { getByTestId, findByText, findByTestId } = render(

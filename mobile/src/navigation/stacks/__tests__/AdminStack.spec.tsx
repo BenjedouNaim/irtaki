@@ -31,16 +31,20 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
     expect(
       screen.getByText('إنشاء · أرشفة · إسناد الطاقم · القوائم'),
     ).toBeTruthy();
-    // Staff & Users / Audit Log screens do not exist — no row leads there.
-    expect(screen.queryByText('الطاقم والمستخدمون')).toBeNull();
+    expect(screen.getByText('الطاقم والمستخدمون')).toBeTruthy();
+    expect(screen.getByText('ترقية مستخدم إلى معلّم أو مساعد')).toBeTruthy();
+    // The Audit Log screen does not exist yet — no row leads there.
     expect(screen.queryByText('سجل التدقيق')).toBeNull();
   });
 
-  it('routes to the groups list and to the profile', () => {
+  it('routes to the groups list, the user directory and the profile', () => {
     render(<AdminStack />);
 
     fireEvent.press(screen.getByTestId('admin-groups-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/admin/groups');
+
+    fireEvent.press(screen.getByTestId('admin-users-button'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/admin/users');
 
     fireEvent.press(screen.getByTestId('profile-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/profile');
