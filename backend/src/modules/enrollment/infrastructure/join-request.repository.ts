@@ -321,6 +321,25 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     return rows[0]?.count ?? 0;
   }
 
+  /**
+   * The accept's whole decision, in ONE guarded statement (TS §20): no SELECT
+   * of the row's status or its group's lifecycle precedes it, so there is
+   * nothing to go stale between check and write. 0 rows = the request is no
+   * longer acceptable → `409 ALREADY_DECIDED` (APIS §9.7, §10.6).
+   *
+   * The `lifecycle_state = 'Active'` predicate is the second half of DBD §27's
+   * accept-vs-archival protection. DS-07 auto-rejects every `Pending` request
+   * in its archival transaction, which covers requests that existed when the
+   * Admin archived; this predicate covers the one it could not see — a request
+   * INSERTed by a concurrent submit whose row was still uncommitted when the
+   * cascade's bulk UPDATE ran, and which therefore survives as `Pending`
+   * against an `Archived` group. Without it that request is acceptable and
+   * BR-42 is broken by a Membership created into an Archived Group.
+   *
+   * Note this is not a lock and not an elevated isolation level: whichever
+   * transaction reaches this row first wins it, and the loser blocks, re-reads
+   * under `READ COMMITTED` and matches nothing.
+   */
   async acceptConditionally(
     id: string,
     reviewerId: string,
@@ -331,13 +350,20 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     // fall back on a server-clock date (INV-27).
     const updateResult: unknown = await manager.query(
       `WITH accepted AS (
-         UPDATE join_requests
+         UPDATE join_requests jr
          SET status = 'Accepted',
              reviewed_at = now(),
              reviewed_by = $2,
              resolution_source = 'manual'
-         WHERE id = $1 AND status = 'Pending' AND deleted_at IS NULL
-         RETURNING user_id, group_id, full_name, gender
+         WHERE jr.id = $1
+           AND jr.status = 'Pending'
+           AND jr.deleted_at IS NULL
+           AND EXISTS (
+                 SELECT 1 FROM groups g
+                  WHERE g.id = jr.group_id
+                    AND g.lifecycle_state = 'Active'
+               )
+         RETURNING jr.user_id, jr.group_id, jr.full_name, jr.gender
        )
        SELECT accepted.user_id,
               accepted.group_id,
