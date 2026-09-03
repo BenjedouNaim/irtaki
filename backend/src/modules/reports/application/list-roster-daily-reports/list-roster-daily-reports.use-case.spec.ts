@@ -3,17 +3,20 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../../../shared/pagination/cursor.util';
+import { NotFoundException } from '@nestjs/common';
 import {
   DailyReportRecord,
   IDailyReportRepository,
 } from '../../domain/daily-report.repository.interface';
-import { ListOwnDailyReportsUseCase } from './list-own-daily-reports.use-case';
+import { IMembershipReportScope } from '../../domain/membership-report-scope.interface';
+import { ListRosterDailyReportsUseCase } from './list-roster-daily-reports.use-case';
 
-describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
-  let useCase: ListOwnDailyReportsUseCase;
+describe('ListRosterDailyReportsUseCase (F-DR-06 / API-032)', () => {
+  let useCase: ListRosterDailyReportsUseCase;
   let repository: jest.Mocked<IDailyReportRepository>;
+  let scope: jest.Mocked<IMembershipReportScope>;
 
-  const userId = 'student-1';
+  const membershipId = '01916362-e61e-7f61-8270-b74e892c90aa';
 
   function record(
     id: string,
@@ -22,7 +25,7 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
   ): DailyReportRecord {
     return {
       id,
-      membershipId: 'membership-1',
+      membershipId,
       reportDate,
       type: 'Absent',
       submittedAt: `${reportDate}T08:30:00.000Z`,
@@ -68,35 +71,45 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
     };
-    useCase = new ListOwnDailyReportsUseCase(repository);
+    scope = {
+      isActiveMembershipOfTeacher: jest.fn(),
+      // The membership passed the guard in every case below unless a test
+      // says otherwise.
+      membershipExists: jest.fn().mockResolvedValue(true),
+    };
+    useCase = new ListRosterDailyReportsUseCase(repository, scope);
   });
 
-  it('asks the repository for the first page with the default limit of 20 and no filters (APIS §9.2)', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+  it('queries by the guard-verified membership id only, with the default limit of 20 and no filters (TS §15.2 step 4, APIS §9.2)', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [newer, older],
       hasMore: false,
     });
 
-    const result = await useCase.execute(userId, {});
+    const result = await useCase.execute(membershipId, {});
 
-    expect(repository.findOwnHistoryByUserId).toHaveBeenCalledWith({
-      userId,
+    expect(repository.findHistoryByMembershipId).toHaveBeenCalledWith({
+      membershipId,
       from: null,
       to: null,
       limit: 20,
       cursor: null,
     });
+    expect(repository.findOwnHistoryByUserId).not.toHaveBeenCalled();
+    // A non-empty page already proves the membership exists (DB-FK).
+    expect(scope.membershipExists).not.toHaveBeenCalled();
+    expect(scope.isActiveMembershipOfTeacher).not.toHaveBeenCalled();
     expect(result.pagination).toEqual({ next_cursor: null, has_more: false });
     expect(result.data.map((r) => r.id)).toEqual([newer.id, older.id]);
   });
 
-  it('maps rows through the DailyReportDto mapper (APIS §11: surah/ayah, wire names)', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+  it('returns the same DailyReportDto shape as API-031 (APIS §10.7 "same shape", §11)', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [older],
       hasMore: false,
     });
 
-    const result = await useCase.execute(userId, {});
+    const result = await useCase.execute(membershipId, {});
 
     expect(result.data[0]).toEqual({
       id: older.id,
@@ -119,17 +132,17 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
   });
 
   it('passes from/to through and clamps limit into [1, 100]', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [],
       hasMore: false,
     });
 
-    await useCase.execute(userId, {
+    await useCase.execute(membershipId, {
       from: '2026-08-01',
       to: '2026-08-31',
       limit: '500',
     });
-    expect(repository.findOwnHistoryByUserId).toHaveBeenLastCalledWith(
+    expect(repository.findHistoryByMembershipId).toHaveBeenLastCalledWith(
       expect.objectContaining({
         from: '2026-08-01',
         to: '2026-08-31',
@@ -137,35 +150,29 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
       }),
     );
 
-    await useCase.execute(userId, { limit: '0' });
-    expect(repository.findOwnHistoryByUserId).toHaveBeenLastCalledWith(
+    await useCase.execute(membershipId, { limit: '0' });
+    expect(repository.findHistoryByMembershipId).toHaveBeenLastCalledWith(
       expect.objectContaining({ limit: 1 }),
-    );
-
-    await useCase.execute(userId, { limit: 'abc' });
-    expect(repository.findOwnHistoryByUserId).toHaveBeenLastCalledWith(
-      expect.objectContaining({ limit: 20 }),
     );
   });
 
   it('emits next_cursor = base64 {id, sortKey.reportDate} of the last row only when has_more (ISS-18)', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [newer, older],
       hasMore: true,
     });
 
-    const result = await useCase.execute(userId, { limit: 2 });
+    const result = await useCase.execute(membershipId, { limit: 2 });
 
     expect(result.pagination.has_more).toBe(true);
-    expect(result.pagination.next_cursor).toEqual(expect.any(String));
     expect(decodeCursor(result.pagination.next_cursor)).toEqual({
       id: older.id,
       sortKey: { reportDate: '2026-09-01' },
     });
   });
 
-  it('decodes a valid cursor and hands it to the repository', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+  it('decodes a valid cursor and falls back to the first page on a malformed one', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [],
       hasMore: false,
     });
@@ -174,63 +181,58 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
       sortKey: { reportDate: '2026-09-01' },
     });
 
-    await useCase.execute(userId, { cursor });
-
-    expect(repository.findOwnHistoryByUserId).toHaveBeenCalledWith(
+    await useCase.execute(membershipId, { cursor });
+    expect(repository.findHistoryByMembershipId).toHaveBeenLastCalledWith(
       expect.objectContaining({
         cursor: { id: older.id, sortKey: { reportDate: '2026-09-01' } },
       }),
     );
-  });
 
-  it.each([
-    ['garbage', 'not-base64-json'],
-    [
-      'non-uuid id',
-      encodeCursor({ id: 'nope', sortKey: { reportDate: '2026-09-01' } }),
-    ],
-    [
-      'missing reportDate',
-      encodeCursor({ id: older.id, sortKey: { other: 1 } }),
-    ],
-    [
-      'malformed date',
-      encodeCursor({ id: older.id, sortKey: { reportDate: '01/09/2026' } }),
-    ],
-    [
-      'SQL in the id',
-      encodeCursor({
+    await useCase.execute(membershipId, {
+      cursor: encodeCursor({
         id: "' OR 1=1 --",
         sortKey: { reportDate: '2026-09-01' },
       }),
-    ],
-  ])(
-    'falls back to the first page on a malformed cursor (%s)',
-    async (_label, cursor) => {
-      repository.findOwnHistoryByUserId.mockResolvedValue({
-        rows: [],
-        hasMore: false,
-      });
+    });
+    expect(repository.findHistoryByMembershipId).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: null }),
+    );
+  });
 
-      await useCase.execute(userId, { cursor });
-
-      expect(repository.findOwnHistoryByUserId).toHaveBeenCalledWith(
-        expect.objectContaining({ cursor: null }),
-      );
-    },
-  );
-
-  it('returns an empty page (not an error) when the caller has no history', async () => {
-    repository.findOwnHistoryByUserId.mockResolvedValue({
+  it('returns an empty page (not an error) when the membership exists but has no live reports', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
       rows: [],
       hasMore: false,
     });
 
-    const result = await useCase.execute(userId, {});
-
-    expect(result).toEqual({
+    await expect(useCase.execute(membershipId, {})).resolves.toEqual({
       data: [],
       pagination: { next_cursor: null, has_more: false },
     });
+    expect(scope.membershipExists).toHaveBeenCalledTimes(1);
+    expect(scope.membershipExists).toHaveBeenCalledWith(membershipId);
+  });
+
+  it('throws 404 NOT_FOUND (Arabic, no internals) when the membership does not exist at all — the Admin path past the DEC-C07 bypass (APIS §9.6, APIQ-NEW-09)', async () => {
+    repository.findHistoryByMembershipId.mockResolvedValue({
+      rows: [],
+      hasMore: false,
+    });
+    scope.membershipExists.mockResolvedValue(false);
+
+    const failure = useCase.execute(membershipId, {});
+
+    await expect(failure).rejects.toThrow(NotFoundException);
+    await expect(failure).rejects.toMatchObject({
+      response: {
+        statusCode: 404,
+        error: 'NOT_FOUND',
+        message: expect.stringMatching(/[\u0600-\u06FF]/) as unknown,
+      },
+    });
+    // Still scoped to exactly the guard-verified id (TS §15.2 step 4).
+    expect(repository.findHistoryByMembershipId).toHaveBeenCalledWith(
+      expect.objectContaining({ membershipId }),
+    );
   });
 });

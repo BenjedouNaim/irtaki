@@ -1,5 +1,6 @@
 import {
   getTodayReportStatus,
+  listMembershipDailyReports,
   listOwnDailyReports,
   ListOwnDailyReportsResponse,
   submitDailyReport,
@@ -181,6 +182,81 @@ describe('dailyReports.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(listOwnDailyReports()).rejects.toBe(error);
+    });
+  });
+
+  describe('listMembershipDailyReports (API-032)', () => {
+    const page: ListOwnDailyReportsResponse = {
+      data: [mockStatus.existing_report!],
+      pagination: { next_cursor: null, has_more: false },
+    };
+
+    it('should GET /memberships/{id}/daily-reports with only limit on the first page and return the whole envelope (APIS §10.7 same shape)', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      const result = await listMembershipDailyReports('membership-1', {
+        limit: 20,
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/membership-1/daily-reports',
+        { params: { limit: 20 } },
+      );
+      expect(result).toEqual(page);
+    });
+
+    it('should send the opaque cursor and the from/to filters when given, and nothing by default', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      await listMembershipDailyReports('membership-1', {
+        cursor: 'eyJpZCI6IjEifQ==',
+        from: '2026-08-01',
+        to: '2026-08-31',
+      });
+      expect(apiClient.get).toHaveBeenLastCalledWith(
+        '/memberships/membership-1/daily-reports',
+        {
+          params: {
+            from: '2026-08-01',
+            to: '2026-08-31',
+            cursor: 'eyJpZCI6IjEifQ==',
+          },
+        },
+      );
+
+      await listMembershipDailyReports('membership-1');
+      expect(apiClient.get).toHaveBeenLastCalledWith(
+        '/memberships/membership-1/daily-reports',
+        { params: {} },
+      );
+    });
+
+    it('should path-encode the membership id and never touch /daily-reports', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue(page);
+
+      await listMembershipDailyReports('a b/../c');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/a%20b%2F..%2Fc/daily-reports',
+        { params: {} },
+      );
+      expect(apiClient.get).not.toHaveBeenCalledWith(
+        '/daily-reports',
+        expect.anything(),
+      );
+    });
+
+    it('should propagate the uniform 403 SCOPE_DENIED ApiError unchanged (SA §14)', async () => {
+      const error = new ApiError({
+        statusCode: 403,
+        error: 'SCOPE_DENIED',
+        message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+      });
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(listMembershipDailyReports('membership-1')).rejects.toBe(
+        error,
+      );
     });
   });
 });

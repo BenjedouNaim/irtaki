@@ -53,23 +53,39 @@ export interface DailyReportRecord {
 }
 
 /**
- * Keyset position for API-031 — the `{id, sort_key}` of the last item on the
- * previous page (APIS §9.2), sort key `report_date` (APIS §9.4).
+ * Keyset position for the daily-report history lists (API-031, API-032) —
+ * the `{id, sort_key}` of the last item on the previous page (APIS §9.2),
+ * sort key `report_date` (APIS §9.4).
  */
-export interface OwnDailyReportsCursor {
+export interface DailyReportsCursor {
   id: string;
   sortKey: { reportDate: string };
 }
 
-export interface FindOwnDailyReportsParams {
-  userId: string;
+/** @deprecated alias kept for API-031 callers; same shape as {@link DailyReportsCursor}. */
+export type OwnDailyReportsCursor = DailyReportsCursor;
+
+/** Filters and page window shared by both history lists (APIS §9.2, §9.3). */
+export interface DailyReportsPageParams {
   /** `YYYY-MM-DD`, inclusive lower bound on `report_date`; null = unbounded. */
   from: string | null;
   /** `YYYY-MM-DD`, inclusive upper bound on `report_date`; null = unbounded. */
   to: string | null;
   /** Already clamped to [1, 100] (APIS §9.2). */
   limit: number;
-  cursor: OwnDailyReportsCursor | null;
+  cursor: DailyReportsCursor | null;
+}
+
+export interface FindOwnDailyReportsParams extends DailyReportsPageParams {
+  userId: string;
+}
+
+/**
+ * API-032: the membership id that already passed the route-specific
+ * ScopeGuard (TS §15.2 step 4 — "never a second, independently-trusted ID").
+ */
+export interface FindMembershipDailyReportsParams extends DailyReportsPageParams {
+  membershipId: string;
 }
 
 export interface DailyReportPage {
@@ -105,6 +121,18 @@ export interface IDailyReportRepository {
    */
   findOwnHistoryByUserId(
     params: FindOwnDailyReportsParams,
+  ): Promise<DailyReportPage>;
+
+  /**
+   * API-032 staff view: the live reports of ONE membership, `report_date
+   * DESC, id DESC`, keyset paginated on DB-IDX-01 — the same page shape as
+   * API-031. Scope is NOT re-derived here: the membership id is the one the
+   * route-specific ScopeGuard already verified (TS §15.2), and the query
+   * is bound to exactly that id (SA §14 NFR-19 backstop). Fetches
+   * `limit + 1` rows to derive `hasMore` without a count (APIS §9.1).
+   */
+  findHistoryByMembershipId(
+    params: FindMembershipDailyReportsParams,
   ): Promise<DailyReportPage>;
 
   /**

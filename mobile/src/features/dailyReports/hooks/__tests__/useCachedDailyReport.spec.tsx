@@ -6,6 +6,7 @@ import { apiClient } from '@/shared/api/client';
 import { useAuthStore } from '@/shared/auth';
 import { useCachedDailyReport } from '../useCachedDailyReport';
 import { ownDailyReportsQueryKey } from '../useOwnDailyReports';
+import { membershipDailyReportsQueryKey } from '../useMembershipDailyReports';
 import { todayReportStatusQueryKey } from '../useTodayReportStatus';
 
 jest.mock('@/shared/api/client', () => ({
@@ -62,11 +63,39 @@ function seed(userId: string | null) {
   return queryClient;
 }
 
-function renderLookup(queryClient: QueryClient, id: string | undefined) {
+const staffRow = report('staff-1', '2026-08-09');
+const MEMBERSHIP_ID = '01912f4e-6c1a-7b3c-9d5e-1f2a3b4c5d6e';
+
+function seedStaffList(
+  queryClient: QueryClient,
+  userId: string | null,
+  membershipId = MEMBERSHIP_ID,
+) {
+  queryClient.setQueryData(
+    membershipDailyReportsQueryKey(membershipId, userId),
+    {
+      pageParams: [undefined],
+      pages: [
+        {
+          data: [staffRow],
+          pagination: { next_cursor: null, has_more: false },
+        },
+      ],
+    },
+  );
+}
+
+function renderLookup(
+  queryClient: QueryClient,
+  id: string | undefined,
+  membershipId?: string,
+) {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return renderHook(() => useCachedDailyReport(id), { wrapper });
+  return renderHook(() => useCachedDailyReport(id, membershipId), {
+    wrapper,
+  });
 }
 
 describe('useCachedDailyReport (F-DR-07: detail from already-fetched data)', () => {
@@ -129,5 +158,23 @@ describe('useCachedDailyReport (F-DR-07: detail from already-fetched data)', () 
     const ownCache = seed('student-user-123');
     expect(renderLookup(ownCache, 'r1').result.current).toEqual(r1);
     ownCache.clear();
+  });
+
+  it("finds a row in the membership's staff list cache when a membershipId is given (SCR-25 → SCR-15, F-DR-06)", () => {
+    const queryClient = seed(null);
+    seedStaffList(queryClient, null);
+
+    expect(
+      renderLookup(queryClient, 'staff-1', MEMBERSHIP_ID).result.current,
+    ).toEqual(staffRow);
+    // The staff list of another membership is never consulted.
+    expect(
+      renderLookup(queryClient, 'staff-1', 'other-membership').result.current,
+    ).toBeNull();
+    // Without a membershipId the staff caches are not searched at all.
+    expect(renderLookup(queryClient, 'staff-1').result.current).toBeNull();
+    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(dailyReportsApi.listMembershipDailyReports).not.toHaveBeenCalled();
+    queryClient.clear();
   });
 });

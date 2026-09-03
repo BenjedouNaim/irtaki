@@ -51,6 +51,7 @@ describe('GetTodayReportStatusUseCase (F-DR-01 / API-029)', () => {
       findByMembershipAndDate: jest.fn(),
       create: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
+      findHistoryByMembershipId: jest.fn(),
     };
     useCase = new GetTodayReportStatusUseCase(repository);
   });

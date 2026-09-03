@@ -10,10 +10,15 @@ import { Button } from '@/shared/components/Button';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { ApiError } from '@/shared/api/types';
 import { DailyReportDto } from '@/shared/api/dailyReports.client';
-import { useOwnDailyReports } from '../hooks/useOwnDailyReports';
+import { useDailyReportsList } from '../hooks/useDailyReportsList';
 import { DailyReportRow } from './DailyReportRow';
 
 export interface DailyReportHistoryListProps {
+  /**
+   * Data source: omitted = the caller's own history (API-031, SCR-14);
+   * a membership id = that student's list read as staff (API-032, SCR-25).
+   */
+  membershipId?: string;
   /** Row tap → SCR-15 rendered from this row (F-DR-07). */
   onOpenReport?: (report: DailyReportDto) => void;
   testID?: string;
@@ -89,9 +94,11 @@ function ErrorBanner({
  * scroll (`limit=20`). Skeleton rows on first load, a small inline spinner
  * at the list bottom while the next page loads (UF §22), an appended
  * retry banner if that page fails, and the UF §23 empty state. This exact
- * component is what SCR-25 reuses for the Teacher's raw-report view.
+ * component is reused verbatim by SCR-25 for the Teacher's raw-report view
+ * (F-DR-06) — only the data source changes, via `membershipId`.
  */
 export function DailyReportHistoryList({
+  membershipId,
   onOpenReport,
   testID = 'daily-report-history',
 }: DailyReportHistoryListProps) {
@@ -106,7 +113,9 @@ export function DailyReportHistoryList({
     isFetchingNextPage,
     isFetchNextPageError,
     fetchNextPage,
-  } = useOwnDailyReports();
+  } = useDailyReportsList(
+    membershipId ? { kind: 'membership', membershipId } : { kind: 'own' },
+  );
 
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError) {

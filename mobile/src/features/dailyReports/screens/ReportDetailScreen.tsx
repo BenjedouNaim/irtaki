@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 import { DailyReportDto } from '@/shared/api/dailyReports.client';
 import { YesNoToggle } from '../components/YesNoToggle';
 import { QuranRangeField } from '../components/QuranRangeField';
@@ -11,6 +11,12 @@ import { TimeWindowDraft } from '../utils/dailyReportForm';
 export interface ReportDetailScreenProps {
   /** The already-fetched row (F-DR-07: no endpoint of its own). */
   report: DailyReportDto;
+  /**
+   * Where "back" lands when there is no navigation history — the role's
+   * Home. Student by default; the Teacher's SCR-25 → SCR-15 route passes
+   * its own (UF §28: SCR-15 is Student / Teacher / Admin, scoped).
+   */
+  homeHref?: Href;
 }
 
 /** Same titles as SCR-10 (UF §33: one canonical term per concept). */
@@ -37,14 +43,17 @@ const noop = () => {};
  * without duplicating the form's layout logic. There is no submit, no
  * discard prompt and no editing path (BR-22: reports are immutable).
  */
-export function ReportDetailScreen({ report }: ReportDetailScreenProps) {
+export function ReportDetailScreen({
+  report,
+  homeHref = '/(app)/student',
+}: ReportDetailScreenProps) {
   const router = useRouter();
 
   const goBack = () => {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(app)/student');
+      router.replace(homeHref);
     }
   };
 
