@@ -322,7 +322,7 @@ describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () 
       expect(userRows[0].role).toBe(UserRole.User);
     });
 
-    it('allows Admin to reject join request for any group', async () => {
+    it('refuses the Admin — APIS §6.1 gives the Admin `—` on `accept|reject`, and SRS §10 grants it `R` on Join Request but never `A`', async () => {
       const teacher = await registerAndLogin(
         'teacher-admin@test-reject.com',
         UserRole.Teacher,
@@ -355,20 +355,18 @@ describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () 
       const res = await request(app.getHttpServer())
         .post(`/api/v1/join-requests/${requestId}/reject`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
-        .expect(HttpStatus.OK);
+        .expect(HttpStatus.FORBIDDEN);
 
-      expect(res.body).toEqual({
-        data: {
-          status: 'Rejected',
-        },
-      });
+      expect(res.body.error).toBe('SCOPE_DENIED');
 
+      // The decision is untouched: the Admin reads the queue, the assigned
+      // Assistant decides it (FR-REQ-04, UC-04).
       const jrRows = await dataSource.query(
         'SELECT status, reviewed_by FROM join_requests WHERE id = $1',
         [requestId],
       );
-      expect(jrRows[0].status).toBe('Rejected');
-      expect(jrRows[0].reviewed_by).toBe(admin.userId);
+      expect(jrRows[0].status).toBe('Pending');
+      expect(jrRows[0].reviewed_by).toBeNull();
     });
   });
 
@@ -399,10 +397,18 @@ describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () 
 
       const requestId = await createJoinRequest(applicant.userId, groupId);
 
-      const admin = await registerAndLogin(
-        'admin-conc-rej@test-reject.com',
-        UserRole.Admin,
-      );
+      // APIS §9.7 frames this race as two Assistants, and §6.1 excludes the
+      // Admin from `accept|reject`, so both racers are the assigned
+      // Assistant on two sessions: the 0-row conditional UPDATE settles it.
+      const secondSession = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'assistant-conc1@test-reject.com',
+          password: 'Password123!',
+        })
+        .expect(HttpStatus.OK);
+      const secondToken = (secondSession.body as { access_token: string })
+        .access_token;
 
       const [res1, res2] = await Promise.all([
         request(app.getHttpServer())
@@ -410,7 +416,7 @@ describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () 
           .set('Authorization', `Bearer ${assistant1.accessToken}`),
         request(app.getHttpServer())
           .post(`/api/v1/join-requests/${requestId}/reject`)
-          .set('Authorization', `Bearer ${admin.accessToken}`),
+          .set('Authorization', `Bearer ${secondToken}`),
       ]);
 
       const statuses = [res1.status, res2.status].sort();

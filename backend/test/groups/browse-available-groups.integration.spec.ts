@@ -362,79 +362,30 @@ describe('GET /groups/available (API-011 Integration)', () => {
     });
   });
 
-  describe('Non-User role handling (query parameter ignored)', () => {
-    it('Student with stored gender Male sends ?gender=Female but receives Male groups', async () => {
-      const admin = await registerAndLogin(
-        'admin-browse@test-browse-groups.com',
-        UserRole.Admin,
-      );
-      const teacher = await registerAndLogin(
-        `teacher-stu-test-${Date.now()}@test-browse-groups.com`,
-        UserRole.Teacher,
-        'معلم',
-        'Male',
-      );
-      const assistant = await registerAndLogin(
-        `assistant-stu-test-${Date.now()}@test-browse-groups.com`,
+  describe('Non-User roles are refused (APIS §6.1, APIS §8 `role=User`)', () => {
+    // API-011's §6.1 row is `— | — | — | — | ✓`: the "open + gender match"
+    // browse belongs to the User alone (SRS §10's Group row), and APIS §8
+    // states the authorization as literally `role=User`, as does SAS §23
+    // API-02. Every other role is absent from `@Roles()`, so RolesGuard
+    // answers the uniform 403 (SA §14) — the staff and Student group lists
+    // are `GET /groups`, which is scope-filtered instead.
+    it.each([
+      [UserRole.Admin, 'admin-browse@test-browse-groups.com'],
+      [UserRole.Teacher, `teacher-403-${Date.now()}@test-browse-groups.com`],
+      [
         UserRole.Assistant,
-        'مساعد',
-        'Male',
-      );
-
-      const maleGroupId = await seedGroup({
-        name: `حلقة رجال للطالب-${Date.now()}`,
-        gender: 'Male',
-        recitationDay: 1,
-        enrollmentStatus: 'Open',
-        lifecycleState: 'Active',
-        teacherId: teacher.userId,
-        assistantId: assistant.userId,
-        createdBy: admin.userId,
-      });
-
-      const femaleGroupId = await seedGroup({
-        name: `حلقة نساء للطالب-${Date.now()}`,
-        gender: 'Female',
-        recitationDay: 2,
-        enrollmentStatus: 'Open',
-        lifecycleState: 'Active',
-        teacherId: teacher.userId,
-        assistantId: assistant.userId,
-        createdBy: admin.userId,
-      });
-
-      const student = await registerAndLogin(
-        `student-male-${Date.now()}@test-browse-groups.com`,
-        UserRole.Student,
-        'طالب ذكر',
-        'Male',
-      );
-
-      // Student sends mismatched ?gender=Female
-      const res = await request(app.getHttpServer())
-        .get('/api/v1/groups/available?gender=Female')
-        .set('Authorization', `Bearer ${student.accessToken}`)
-        .expect(HttpStatus.OK);
-
-      const body = res.body as { data: GroupListItemLimitedDto[] };
-      const returnedIds = body.data.map((g) => g.id);
-
-      expect(returnedIds).toContain(maleGroupId);
-      expect(returnedIds).not.toContain(femaleGroupId);
-    });
-
-    it('Admin with null stored gender receives { data: [] }', async () => {
-      const admin = await registerAndLogin(
-        'admin-browse@test-browse-groups.com',
-        UserRole.Admin,
-      );
+        `assistant-403-${Date.now()}@test-browse-groups.com`,
+      ],
+      [UserRole.Student, `student-403-${Date.now()}@test-browse-groups.com`],
+    ])('returns 403 for %s', async (role, email) => {
+      const actor = await registerAndLogin(email, role, 'مستخدم', 'Male');
 
       const res = await request(app.getHttpServer())
         .get('/api/v1/groups/available?gender=Male')
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .expect(HttpStatus.OK);
+        .set('Authorization', `Bearer ${actor.accessToken}`)
+        .expect(HttpStatus.FORBIDDEN);
 
-      expect(res.body).toEqual({ data: [] });
+      expect((res.body as { error: string }).error).toBe('SCOPE_DENIED');
     });
   });
 

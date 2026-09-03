@@ -73,4 +73,27 @@ describe('AyahPosition (VO-01)', () => {
     expect(totalAyahCount(SURAHS)).toBe(492);
     expect(totalAyahCount([])).toBe(0);
   });
+  it('rejects a non-integer or non-positive ordinal (VR-13)', () => {
+    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => AyahPosition.fromOrdinal(bad, SURAHS)).toThrow(
+        InvalidCoverageIntervalError,
+      );
+    }
+  });
+
+  it('rejects a non-integer ayah number for a valid surah (VR-13)', () => {
+    for (const bad of [1.5, -2, Number.NaN]) {
+      expect(() => AyahPosition.fromSurahAyah(1, bad, SURAHS)).toThrow(
+        InvalidCoverageIntervalError,
+      );
+    }
+  });
+
+  it('rejects a surah number outside 1..114 (VO-01 validation, VR-13)', () => {
+    for (const bad of [0, -1, 115, 1.5]) {
+      expect(() => AyahPosition.fromSurahAyah(bad, 1, SURAHS)).toThrow(
+        InvalidCoverageIntervalError,
+      );
+    }
+  });
 });

@@ -63,4 +63,37 @@ describe('classifyDay (VO-09 DayClassification, SAS §17.4 / TS §22)', () => {
       classifyDay(snapshot({ type: 'Absent', absenceReason: 'Other' })),
     ).toBe('ABSENT_OTHER');
   });
+  it('classifies an Absent report with an unrecognised reason as excused, never silently NORMAL', () => {
+    // VR-19 makes a reason mandatory, so this shape is unreachable in
+    // practice; the assertion pins the conservative fallback so a future
+    // AbsenceReason value cannot quietly land in the wrong bucket.
+    expect(
+      classifyDay(snapshot({ type: 'Absent', absenceReason: 'Sick' })),
+    ).toBe('ABSENT_EXCUSED');
+  });
+
+  it('throws rather than guessing when the type is outside the enumeration', () => {
+    expect(() =>
+      classifyDay(snapshot({ type: 'Weekly' as unknown as 'Normal' })),
+    ).toThrow(RangeError);
+  });
+
+  it('returns exactly one of the five VO-09 values for every documented shape', () => {
+    const values = new Set([
+      classifyDay(null),
+      classifyDay(snapshot({ type: 'Normal' })),
+      classifyDay(snapshot({ type: 'Revision' })),
+      classifyDay(snapshot({ type: 'Absent', absenceReason: 'Sick' })),
+      classifyDay(snapshot({ type: 'Absent', absenceReason: 'Studying' })),
+      classifyDay(snapshot({ type: 'Absent', absenceReason: 'Other' })),
+    ]);
+
+    expect([...values].sort()).toEqual([
+      'ABSENT_EXCUSED',
+      'ABSENT_OTHER',
+      'NORMAL',
+      'NO_REPORT',
+      'REVISION',
+    ]);
+  });
 });

@@ -73,6 +73,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
     mockMembershipRepo.findStateAndUserById.mockResolvedValue({
       userId: endedUserId,
       state: 'Active',
+      timezone: 'Africa/Tunis',
     });
     mockMembershipRepo.terminateConditionally.mockResolvedValue({
       userId: endedUserId,
@@ -210,6 +211,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
       mockMembershipRepo.findStateAndUserById.mockResolvedValue({
         userId: callerId,
         state: 'Active',
+        timezone: 'Africa/Tunis',
       });
 
       try {
@@ -238,6 +240,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
       mockMembershipRepo.findStateAndUserById.mockResolvedValue({
         userId: endedUserId,
         state: 'Terminated',
+        timezone: 'Africa/Tunis',
       });
 
       try {
@@ -268,6 +271,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
       mockMembershipRepo.findStateAndUserById.mockResolvedValue({
         userId: endedUserId,
         state: 'Active',
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.terminateConditionally.mockResolvedValue(null);
 

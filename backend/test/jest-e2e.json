@@ -3,6 +3,8 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".(e2e-spec|integration\\.spec)\\.ts$",
+  "setupFiles": ["<rootDir>/shared/relaxed-rate-limits.setup.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/shared/no-internal-leakage.setup.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }

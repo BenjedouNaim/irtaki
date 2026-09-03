@@ -2,7 +2,6 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager } from 'typeorm';
-import { UserRole } from '../../../identity/domain/user-role.enum';
 import { IUserRepository } from '../../../identity/domain/user.repository.interface';
 import { IMembershipRepository } from '../../../memberships/domain/membership.repository.interface';
 import { ICoverageRepository } from '../../../progress/domain/coverage.repository.interface';
@@ -122,11 +121,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(null);
 
       await expect(
-        useCase.execute(
-          'ast-4444-4444-4444-4444',
-          UserRole.Assistant,
-          'non-existent-id',
-        ),
+        useCase.execute('ast-4444-4444-4444-4444', 'non-existent-id'),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -139,11 +134,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       });
 
       await expect(
-        useCase.execute(
-          'ast-4444-4444-4444-4444',
-          UserRole.Assistant,
-          mockDetailRow.id,
-        ),
+        useCase.execute('ast-4444-4444-4444-4444', mockDetailRow.id),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
@@ -153,43 +144,25 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
 
       await expect(
-        useCase.execute(
-          'different-assistant-id',
-          UserRole.Assistant,
-          mockDetailRow.id,
-        ),
+        useCase.execute('different-assistant-id', mockDetailRow.id),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('allows Admin to accept a join request for any group', async () => {
+    it('throws ForbiddenException for a caller who is not the assigned Assistant — the Admin included (APIS §6.1, SRS §10)', async () => {
+      // APIS §6.1's `POST /join-requests/{id}/accept|reject` row is
+      // `— | — | ✓ (g) | — | —`, and SRS §10 grants the Admin `R` on Join
+      // Request but never `A`. `@Roles(Assistant)` already refuses the Admin
+      // at the guard; this is the NFR-19 application backstop behind it, so
+      // no Admin bypass may exist here either.
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
-      mockJoinRequestRepo.acceptConditionally.mockResolvedValue({
-        userId: mockDetailRow.userId,
-        groupId: mockDetailRow.groupId,
-        fullName: mockDetailRow.fullName,
-        gender: mockDetailRow.gender as 'Male' | 'Female',
-        memorizedAhzab: mockDetailRow.memorizedAhzab,
-      });
-      mockMembershipRepo.create.mockResolvedValue({
-        id: 'mem-9999-9999',
-        startedAt: '2026-08-23',
-      });
-      mockUserRepo.promoteToStudent.mockResolvedValue(undefined);
-      mockCoverageRepo.seedFromHizbSelection.mockResolvedValue(undefined);
 
-      const result = await useCase.execute(
-        'admin-id',
-        UserRole.Admin,
-        mockDetailRow.id,
-      );
+      await expect(
+        useCase.execute('admin-id', mockDetailRow.id),
+      ).rejects.toThrow(ForbiddenException);
 
-      expect(result).toEqual({
-        data: {
-          membership_id: 'mem-9999-9999',
-        },
-      });
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -202,6 +175,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.create.mockResolvedValue({
         id: 'mem-1111-1111-1111-1111',
@@ -212,7 +186,6 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
 
       const result = await useCase.execute(
         mockDetailRow.assistantId,
-        UserRole.Assistant,
         mockDetailRow.id,
       );
 
@@ -265,11 +238,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.acceptConditionally.mockResolvedValue(null);
 
       try {
-        await useCase.execute(
-          mockDetailRow.assistantId,
-          UserRole.Assistant,
-          mockDetailRow.id,
-        );
+        await useCase.execute(mockDetailRow.assistantId, mockDetailRow.id);
         fail('Expected ConflictException');
       } catch (err: unknown) {
         expect(err).toBeInstanceOf(ConflictException);
@@ -296,6 +265,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
 
       const uniqueConstraintError = {
@@ -305,11 +275,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       mockMembershipRepo.create.mockRejectedValue(uniqueConstraintError);
 
       try {
-        await useCase.execute(
-          mockDetailRow.assistantId,
-          UserRole.Assistant,
-          mockDetailRow.id,
-        );
+        await useCase.execute(mockDetailRow.assistantId, mockDetailRow.id);
         fail('Expected ConflictException');
       } catch (err: unknown) {
         expect(err).toBeInstanceOf(ConflictException);
@@ -335,6 +301,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.create.mockResolvedValue({
         id: 'mem-1111-1111-1111-1111',
@@ -348,7 +315,6 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
 
       const result = await useCase.execute(
         mockDetailRow.assistantId,
-        UserRole.Assistant,
         mockDetailRow.id,
       );
 
