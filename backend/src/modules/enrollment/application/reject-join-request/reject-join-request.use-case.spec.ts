@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserRole } from '../../../identity/domain/user-role.enum';
 import {
   IJoinRequestRepository,
   JoinRequestDetailRow,
@@ -68,11 +67,7 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(null);
 
       await expect(
-        useCase.execute(
-          'ast-4444-4444-4444-4444',
-          UserRole.Assistant,
-          'non-existent-id',
-        ),
+        useCase.execute('ast-4444-4444-4444-4444', 'non-existent-id'),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockJoinRequestRepo.rejectConditionally).not.toHaveBeenCalled();
@@ -85,11 +80,7 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
       });
 
       await expect(
-        useCase.execute(
-          'ast-4444-4444-4444-4444',
-          UserRole.Assistant,
-          mockDetailRow.id,
-        ),
+        useCase.execute('ast-4444-4444-4444-4444', mockDetailRow.id),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockJoinRequestRepo.rejectConditionally).not.toHaveBeenCalled();
@@ -99,25 +90,31 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
 
       await expect(
-        useCase.execute(
-          'different-assistant-id',
-          UserRole.Assistant,
-          mockDetailRow.id,
-        ),
+        useCase.execute('different-assistant-id', mockDetailRow.id),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockJoinRequestRepo.rejectConditionally).not.toHaveBeenCalled();
     });
 
-    it('allows Admin to reject a join request for any group', async () => {
+    it('throws ForbiddenException for a caller who is not the assigned Assistant — the Admin included (APIS §6.1, SRS §10)', async () => {
+      // Same rule as API-023: the Admin reads the queue but never decides it.
+      mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
+
+      await expect(
+        useCase.execute('admin-id', mockDetailRow.id),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockJoinRequestRepo.rejectConditionally).not.toHaveBeenCalled();
+    });
+
+    it('rejects for the assigned Assistant', async () => {
       mockJoinRequestRepo.findByIdForDetail.mockResolvedValue(mockDetailRow);
       mockJoinRequestRepo.rejectConditionally.mockResolvedValue({
         userId: mockDetailRow.userId,
       });
 
       const result = await useCase.execute(
-        'admin-id',
-        UserRole.Admin,
+        mockDetailRow.assistantId,
         mockDetailRow.id,
       );
 
@@ -129,7 +126,7 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
 
       expect(mockJoinRequestRepo.rejectConditionally).toHaveBeenCalledWith(
         mockDetailRow.id,
-        'admin-id',
+        mockDetailRow.assistantId,
       );
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         JoinRequestRejectedEvent.EVENT_NAME,
@@ -150,7 +147,6 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
 
       const result = await useCase.execute(
         mockDetailRow.assistantId,
-        UserRole.Assistant,
         mockDetailRow.id,
       );
 
@@ -179,11 +175,7 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
       mockJoinRequestRepo.rejectConditionally.mockResolvedValue(null);
 
       try {
-        await useCase.execute(
-          mockDetailRow.assistantId,
-          UserRole.Assistant,
-          mockDetailRow.id,
-        );
+        await useCase.execute(mockDetailRow.assistantId, mockDetailRow.id);
         fail('Expected ConflictException');
       } catch (err: unknown) {
         expect(err).toBeInstanceOf(ConflictException);
@@ -211,7 +203,6 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
 
       const result = await useCase.execute(
         mockDetailRow.assistantId,
-        UserRole.Assistant,
         mockDetailRow.id,
       );
 

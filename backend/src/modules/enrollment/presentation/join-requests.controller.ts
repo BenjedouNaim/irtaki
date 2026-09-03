@@ -82,32 +82,36 @@ export class JoinRequestsController {
     );
   }
 
-  @Roles(UserRole.Assistant, UserRole.Admin)
+  /**
+   * API-023 `POST /join-requests/{id}/accept` — **Assistant only**, on their
+   * assigned group. APIS §6.1's row `POST /join-requests/{id}/accept|reject`
+   * is `— | — | ✓ (g) | — | —`: the Admin reads the queue (`GET
+   * /join-requests`, `✓ all`) but does not decide. SRS §10 says the same in
+   * its own words — "Join Request | Admin: R | … | Assistant: R A (own
+   * groups)" — and FR-REQ-04 / UC-04 name the Assistant as the only actor,
+   * as does APIS §9.7's concurrency row ("Two Assistants act concurrently").
+   * The Admin is therefore absent from `@Roles()` and RolesGuard refuses.
+   */
+  @Roles(UserRole.Assistant)
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
   async accept(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<AcceptJoinRequestResponseDto> {
-    return this.acceptJoinRequestUseCase.execute(
-      req.user.id,
-      req.user.role,
-      id,
-    );
+    return this.acceptJoinRequestUseCase.execute(req.user.id, id);
   }
 
-  @Roles(UserRole.Assistant, UserRole.Admin)
+  /** API-024 `POST /join-requests/{id}/reject` — Assistant only, exactly as
+   *  API-023 above (same APIS §6.1 row, same SRS §10 "R A" grant). */
+  @Roles(UserRole.Assistant)
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   async reject(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<RejectJoinRequestResponseDto> {
-    return this.rejectJoinRequestUseCase.execute(
-      req.user.id,
-      req.user.role,
-      id,
-    );
+    return this.rejectJoinRequestUseCase.execute(req.user.id, id);
   }
 
   @Roles(UserRole.User)

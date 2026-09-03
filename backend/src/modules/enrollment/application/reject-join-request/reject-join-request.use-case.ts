@@ -5,7 +5,6 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserRole } from '../../../identity/domain/user-role.enum';
 import { JOIN_REQUEST_REPOSITORY } from '../../domain/join-request.repository.interface';
 import type { IJoinRequestRepository } from '../../domain/join-request.repository.interface';
 import { JoinRequestRejectedEvent } from '../../domain/events/join-request-rejected.event';
@@ -21,17 +20,17 @@ export class RejectJoinRequestUseCase {
 
   async execute(
     actorId: string,
-    actorRole: string,
     joinRequestId: string,
   ): Promise<RejectJoinRequestResponseDto> {
-    // 1. Uniform 403 scope check (NFR-20 / APIQ-04)
+    // 1. Uniform 403 scope check (NFR-20 / APIQ-04). As in API-023: the
+    //    assigned Assistant is the only decider (APIS §6.1's `accept|reject`
+    //    row, SRS §10's "Assistant: R A (own groups)"), so no Admin bypass.
     const row = await this.joinRequestRepo.findByIdForDetail(joinRequestId);
     if (!row || row.deletedAt) {
       throw new ForbiddenException();
     }
 
-    const isAdmin = actorRole === (UserRole.Admin as string);
-    if (!isAdmin && row.assistantId !== actorId) {
+    if (row.assistantId !== actorId) {
       throw new ForbiddenException();
     }
 

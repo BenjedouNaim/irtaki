@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { UserRole } from '../../../identity/domain/user-role.enum';
 import { USER_REPOSITORY } from '../../../identity/domain/user.repository.interface';
 import type { IUserRepository } from '../../../identity/domain/user.repository.interface';
 import { MEMBERSHIP_REPOSITORY } from '../../../memberships/domain/membership.repository.interface';
@@ -35,17 +34,21 @@ export class AcceptJoinRequestUseCase {
 
   async execute(
     actorId: string,
-    actorRole: string,
     joinRequestId: string,
   ): Promise<AcceptJoinRequestResponseDto> {
-    // 1. Uniform 403 scope check (NFR-20 / APIQ-04)
+    // 1. Uniform 403 scope check (NFR-20 / APIQ-04). The NFR-19 backstop
+    //    behind `@Roles(Assistant)`: the only caller who may decide a join
+    //    request is the group's own assigned Assistant. APIS §6.1's
+    //    `accept|reject` row gives the Admin `—` and SRS §10 grants the Admin
+    //    `R` on Join Request but not `A`, so there is deliberately no Admin
+    //    bypass here — non-existent, soft-deleted and another group's request
+    //    are all the same masked 403.
     const row = await this.joinRequestRepo.findByIdForDetail(joinRequestId);
     if (!row || row.deletedAt) {
       throw new ForbiddenException();
     }
 
-    const isAdmin = actorRole === (UserRole.Admin as string);
-    if (!isAdmin && row.assistantId !== actorId) {
+    if (row.assistantId !== actorId) {
       throw new ForbiddenException();
     }
 
