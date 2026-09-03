@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleProp, ViewStyle } from 'react-native';
+import { AtRiskBadge, AT_RISK_LABEL } from '@/shared/components/AtRiskBadge';
 import { Banner } from '@/shared/components/Banner';
 import { Donut } from '@/shared/components/Donut';
 import { EmptyState } from '@/shared/components/EmptyState';
@@ -18,10 +19,15 @@ import {
   GroupStudentPerformanceDto,
   PerformancePeriod,
 } from '@/shared/api/performance.client';
+import { useGroupAtRisk } from '@/features/performance/hooks/useGroupAtRisk';
 import { useGroupPerformance } from '@/features/performance/hooks/useGroupPerformance';
 import { typography } from '@/shared/theme/typography';
 import { itemsStart, rowStart } from '@/shared/theme/rtl';
-import { formatArabicCount, STUDENT_COUNT_FORMS } from '@/shared/utils/format';
+import {
+  DAY_COUNT_FORMS,
+  formatArabicCount,
+  STUDENT_COUNT_FORMS,
+} from '@/shared/utils/format';
 
 export interface GroupPerformanceSectionProps {
   groupId: string;
@@ -43,6 +49,15 @@ const NETWORK_ERROR_MESSAGE =
 
 /** Server error 5xx (UF §24 / TS §29) — generic, never the server's own message. */
 const SERVER_ERROR_MESSAGE = 'حدث خطأ أثناء تحميل أداء المجموعة';
+
+/**
+ * The at-risk list is a SECOND call (API-040) beside the dashboard's own.
+ * When it fails the scores still render, but every badge would silently go
+ * missing — and an absent badge reads as "not at risk", a false negative on
+ * the one signal this screen exists to raise (SRS pain point #2). So the
+ * failure is stated, with a retry, rather than swallowed.
+ */
+const AT_RISK_ERROR_MESSAGE = 'تعذر تحميل قائمة الطلاب المعرّضين للخطر';
 
 /** UF §23 — factual, no CTA. */
 const EMPTY_MESSAGE = 'لا طلاب في هذه المجموعة خلال هذه الفترة';
@@ -144,6 +159,21 @@ export function GroupPerformanceSection({
     groupId,
     period,
   );
+  // API-040 is a separate call with no period of its own: the predicate
+  // always looks backwards from today (SAS §18.4), so switching segments
+  // never refetches it. Cross-referenced by membership_id and NEVER inferred
+  // from a low commitment score (UF §17).
+  const atRiskQuery = useGroupAtRisk(groupId);
+  const atRiskDays = useMemo(
+    () =>
+      new Map(
+        (atRiskQuery.data ?? []).map((entry) => [
+          entry.membership_id,
+          entry.days_since_last_report,
+        ]),
+      ),
+    [atRiskQuery.data],
+  );
 
   const showSkeleton = isLoading && !data;
   const showError = isError && !data;
@@ -178,6 +208,14 @@ export function GroupPerformanceSection({
         <GroupPerformanceContent
           data={data}
           period={period}
+          atRiskDays={atRiskDays}
+          atRiskError={
+            atRiskQuery.isError
+              ? () => {
+                  void atRiskQuery.refetch();
+                }
+              : undefined
+          }
           onStudentPress={onStudentPress}
           testID={testID}
         />
@@ -189,11 +227,17 @@ export function GroupPerformanceSection({
 function GroupPerformanceContent({
   data,
   period,
+  atRiskDays,
+  atRiskError,
   onStudentPress,
   testID,
 }: {
   data: GroupPerformanceDto;
   period: PerformancePeriod;
+  /** membership_id → `days_since_last_report`, for the flagged students only. */
+  atRiskDays: ReadonlyMap<string, number>;
+  /** Retry handler, present only while the at-risk call is failing. */
+  atRiskError?: () => void;
   onStudentPress?: (student: GroupStudentPerformanceDto) => void;
   testID: string;
 }) {
@@ -255,6 +299,15 @@ function GroupPerformanceContent({
         </Text>
       </View>
 
+      {atRiskError ? (
+        <Banner
+          tone="warning"
+          message={AT_RISK_ERROR_MESSAGE}
+          onRetry={atRiskError}
+          testID={`${testID}-at-risk-error`}
+        />
+      ) : null}
+
       {data.students.length === 0 ? (
         <EmptyState
           icon="users"
@@ -267,6 +320,7 @@ function GroupPerformanceContent({
             <StudentRow
               key={student.membership_id}
               student={student}
+              daysSinceLastReport={atRiskDays.get(student.membership_id)}
               onPress={onStudentPress}
               testID={`${testID}-student-${student.membership_id}`}
             />
@@ -279,16 +333,25 @@ function GroupPerformanceContent({
 
 function StudentRow({
   student,
+  daysSinceLastReport,
   onPress,
   testID,
 }: {
   student: GroupStudentPerformanceDto;
+  /**
+   * The student's `days_since_last_report` when API-040 flagged them, and
+   * `undefined` when it did not — presence IS the predicate. Never derived
+   * from `commitment_score` (UF §17: "a separate badge, never inferred from
+   * a low score alone").
+   */
+  daysSinceLastReport?: number;
   onPress?: (student: GroupStudentPerformanceDto) => void;
   testID: string;
 }) {
   const name = student.full_name || 'غير محدد';
   const score = formatRate(student.commitment_score);
   const pressable = Boolean(onPress);
+  const atRisk = daysSinceLastReport !== undefined;
 
   return (
     <Pressable
@@ -296,11 +359,16 @@ function StudentRow({
       accessibilityRole="button"
       accessibilityLabel={`${name}، نسبة الالتزام: ${
         score ?? METRIC_NULL_PLACEHOLDER
-      }`}
+      }${atRisk ? `، ${AT_RISK_LABEL}` : ''}`}
       accessibilityState={{ disabled: !pressable }}
       disabled={!pressable}
       onPress={() => onPress?.(student)}
-      className={`${rowStart} items-center gap-2.5 w-full rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-3.5 py-3 active:opacity-80`}
+      // Figma 37:222 vs 37:273: an at-risk row carries border/error where an
+      // ordinary one carries border/default. The colour is never the only
+      // carrier — the badge below pairs an icon with its label (UF §32).
+      className={`${rowStart} items-center gap-2.5 w-full rounded-md bg-surface dark:bg-surface-dark border ${
+        atRisk ? 'border-line-error' : 'border-line dark:border-line-dark'
+      } px-3.5 py-3 active:opacity-80`}
       style={{ borderCurve: 'continuous' }}
     >
       <View className="w-9 h-9 rounded-full bg-subtle dark:bg-subtle-dark items-center justify-center">
@@ -320,18 +388,41 @@ function StudentRow({
         >
           {name}
         </Text>
-        {/* The at-risk badge and the "days since last report" line need the
-            at-risk endpoint (API-040), which this feature does not call —
-            the badge is a separate predicate and is never inferred from a
-            low score (UF §17, UF §29). */}
+        {/* Figma 37:228 "M": the badge and, beside it, the recency line —
+            the same expected-day counting as the predicate, so the two can
+            never disagree (SAS §18.4). An ordinary row has no recency line
+            at all: API-038 carries no day count and API-040 returns one only
+            for the students it flags, and a fabricated number is worse than
+            an absent one. */}
+        {atRisk ? (
+          <View
+            testID={`${testID}-at-risk`}
+            className={`${rowStart} items-center gap-2`}
+          >
+            <AtRiskBadge testID={`${testID}-at-risk-badge`} />
+            <Text
+              testID={`${testID}-days`}
+              className={`${typography.caption} text-right text-fg-error`}
+              numberOfLines={1}
+              maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
+            >
+              {`${formatArabicCount(
+                daysSinceLastReport,
+                DAY_COUNT_FORMS,
+              )} منذ آخر تقرير`}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <Text
         testID={`${testID}-score`}
         className={`${typography.headingSm} text-left ${
-          score === null
-            ? 'text-fg-tertiary dark:text-fg-tertiary-dark'
-            : 'text-fg dark:text-fg-dark'
+          atRisk
+            ? 'text-fg-error'
+            : score === null
+              ? 'text-fg-tertiary dark:text-fg-tertiary-dark'
+              : 'text-fg dark:text-fg-dark'
         }`}
         numberOfLines={1}
         adjustsFontSizeToFit

@@ -1,4 +1,6 @@
 import {
+  AtRiskEntryDto,
+  getGroupAtRisk,
   getGroupPerformance,
   getMembershipPerformance,
   getMyPerformance,
@@ -265,6 +267,49 @@ describe('performance.client', () => {
       await expect(getMembershipPerformance('membership-1')).rejects.toBe(
         error,
       );
+    });
+  });
+
+  describe('getGroupAtRisk (API-040)', () => {
+    const entries: AtRiskEntryDto[] = [
+      {
+        membership_id: 'm-1',
+        full_name: 'يوسف بن سالم',
+        days_since_last_report: 5,
+      },
+      { membership_id: 'm-2', full_name: null, days_since_last_report: 3 },
+    ];
+
+    it('GETs the at-risk list and unwraps the §9.1 envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: entries });
+
+      const result = await getGroupAtRisk('group-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/groups/group-1/at-risk');
+      expect(result).toEqual(entries);
+    });
+
+    it('sends no ?period= — the predicate always looks back from today', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      await getGroupAtRisk('group-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/groups/group-1/at-risk');
+    });
+
+    it('keeps a null full_name null rather than coercing it', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: entries });
+
+      const result = await getGroupAtRisk('group-1');
+
+      expect(result[1].full_name).toBeNull();
+    });
+
+    it('propagates apiClient errors unchanged', async () => {
+      const error = new Error('boom');
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(getGroupAtRisk('group-1')).rejects.toBe(error);
     });
   });
 });

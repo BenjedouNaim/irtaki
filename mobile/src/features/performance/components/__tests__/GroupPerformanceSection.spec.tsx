@@ -43,6 +43,24 @@ const empty: performanceApi.GroupPerformanceDto = {
   submission_rate: null,
 };
 
+/**
+ * API-040's list — deliberately NOT the weakest students: the badge is a
+ * separate predicate, "never inferred from a low score alone" (UF §17). The
+ * 41% student is silent-free and the 52% and 94% ones are flagged.
+ */
+const mockAtRisk: performanceApi.AtRiskEntryDto[] = [
+  {
+    membership_id: 'm-2',
+    full_name: 'مريم الجبالي',
+    days_since_last_report: 3,
+  },
+  {
+    membership_id: 'm-3',
+    full_name: 'أحمد الطرابلسي',
+    days_since_last_report: 12,
+  },
+];
+
 const NEVER = () => new Promise<never>(() => {});
 
 const GENERIC_SERVER_MESSAGE = 'حدث خطأ أثناء تحميل أداء المجموعة';
@@ -66,6 +84,9 @@ function renderSection(
 describe('GroupPerformanceSection (SCR-23, F-PERF-02, Figma 37:124)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Most cases care only about API-038; the at-risk call defaults to an
+    // empty list so no row is flagged unless the test says so.
+    jest.spyOn(performanceApi, 'getGroupAtRisk').mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -369,6 +390,168 @@ describe('GroupPerformanceSection (SCR-23, F-PERF-02, Figma 37:124)', () => {
         await screen.findByTestId('group-performance-students'),
       ).toBeTruthy();
       expect(spy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('the at-risk badge (F-PERF-04, API-040, UF §17, Figma 37:228)', () => {
+    it('asks API-040 for the group and flags exactly the rows it names', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      expect(
+        await screen.findByTestId('group-performance-student-m-2-at-risk'),
+      ).toBeTruthy();
+      expect(performanceApi.getGroupAtRisk).toHaveBeenCalledWith(GROUP_ID);
+      expect(
+        screen.getByTestId('group-performance-student-m-3-at-risk'),
+      ).toBeTruthy();
+      // The weakest student (41%) is NOT on the list and carries no badge —
+      // the flag is cross-referenced, never inferred from a low score.
+      expect(
+        screen.queryByTestId('group-performance-student-m-1-at-risk'),
+      ).toBeNull();
+    });
+
+    it('pairs the badge with its label and an icon, never colour alone (UF §32)', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      expect(
+        await screen.findByTestId(
+          'group-performance-student-m-2-at-risk-badge',
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.getByTestId('group-performance-student-m-2-at-risk-badge-icon', {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
+      expect(screen.getAllByText('معرّض للخطر')).toHaveLength(2);
+    });
+
+    it('renders the recency line with Arabic number agreement', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      // 3 → "أيام" (few), 12 → "يومًا" (many).
+      expect(await screen.findByText('3 أيام منذ آخر تقرير')).toBeTruthy();
+      expect(screen.getByText('12 يومًا منذ آخر تقرير')).toBeTruthy();
+    });
+
+    it('shows no recency line on a row API-040 did not flag', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      await screen.findByTestId('group-performance-student-m-2-at-risk');
+      // No day count exists for an un-flagged student, and none is invented.
+      expect(
+        screen.queryByTestId('group-performance-student-m-1-days'),
+      ).toBeNull();
+    });
+
+    it('names the at-risk state in the row’s accessibility label', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      const flagged = await screen.findByTestId(
+        'group-performance-student-m-2',
+      );
+      expect(flagged.props.accessibilityLabel).toContain('معرّض للخطر');
+      expect(
+        screen.getByTestId('group-performance-student-m-1').props
+          .accessibilityLabel,
+      ).not.toContain('معرّض للخطر');
+    });
+
+    it('does NOT refetch the list when the period changes (SAS §18.4)', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      const atRisk = jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+      await screen.findByTestId('group-performance-students');
+
+      fireEvent.press(screen.getByText('شهر'));
+
+      await waitFor(() =>
+        expect(performanceApi.getGroupPerformance).toHaveBeenCalledWith(
+          GROUP_ID,
+          { period: 'month' },
+        ),
+      );
+      // The predicate always looks backwards from today, so no period can
+      // change its answer — one call, whatever the selector says.
+      expect(atRisk).toHaveBeenCalledTimes(1);
+    });
+
+    it('states the failure rather than silently dropping every badge (UF §24)', async () => {
+      jest
+        .spyOn(performanceApi, 'getGroupPerformance')
+        .mockResolvedValue(mockGroupPerformance);
+      const atRisk = jest
+        .spyOn(performanceApi, 'getGroupAtRisk')
+        .mockRejectedValueOnce(
+          new ApiError({
+            statusCode: 500,
+            error: 'INTERNAL_ERROR',
+            message: 'Internal server error detail',
+          }),
+        )
+        .mockResolvedValue(mockAtRisk);
+
+      renderSection();
+
+      // The dashboard itself still renders — only the badges are missing.
+      expect(
+        await screen.findByTestId('group-performance-at-risk-error'),
+      ).toBeTruthy();
+      expect(
+        screen.getByText('تعذر تحميل قائمة الطلاب المعرّضين للخطر'),
+      ).toBeTruthy();
+      expect(screen.queryByText('Internal server error detail')).toBeNull();
+      expect(screen.getByTestId('group-performance-students')).toBeTruthy();
+
+      fireEvent.press(
+        screen.getByTestId('group-performance-at-risk-error-retry-button'),
+      );
+
+      expect(
+        await screen.findByTestId('group-performance-student-m-2-at-risk'),
+      ).toBeTruthy();
+      expect(atRisk).toHaveBeenCalledTimes(2);
     });
   });
 });

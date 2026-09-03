@@ -146,3 +146,46 @@ export async function getGroupPerformance(
   );
   return response.data;
 }
+
+/**
+ * One entry of API-040 `GET /groups/{id}/at-risk` (`AtRiskEntryDto`,
+ * TS §13; APIS §10.9).
+ *
+ * There is no `at_risk` flag: membership of this list IS the flag. UF §17
+ * requires the badge to be "cross-referenced from the at-risk endpoint,
+ * never inferred from a low score alone", so a student absent from the list
+ * is simply not at risk — and no `days_since_last_report` exists for them.
+ */
+export interface AtRiskEntryDto {
+  membership_id: string;
+  /** Null when the student never completed their profile — never "". */
+  full_name: string | null;
+  /**
+   * Expected days since the last report, not raw calendar days (SAS §18.4):
+   * recitation days are skipped. Always ≥ 3 on this list.
+   */
+  days_since_last_report: number;
+}
+
+/** APIS §9.1 bounded-collection envelope — no `pagination`, no total. */
+export interface AtRiskListResponse {
+  data: AtRiskEntryDto[];
+}
+
+/**
+ * Fetches a group's at-risk students (Teacher on an assigned group or
+ * Admin, API-040) and unwraps the APIS §9.1 envelope.
+ *
+ * No `?period=` is sent: the predicate always looks backwards from today
+ * (SAS §18.4), so SCR-23's period selector never changes this answer.
+ * Errors surface as `ApiError` unchanged — an out-of-scope group is a
+ * `403 SCOPE_DENIED`, which navigation never offers (UF §24).
+ */
+export async function getGroupAtRisk(
+  groupId: string,
+): Promise<AtRiskEntryDto[]> {
+  const response = await apiClient.get<AtRiskListResponse>(
+    `/groups/${groupId}/at-risk`,
+  );
+  return response.data;
+}
