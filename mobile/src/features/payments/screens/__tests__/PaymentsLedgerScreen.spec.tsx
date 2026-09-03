@@ -236,8 +236,15 @@ describe('PaymentsLedgerScreen (SCR-20, F-PAY-02, Figma 36:401 / 53:747)', () =>
         status: 'Unpaid',
       }),
     );
+    // Counted, not queried: `waitFor` polls until its callback stops
+    // throwing, and a matcher handed a React element builds its failure
+    // message out of that element's fibre — seconds of pretty-printing per
+    // attempt, on every attempt before the refetch lands, which is what put
+    // this test past the 5 s timeout. `.length` fails as a number.
     await waitFor(() =>
-      expect(screen.queryByTestId('payment-ledger-row-m-paid')).toBeNull(),
+      expect(screen.queryAllByTestId('payment-ledger-row-m-paid').length).toBe(
+        0,
+      ),
     );
     expect(
       screen.getByTestId('payments-ledger-filter-unpaid').props
