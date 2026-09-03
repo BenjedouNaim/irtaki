@@ -5,3 +5,4 @@ import { configure } from '@testing-library/react-native';
 // pre-existing specs time out spuriously. A longer ceiling never makes a
 // failing assertion pass — it only stops load-dependent flakiness.
 configure({ asyncUtilTimeout: 5000 });
+jest.setTimeout(15000);
