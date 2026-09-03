@@ -52,10 +52,10 @@ import { NotificationsController } from './presentation/notifications.controller
     GetNotificationPreferencesUseCase,
     SetNotificationPreferenceUseCase,
   ],
-  exports: [
-    DEVICE_TOKEN_REPOSITORY,
-    DeviceTokenRepository,
-    NOTIFICATION_PREFERENCE_REPOSITORY,
-  ],
+  // SA §11: Notifications is a module other modules never call into directly —
+  // they emit events and it listens. Only the device-token pair predating
+  // F-NOT-03 is exported; the E-10 preference repository is deliberately NOT,
+  // so no module can acquire an injection point into this one.
+  exports: [DEVICE_TOKEN_REPOSITORY, DeviceTokenRepository],
 })
 export class NotificationsModule {}
