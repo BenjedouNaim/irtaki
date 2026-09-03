@@ -110,6 +110,7 @@ export function ReportStatusCard({
   if (isLoading && !data) {
     return (
       <View
+        key="skeleton"
         testID={`${testID}-skeleton`}
         className={`w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 ${
           className ?? ''
@@ -126,6 +127,7 @@ export function ReportStatusCard({
 
     return (
       <View
+        key="error"
         testID={`${testID}-error`}
         accessibilityRole="alert"
         className={`w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3 ${
@@ -216,6 +218,7 @@ export function ReportStatusCard({
 
   return (
     <View
+      key="data"
       testID={testID}
       accessibilityRole="summary"
       accessibilityLabel={`تقرير اليوم: ${state.badge.label}. ${state.title}`}
