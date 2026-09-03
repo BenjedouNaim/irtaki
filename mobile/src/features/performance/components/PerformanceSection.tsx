@@ -258,8 +258,6 @@ function ScoreCard({
           <Text
             testID={`${testID}-value`}
             className={`${typography.displayLg} text-fg dark:text-fg-dark`}
-            numberOfLines={1}
-            adjustsFontSizeToFit
             maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
           >
             {String(Math.round(score))}
@@ -364,8 +362,6 @@ function PerformanceDetail({
           className={`${typography.headingLg} text-left ${
             isAlerting ? 'text-fg-error' : 'text-fg dark:text-fg-dark'
           }`}
-          numberOfLines={1}
-          adjustsFontSizeToFit
           maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
         >
           {String(daysSince)}

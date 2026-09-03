@@ -399,8 +399,12 @@ describe('PerformanceSection (SCR-13 Performance, F-PERF-01, Figma 30:553)', () 
     renderSection();
 
     const value = await screen.findByTestId('performance-section-score-value');
+    // UF §32 is satisfied by capping the OS text-scale multiplier. The score
+    // must NOT also use adjustsFontSizeToFit: it sits in a flex row with no
+    // width constraint, so RN measures it at almost nothing and shrinks the
+    // number to an unreadable size next to a full-size % glyph.
     expect(value.props.maxFontSizeMultiplier).toBe(1.5);
-    expect(value.props.adjustsFontSizeToFit).toBe(true);
+    expect(value.props.adjustsFontSizeToFit).toBeUndefined();
   });
 
   describe('SCR-24 reuse: the same section against API-039 (F-PERF-03)', () => {
