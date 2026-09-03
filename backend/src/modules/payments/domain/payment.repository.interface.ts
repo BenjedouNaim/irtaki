@@ -39,6 +39,35 @@ export interface MembershipPaidCycleRecord extends PaidCycleRecord {
   membershipId: string;
 }
 
+/** The one write of the whole module (API-047): a cycle asserted as paid. */
+export interface RecordPaidCycleInput {
+  membershipId: string;
+  /** 0-based (DB-CHK-18). */
+  cycleIndex: number;
+  /** BR-31's fixed fee — supplied by the domain, never by a client. */
+  amount: number;
+  /** BR-34 — the Assistant who asserted it (`payment_records.recorded_by`). */
+  recordedBy: string;
+  /** When it was recorded (`payment_records.paid_at`). */
+  paidAt: Date;
+}
+
+/** The persisted `payment_records` row, as API-047's `201` reports it. */
+export interface PaymentRecordCreatedRecord {
+  id: string;
+  cycleIndex: number;
+  /**
+   * The amount that was actually stored, read back rather than echoed:
+   * DBD §16 keeps the fee per-row "so a future price change never
+   * invalidates historical records", which only holds if the response
+   * reports the row and not the constant.
+   */
+  amount: number;
+  /** ISO-8601 instant. */
+  paidAt: string;
+  recordedBy: string;
+}
+
 export interface IPaymentRepository {
   /**
    * The caller's own Active membership context, or `null` when they have
@@ -74,4 +103,26 @@ export interface IPaymentRepository {
   findPaidCyclesByMembershipIds(
     membershipIds: readonly string[],
   ): Promise<MembershipPaidCycleRecord[]>;
+
+  /**
+   * The DS-06 context of one **Active** membership, or `null` when the id
+   * names none. Scope lives in the WHERE clause of one indexed lookup
+   * (TS §15.2) — the membership id handed in is the one that already passed
+   * API-047's ScopeGuard, and the repository still scopes on it (SA §14's
+   * second layer).
+   */
+  findLedgerContextByMembershipId(
+    membershipId: string,
+  ): Promise<OwnLedgerContextRecord | null>;
+
+  /**
+   * Inserts one `payment_records` row (API-047). A single auto-committed
+   * INSERT — no `QueryRunner`, since TS §19 lists "Record Payment Cycle" as
+   * "Single insert". A duplicate cycle is rejected by DB-UQ-06 and the
+   * driver error travels up unchanged for the use case to translate into
+   * the `409` (TS §20: never SELECT-then-INSERT).
+   */
+  createPaidCycle(
+    input: RecordPaidCycleInput,
+  ): Promise<PaymentRecordCreatedRecord>;
 }

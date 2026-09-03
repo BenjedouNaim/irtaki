@@ -36,6 +36,8 @@ describe('GetGroupPaymentLedgerUseCase (F-PAY-02 / API-046)', () => {
       findPaidCyclesByMembershipId: jest.fn(),
       findGroupLedgerContextsByGroupId: jest.fn().mockResolvedValue([]),
       findPaidCyclesByMembershipIds: jest.fn().mockResolvedValue([]),
+      findLedgerContextByMembershipId: jest.fn(),
+      createPaidCycle: jest.fn(),
     };
     groupPaymentScope = {
       isGroupOfAssistant: jest.fn(),

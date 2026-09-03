@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
 import {
   GroupLedgerContextRecord,
   IPaymentRepository,
   MembershipPaidCycleRecord,
   OwnLedgerContextRecord,
   PaidCycleRecord,
+  PaymentRecordCreatedRecord,
+  RecordPaidCycleInput,
 } from '../domain/payment.repository.interface';
 import { PaymentRecordTypeOrmEntity } from './payment-record.typeorm-entity';
 
@@ -29,6 +32,15 @@ interface RawPaidCycleRow {
 
 interface RawMembershipPaidCycleRow extends RawPaidCycleRow {
   membership_id: string;
+}
+
+interface RawCreatedPaymentRecordRow {
+  id: string;
+  cycle_index: number | string;
+  /** `NUMERIC(10,2)` — the driver hands it back as text. */
+  amount: string;
+  paid_at: string;
+  recorded_by: string;
 }
 
 @Injectable()
@@ -169,5 +181,89 @@ export class PaymentRepository implements IPaymentRepository {
       cycleIndex: Number(row.cycle_index),
       paidAt: new Date(row.paid_at).toISOString(),
     }));
+  }
+
+  async findLedgerContextByMembershipId(
+    membershipId: string,
+  ): Promise<OwnLedgerContextRecord | null> {
+    // ONE parameterised, indexed lookup (TS §15.2/§36) on the memberships
+    // primary key, with the Active predicate in the WHERE clause. Carries
+    // the cycle clock (BR-32), both FR-PAY-12 generation stops and the
+    // student's own timezone (T-01) — everything VR-37 needs to know which
+    // cycle is the current one. Dates travel as text so the driver never
+    // re-reads a DATE through the server timezone (T-04).
+    const rows = await this.paymentRecordRepo.manager.query<
+      RawOwnLedgerContextRow[]
+    >(
+      `SELECT m.id                AS membership_id,
+              m.started_at::text  AS started_at,
+              m.ended_at::text    AS ended_at,
+              g.archived_at::text AS archived_at,
+              u.timezone
+         FROM memberships m
+         JOIN groups g ON g.id = m.group_id
+         JOIN users  u ON u.id = m.user_id
+        WHERE m.id = $1
+          AND m.state = 'Active'
+        LIMIT 1`,
+      [membershipId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    const row = rows[0];
+    return {
+      membershipId: row.membership_id,
+      startedAt: row.started_at,
+      endedAt: row.ended_at ?? null,
+      archivedAt: row.archived_at
+        ? new Date(row.archived_at).toISOString()
+        : null,
+      timezone: row.timezone,
+    };
+  }
+
+  async createPaidCycle(
+    input: RecordPaidCycleInput,
+  ): Promise<PaymentRecordCreatedRecord> {
+    const id = uuidv7();
+    // One INSERT, auto-committed (TS §19 "Record Payment Cycle — single
+    // insert"). No pre-flight SELECT: DB-UQ-06 is the duplicate guarantee
+    // and its violation travels up for the use case to translate (TS §20).
+    // `RETURNING` reads the row back as the database stored it, so the
+    // `201` reports the persisted amount rather than echoing the constant
+    // that was sent — DBD §16 keeps the fee per-row for exactly that
+    // reason. One literal parameterised statement (TS §36).
+    const rows = await this.paymentRecordRepo.manager.query<
+      RawCreatedPaymentRecordRow[]
+    >(
+      `INSERT INTO payment_records (
+              id, membership_id, cycle_index, amount, paid_at, recorded_by
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id,
+                   cycle_index,
+                   amount,
+                   paid_at::text AS paid_at,
+                   recorded_by`,
+      [
+        id,
+        input.membershipId,
+        input.cycleIndex,
+        input.amount,
+        input.paidAt,
+        input.recordedBy,
+      ],
+    );
+
+    const row = rows[0];
+    return {
+      id: row.id,
+      cycleIndex: Number(row.cycle_index),
+      amount: Number(row.amount),
+      paidAt: new Date(row.paid_at).toISOString(),
+      recordedBy: row.recorded_by,
+    };
   }
 }
