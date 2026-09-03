@@ -13,6 +13,7 @@ import {
   IDailyReportRepository,
   TodayReportContextRecord,
 } from '../domain/daily-report.repository.interface';
+import { DatedDailyReportSnapshot } from '../domain/weekly-metrics-calculator';
 import { DailyReportTypeOrmEntity } from './daily-report.typeorm-entity';
 
 interface RawTodayContextRow {
@@ -21,6 +22,17 @@ interface RawTodayContextRow {
   lifecycle_state: string;
   recitation_day: number | string;
   timezone: string;
+}
+
+interface RawDaySnapshotRow {
+  report_date: string;
+  type: 'Normal' | 'Absent' | 'Revision';
+  absence_reason: 'Sick' | 'Studying' | 'Other' | null;
+  no_memorization_today: boolean | null;
+  no_revision_today: boolean | null;
+  has_memo_range: boolean;
+  completed_50_repetitions: boolean | null;
+  repetitions_in_single_session: boolean | null;
 }
 
 interface RawDailyReportRow {
@@ -270,6 +282,45 @@ export class DailyReportRepository implements IDailyReportRepository {
     }
 
     return toRecord(rows[0]);
+  }
+
+  async findDaySnapshotsByMembershipAndRange(
+    membershipId: string,
+    from: string,
+    to: string,
+  ): Promise<DatedDailyReportSnapshot[]> {
+    // One DB-IDX-01 (membership_id, report_date) range walk — the query
+    // DBD §26 lists for "Generate weekly report (current week, live)".
+    // Only the VO-09 classification inputs are projected; the memo range
+    // is reduced to its presence so no ordinal leaves the query.
+    const rows = await this.dailyReportRepo.manager.query<RawDaySnapshotRow[]>(
+      `SELECT r.report_date::text AS report_date,
+              r.type,
+              r.absence_reason,
+              r.no_memorization_today,
+              r.no_revision_today,
+              (r.memo_from_ordinal IS NOT NULL) AS has_memo_range,
+              r.completed_50_repetitions,
+              r.repetitions_in_single_session
+         FROM daily_reports r
+        WHERE r.membership_id = $1
+          AND r.report_date >= $2::date
+          AND r.report_date <= $3::date
+          AND r.deleted_at IS NULL
+        ORDER BY r.report_date ASC`,
+      [membershipId, from, to],
+    );
+
+    return rows.map((row) => ({
+      reportDate: row.report_date,
+      type: row.type,
+      absenceReason: row.absence_reason ?? null,
+      noMemorizationToday: row.no_memorization_today ?? null,
+      noRevisionToday: row.no_revision_today ?? null,
+      hasMemoRange: row.has_memo_range,
+      completed50Repetitions: row.completed_50_repetitions ?? null,
+      repetitionsInSingleSession: row.repetitions_in_single_session ?? null,
+    }));
   }
 
   async findOwnHistoryByUserId(
