@@ -38,15 +38,19 @@ export class ArchiveGroupUseCase {
       };
     }
 
-    // 3. Update lifecycle state to Archived with timestamp
+    // 3. DS-07's archival transaction (AR-04): the lifecycle flip and
+    //    FR-REQ-08's auto-rejection of every Pending request commit together.
+    //    Step 2's read is a fast path for BR-42's no-op response shape only —
+    //    the guarded `UPDATE … WHERE lifecycle_state = 'Active'` inside the
+    //    transaction is what actually decides, so two concurrent archives
+    //    cannot both cascade (TS §20).
     const archivedAt = new Date();
-    const updated = await this.groupRepository.updateLifecycle(
+    const outcome = await this.groupRepository.archiveWithPendingRejection(
       groupId,
-      'Archived',
       archivedAt,
     );
 
-    if (!updated) {
+    if (!outcome.group) {
       throw new NotFoundException({
         statusCode: 404,
         error: 'GROUP_NOT_FOUND',
@@ -54,13 +58,30 @@ export class ArchiveGroupUseCase {
       });
     }
 
+    // 3a. Lost the guarded UPDATE to a concurrent Admin: BR-42's no-op. The
+    //     winner already cascaded and emitted DE-10; doing either again would
+    //     double-notify.
+    if (!outcome.changed) {
+      return {
+        data: this.mapToDto(outcome.group),
+      };
+    }
+
     // 4. DEC-D05: Archiving does NOT write an AuditEntry row (explicit specification deviation)
 
-    // 5. Emit DE-10 (GroupArchivedEvent) post-commit, fire-and-forget (ADR-032)
+    // 5. Emit DE-10 (GroupArchivedEvent) post-commit, fire-and-forget (ADR-032).
+    //    DMS §DE-10 makes this event the carrier of the cascade downstream:
+    //    Notifications fans DE-04/N-04 out to each auto-rejected applicant from
+    //    the ids it names. The rejection itself is already durable — the event
+    //    only announces it, so a dropped listener cannot reopen the race.
     try {
       this.eventEmitter.emit(
         GroupArchivedEvent.EVENT_NAME,
-        new GroupArchivedEvent(groupId, archivedAt),
+        new GroupArchivedEvent(
+          groupId,
+          archivedAt,
+          outcome.autoRejectedRequestIds,
+        ),
       );
     } catch {
       // Event emission failure must never block the operation
@@ -68,7 +89,7 @@ export class ArchiveGroupUseCase {
 
     // 6. Return updated group in envelope
     return {
-      data: this.mapToDto(updated),
+      data: this.mapToDto(outcome.group),
     };
   }
 

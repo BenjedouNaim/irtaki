@@ -35,12 +35,12 @@ export class UnarchiveGroupUseCase {
       };
     }
 
-    // 3. Update lifecycle state to Active and clear archivedAt
-    const updated = await this.groupRepository.updateLifecycle(
-      groupId,
-      'Active',
-      null,
-    );
+    // 3. Guarded flip back to Active (TS §20). Step 2's read is a fast path;
+    //    the `WHERE lifecycle_state = 'Archived'` predicate inside the UPDATE
+    //    is what decides, so this can never overwrite an archive that
+    //    committed in between — one whose FR-REQ-08 cascade has already
+    //    rejected the group's whole Pending queue, irreversibly (APIS §10.4).
+    const { group: updated } = await this.groupRepository.unarchive(groupId);
 
     if (!updated) {
       throw new NotFoundException({

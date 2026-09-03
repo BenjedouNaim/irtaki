@@ -41,7 +41,7 @@ describe('UnarchiveGroupUseCase', () => {
   beforeEach(async () => {
     const mockGroupRepo: Partial<jest.Mocked<IGroupRepository>> = {
       findByIdForDetail: jest.fn(),
-      updateLifecycle: jest.fn(),
+      unarchive: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -65,7 +65,7 @@ describe('UnarchiveGroupUseCase', () => {
       NotFoundException,
     );
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).not.toHaveBeenCalled();
+    expect(groupRepository.unarchive).not.toHaveBeenCalled();
   });
 
   it('returns current state without updating when group is already Active (BR-42 no-op)', async () => {
@@ -74,24 +74,38 @@ describe('UnarchiveGroupUseCase', () => {
     const result = await useCase.execute(adminId, groupId);
 
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).not.toHaveBeenCalled();
+    expect(groupRepository.unarchive).not.toHaveBeenCalled();
     expect(result.data.lifecycle_state).toBe('Active');
     expect(result.data.id).toBe(groupId);
   });
 
   it('successfully un-archives an Archived group and returns updated DTO', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockArchivedGroup);
-    groupRepository.updateLifecycle.mockResolvedValueOnce(mockActiveGroup);
+    groupRepository.unarchive.mockResolvedValueOnce({
+      changed: true,
+      group: mockActiveGroup,
+    });
 
     const result = await useCase.execute(adminId, groupId);
 
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).toHaveBeenCalledWith(
-      groupId,
-      'Active',
-      null,
-    );
+    expect(groupRepository.unarchive).toHaveBeenCalledWith(groupId);
     expect(result.data.lifecycle_state).toBe('Active');
     expect(result.data.name).toBe('حلقة قالون');
+  });
+
+  it('returns the archived group untouched when a concurrent archive won the guard', async () => {
+    // The guarded UPDATE matched nothing: an archive committed between the
+    // step-2 read and the write, and its FR-REQ-08 cascade already rejected
+    // the queue. Reporting the group's real state is the only safe answer.
+    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockArchivedGroup);
+    groupRepository.unarchive.mockResolvedValueOnce({
+      changed: false,
+      group: mockArchivedGroup,
+    });
+
+    const result = await useCase.execute(adminId, groupId);
+
+    expect(result.data.lifecycle_state).toBe('Archived');
   });
 });

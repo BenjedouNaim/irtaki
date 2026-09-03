@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  GroupArchivalResult,
+  GroupLifecycleTransition,
   GroupListRow,
   IGroupRepository,
 } from '../domain/group.repository.interface';
@@ -347,21 +349,100 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
-  async updateLifecycle(
-    id: string,
-    lifecycleState: 'Active' | 'Archived',
-    archivedAt: Date | null,
-  ): Promise<GroupListRow | null> {
-    const updateResult = await this.groupRepo.update(
-      { id },
-      { lifecycleState, archivedAt },
+  /**
+   * The un-archive half of UC-13, guarded the same way its archival twin is.
+   *
+   * The `lifecycle_state = 'Archived'` predicate matters more here than it
+   * looks: an un-archive that read `Archived` a moment before a concurrent
+   * archive committed would otherwise clobber it, leaving the group `Active`
+   * with `archived_at` cleared **after** that archive's cascade had already
+   * auto-rejected its whole Pending queue (FR-REQ-08) — and nothing in the API
+   * revives a rejected request (APIS §10.4). 0 rows means the group was
+   * already `Active`; that is BR-42's no-op, not an error.
+   */
+  async unarchive(groupId: string): Promise<GroupLifecycleTransition> {
+    const changedRows = unwrapReturning<{ id: string }>(
+      await this.groupRepo.query(
+        `UPDATE groups
+            SET lifecycle_state = 'Active',
+                archived_at = NULL,
+                updated_at = now()
+          WHERE id = $1 AND lifecycle_state = 'Archived'
+          RETURNING id`,
+        [groupId],
+      ),
     );
 
-    if (!updateResult.affected || updateResult.affected === 0) {
-      return null;
-    }
+    return {
+      changed: changedRows.length > 0,
+      group: await this.findByIdForDetail(groupId),
+    };
+  }
 
-    return this.findByIdForDetail(id);
+  /**
+   * DS-07's archival transaction (UC-13 / FR-REQ-08 / BR-42).
+   *
+   * Two statements, one transaction (AR-04), default `READ COMMITTED` — no row
+   * locking and no elevated isolation, per TS §20:
+   *
+   *  1. A **guarded** `UPDATE … WHERE lifecycle_state = 'Active'` decides who
+   *     archives. Two concurrent Admins cannot both cascade: the loser matches
+   *     0 rows and returns `archived: false`, BR-42's no-op.
+   *  2. The bulk auto-reject. It takes a write lock on every `Pending` row of
+   *     the group, so a concurrent accept's own
+   *     `UPDATE … WHERE status = 'Pending'` either ran first (and wins, the
+   *     legitimate serial order) or blocks here, re-reads `Rejected` after this
+   *     commit, matches 0 rows and answers `409 ALREADY_DECIDED`.
+   *
+   * `resolution_source = 'system'` marks the archival auto-rejection apart from
+   * an Assistant's `'manual'` decision (SAS §21.3, DBD §14). Only columns
+   * DB-CHK-10 permits are touched; `reviewed_by` stays NULL because no human
+   * reviewed it.
+   */
+  async archiveWithPendingRejection(
+    groupId: string,
+    archivedAt: Date,
+  ): Promise<GroupArchivalResult> {
+    const outcome = await this.groupRepo.manager.transaction(
+      async (manager) => {
+        const archivedRows = unwrapReturning<{ id: string }>(
+          await manager.query(
+            `UPDATE groups
+                SET lifecycle_state = 'Archived',
+                    archived_at = $2,
+                    updated_at = now()
+              WHERE id = $1 AND lifecycle_state = 'Active'
+              RETURNING id`,
+            [groupId, archivedAt],
+          ),
+        );
+
+        if (archivedRows.length === 0) {
+          return { changed: false, autoRejectedRequestIds: [] as string[] };
+        }
+
+        const rejectedRows = unwrapReturning<{ id: string }>(
+          await manager.query(
+            `UPDATE join_requests
+                SET status = 'Rejected',
+                    reviewed_at = $2,
+                    resolution_source = 'system'
+              WHERE group_id = $1
+                AND status = 'Pending'
+                AND deleted_at IS NULL
+              RETURNING id`,
+            [groupId, archivedAt],
+          ),
+        );
+
+        return {
+          changed: true,
+          autoRejectedRequestIds: rejectedRows.map((r) => r.id),
+        };
+      },
+    );
+
+    return { ...outcome, group: await this.findByIdForDetail(groupId) };
   }
 
   async hasMembershipHistory(groupId: string): Promise<boolean> {
@@ -417,4 +498,21 @@ export class GroupRepository implements IGroupRepository {
       },
     };
   }
+}
+
+/**
+ * `EntityManager.query` surfaces an `UPDATE … RETURNING` result either as the
+ * row array itself or as the driver's `[rows, affectedCount]` pair, depending on
+ * the call path. The enrollment repository's conditional updates normalise it
+ * the same way; this keeps the shape decision in one expression instead of
+ * scattering unchecked member access through the query sites.
+ */
+function unwrapReturning<T>(result: unknown): T[] {
+  if (!Array.isArray(result)) {
+    return [];
+  }
+  if (Array.isArray(result[0])) {
+    return result[0] as T[];
+  }
+  return result as T[];
 }

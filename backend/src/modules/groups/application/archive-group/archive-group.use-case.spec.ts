@@ -44,7 +44,7 @@ describe('ArchiveGroupUseCase', () => {
   beforeEach(async () => {
     const mockGroupRepo: Partial<jest.Mocked<IGroupRepository>> = {
       findByIdForDetail: jest.fn(),
-      updateLifecycle: jest.fn(),
+      archiveWithPendingRejection: jest.fn(),
     };
 
     const mockEventEmitter: Partial<jest.Mocked<EventEmitter2>> = {
@@ -77,7 +77,7 @@ describe('ArchiveGroupUseCase', () => {
       NotFoundException,
     );
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).not.toHaveBeenCalled();
+    expect(groupRepository.archiveWithPendingRejection).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
@@ -87,7 +87,7 @@ describe('ArchiveGroupUseCase', () => {
     const result = await useCase.execute(adminId, groupId);
 
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).not.toHaveBeenCalled();
+    expect(groupRepository.archiveWithPendingRejection).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
     expect(result.data.lifecycle_state).toBe('Archived');
     expect(result.data.id).toBe(groupId);
@@ -95,14 +95,17 @@ describe('ArchiveGroupUseCase', () => {
 
   it('successfully archives an Active group, emits GroupArchivedEvent, and returns updated DTO', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockActiveGroup);
-    groupRepository.updateLifecycle.mockResolvedValueOnce(mockArchivedGroup);
+    groupRepository.archiveWithPendingRejection.mockResolvedValueOnce({
+      changed: true,
+      group: mockArchivedGroup,
+      autoRejectedRequestIds: [],
+    });
 
     const result = await useCase.execute(adminId, groupId);
 
     expect(groupRepository.findByIdForDetail).toHaveBeenCalledWith(groupId);
-    expect(groupRepository.updateLifecycle).toHaveBeenCalledWith(
+    expect(groupRepository.archiveWithPendingRejection).toHaveBeenCalledWith(
       groupId,
-      'Archived',
       expect.any(Date),
     );
     expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
@@ -117,9 +120,60 @@ describe('ArchiveGroupUseCase', () => {
     expect(result.data.name).toBe('حلقة قالون');
   });
 
+  it('carries the auto-rejected JoinRequest ids on DE-10 for the N-04 fan-out (FR-REQ-08)', async () => {
+    const rejectedIds = [
+      '55555555-5555-5555-5555-555555555555',
+      '66666666-6666-6666-6666-666666666666',
+    ];
+    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockActiveGroup);
+    groupRepository.archiveWithPendingRejection.mockResolvedValueOnce({
+      changed: true,
+      group: mockArchivedGroup,
+      autoRejectedRequestIds: rejectedIds,
+    });
+
+    await useCase.execute(adminId, groupId);
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      GroupArchivedEvent.EVENT_NAME,
+      expect.objectContaining({ autoRejectedJoinRequestIds: rejectedIds }),
+    );
+  });
+
+  it('emits nothing when a concurrent Admin won the guarded UPDATE (BR-42 no-op)', async () => {
+    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockActiveGroup);
+    groupRepository.archiveWithPendingRejection.mockResolvedValueOnce({
+      changed: false,
+      group: mockArchivedGroup,
+      autoRejectedRequestIds: [],
+    });
+
+    const result = await useCase.execute(adminId, groupId);
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+    expect(result.data.lifecycle_state).toBe('Archived');
+  });
+
+  it('throws NotFoundException when the group vanished before the archival transaction', async () => {
+    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockActiveGroup);
+    groupRepository.archiveWithPendingRejection.mockResolvedValueOnce({
+      changed: false,
+      group: null,
+      autoRejectedRequestIds: [],
+    });
+
+    await expect(useCase.execute(adminId, groupId)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
   it('does not fail request if event emission throws an error', async () => {
     groupRepository.findByIdForDetail.mockResolvedValueOnce(mockActiveGroup);
-    groupRepository.updateLifecycle.mockResolvedValueOnce(mockArchivedGroup);
+    groupRepository.archiveWithPendingRejection.mockResolvedValueOnce({
+      changed: true,
+      group: mockArchivedGroup,
+      autoRejectedRequestIds: [],
+    });
     eventEmitter.emit.mockImplementationOnce(() => {
       throw new Error('Event listener failed');
     });
