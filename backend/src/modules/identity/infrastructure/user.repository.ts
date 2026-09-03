@@ -1,10 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { IUserRepository } from '../domain/user.repository.interface';
+import {
+  FindUsersPageParams,
+  IUserRepository,
+  UserDirectoryPage,
+} from '../domain/user.repository.interface';
 import { User } from '../domain/user.entity';
 import { PromotionTargetRole, UserRole } from '../domain/user-role.enum';
 import { UserTypeOrmEntity } from './user.typeorm-entity';
+
+/** One raw `users` row of the directory projection (API-053). */
+interface RawUserDirectoryRow {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+  created_at: string;
+}
 
 @Injectable()
 export class UserRepository implements IUserRepository {
@@ -26,12 +39,51 @@ export class UserRepository implements IUserRepository {
     return this.toDomain(entity);
   }
 
-  async findAllByRole(role?: UserRole): Promise<User[]> {
-    const entities = await this.repo.find({
-      where: role ? { role } : {},
-      order: { createdAt: 'ASC' },
-    });
-    return entities.map((e) => this.toDomain(e));
+  async findPageByRole(
+    params: FindUsersPageParams,
+  ): Promise<UserDirectoryPage> {
+    // One literal parameterised statement (TS §36): the optional role filter
+    // and the optional keyset position are nullable parameters rather than
+    // appended SQL. `created_at DESC, id DESC` is the fixed order APIS §9.4
+    // pins to `/users`; the id tie-break (UUIDv7, time-ordered) is what makes
+    // the cursor stable when two accounts share a `created_at`. The sort key
+    // is projected as a full-precision ISO instant so the cursor compares
+    // exactly what was ordered by. `LIMIT limit + 1` derives `hasMore`
+    // without a COUNT (APIS §9.1).
+    const rows = await this.repo.manager.query<RawUserDirectoryRow[]>(
+      `SELECT u.id,
+              u.email,
+              u.full_name,
+              u.role,
+              to_char(u.created_at AT TIME ZONE 'UTC',
+                      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+         FROM users u
+        WHERE ($1::text IS NULL OR u.role = $1::text)
+          AND ($2::timestamptz IS NULL
+               OR u.created_at < $2::timestamptz
+               OR (u.created_at = $2::timestamptz AND u.id < $3::uuid))
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT $4`,
+      [
+        params.role,
+        params.cursor?.sortKey.createdAt ?? null,
+        params.cursor?.id ?? null,
+        params.limit + 1,
+      ],
+    );
+
+    const hasMore = rows.length > params.limit;
+    const page = hasMore ? rows.slice(0, params.limit) : rows;
+    return {
+      rows: page.map((row) => ({
+        id: row.id,
+        email: row.email,
+        fullName: row.full_name,
+        role: row.role as UserRole,
+        createdAt: row.created_at,
+      })),
+      hasMore,
+    };
   }
 
   async save(user: User): Promise<User> {

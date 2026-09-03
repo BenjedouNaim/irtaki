@@ -38,7 +38,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
     mockUserRepo = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
-      findAllByRole: jest.fn(),
+      findPageByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),

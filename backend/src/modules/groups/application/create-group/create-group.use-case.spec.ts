@@ -90,7 +90,7 @@ describe('CreateGroupUseCase', () => {
     const mockUserRepo: Partial<jest.Mocked<IUserRepository>> = {
       findById: jest.fn(),
       findByEmail: jest.fn(),
-      findAllByRole: jest.fn(),
+      findPageByRole: jest.fn(),
       save: jest.fn(),
     };
 
