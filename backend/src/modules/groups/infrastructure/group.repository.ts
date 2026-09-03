@@ -305,12 +305,13 @@ export class GroupRepository implements IGroupRepository {
     return this.findByIdForDetail(id);
   }
 
+  /** Guarded by `lifecycle_state = 'Active'` — see the interface (BR-42, TS §20). */
   async updateEnrollmentStatus(
     id: string,
     status: 'Open' | 'Closed',
   ): Promise<GroupListRow | null> {
     const updateResult = await this.groupRepo.update(
-      { id },
+      { id, lifecycleState: 'Active' },
       { enrollmentStatus: status },
     );
 

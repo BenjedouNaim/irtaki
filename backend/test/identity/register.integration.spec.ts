@@ -142,6 +142,42 @@ describe('POST /auth/register (API-001 Integration)', () => {
     expect(body.message).toBeDefined();
   });
 
+  // TS §20 — the duplicate pre-check above is a fast path only. Two
+  // registrations of the same address in flight together both clear it, so the
+  // loser can only be stopped by DB-UQ-01. Before the constraint violation was
+  // translated, that loser surfaced as a 500 instead of the documented 409.
+  it('lets exactly one of two concurrent registrations of the same email win (409 EMAIL_TAKEN)', async () => {
+    const email = `race-${Date.now()}@test-register.com`;
+
+    const [res1, res2] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ email, password: 'ValidPassword123!' }),
+      request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ email, password: 'AnotherPassword123!' }),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort();
+    expect(statuses).toEqual([HttpStatus.CREATED, HttpStatus.CONFLICT]);
+
+    const loser = res1.status === Number(HttpStatus.CONFLICT) ? res1 : res2;
+    const loserBody = loser.body as ErrorEnvelope;
+    expect(loserBody.statusCode).toBe(HttpStatus.CONFLICT);
+    expect(loserBody.error).toBe('EMAIL_TAKEN');
+    expect(loserBody.message).toBeDefined();
+
+    // The constraint name must never reach the caller (TS §21, §29).
+    expect(JSON.stringify(loserBody)).not.toContain('DB-UQ-01');
+    expect(JSON.stringify(loserBody)).not.toMatch(/unique constraint/i);
+
+    const rows = await dataSource.query<DbUserRow[]>(
+      'SELECT id FROM users WHERE email = $1',
+      [email],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
   it('rejects weak password with < 8 chars with 422 Unprocessable Entity', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')

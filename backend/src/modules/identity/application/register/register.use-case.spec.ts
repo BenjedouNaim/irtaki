@@ -99,4 +99,44 @@ describe('RegisterUseCase', () => {
       }),
     ).rejects.toThrow(ConflictException);
   });
+
+  // TS §20 — the pre-check above is only a fast path; two registrations of the
+  // same address both clear it and the loser is rejected by DB-UQ-01.
+  it('translates a DB-UQ-01 violation into the same 409 EMAIL_TAKEN', async () => {
+    mockUserRepo.findByEmail.mockResolvedValue(null);
+    mockUserRepo.save.mockRejectedValue(
+      Object.assign(
+        new Error('duplicate key value violates unique constraint'),
+        {
+          code: '23505',
+          driverError: { code: '23505', constraint: 'DB-UQ-01' },
+        },
+      ),
+    );
+
+    const promise = useCase.execute({
+      email: 'racing@example.com',
+      password: 'Password123!',
+    });
+
+    await expect(promise).rejects.toThrow(ConflictException);
+    await expect(promise).rejects.toMatchObject({
+      response: { error: 'EMAIL_TAKEN' },
+    });
+  });
+
+  it('rethrows a non-unique database failure untouched', async () => {
+    mockUserRepo.findByEmail.mockResolvedValue(null);
+    const failure = Object.assign(new Error('connection terminated'), {
+      code: '08006',
+    });
+    mockUserRepo.save.mockRejectedValue(failure);
+
+    await expect(
+      useCase.execute({
+        email: 'unreachable@example.com',
+        password: 'Password123!',
+      }),
+    ).rejects.toBe(failure);
+  });
 });
