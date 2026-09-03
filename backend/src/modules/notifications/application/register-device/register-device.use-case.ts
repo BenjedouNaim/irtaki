@@ -64,7 +64,10 @@ export class RegisterDeviceUseCase {
     const record =
       await this.deviceTokenRepository.registerOrRefresh(deviceToken);
 
-    this.logger.log(
+    // TS §30: use-case entry/exit is DEBUG (local development only). INFO is
+    // reserved for request-completed lines, scheduled-job outcomes and
+    // notification DISPATCH outcomes — a token registration is none of those.
+    this.logger.debug(
       `Registered device token ${record.id} (${record.platform}) for user ${userId}`,
     );
 

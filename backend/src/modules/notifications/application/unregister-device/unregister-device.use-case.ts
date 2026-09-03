@@ -48,6 +48,9 @@ export class UnregisterDeviceUseCase {
       throw scopeDenied();
     }
 
-    this.logger.log(`Unregistered device token ${deviceId} for user ${userId}`);
+    // TS §30: use-case entry/exit is DEBUG, not INFO (see RegisterDeviceUseCase).
+    this.logger.debug(
+      `Unregistered device token ${deviceId} for user ${userId}`,
+    );
   }
 }
