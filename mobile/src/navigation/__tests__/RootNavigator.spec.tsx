@@ -1,78 +1,89 @@
 import React from 'react';
-import { render as rtlRender, screen } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react-native';
 import { RootNavigator } from '../RootNavigator';
+import { ROLE_HOME_ROUTES, homeRouteForRole } from '../roleHome';
 import { useAuthStore } from '../../shared/auth/authStore';
-import * as groupsApi from '@/shared/api/groups.client';
-import * as meApi from '@/shared/api/me.client';
+import type { Role } from '../../shared/auth/types';
 
-// StudentTabs hosts the Daily Report CTA card (F-DR-01), which reads API-029
-// through TanStack Query — RootLayout provides the QueryClient in the app.
-jest.mock('@/shared/api/dailyReports.client');
+// `Redirect` renders nothing observable, so the mock surfaces its `href` as
+// text — the routing decision IS what these tests assert.
+jest.mock('expo-router', () => {
+  const ReactModule = jest.requireActual<typeof React>('react');
+  const { Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Redirect: ({ href }: { href: unknown }) =>
+      ReactModule.createElement(Text, { testID: 'redirect' }, String(href)),
+  };
+});
 
-// AssistantTabs draws the Assistant tab bar (safe-area bottom inset) and
-// reads GET /groups + GET /me — no SafeAreaProvider or network here.
-jest.mock('react-native-safe-area-context', () => ({
-  ...jest.requireActual('react-native-safe-area-context'),
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-jest.mock('@/shared/api/groups.client');
-jest.mock('@/shared/api/me.client');
+/** UF §7's role → Home mapping, restated here so a drift is visible. */
+const ROLE_HOMES: Array<{ role: Role; screen: string; route: string }> = [
+  { role: 'User', screen: 'SCR-05', route: '/(app)/user' },
+  { role: 'Student', screen: 'SCR-08', route: '/(app)/student' },
+  { role: 'Assistant', screen: 'SCR-17', route: '/(app)/assistant' },
+  { role: 'Teacher', screen: 'SCR-22', route: '/(app)/teacher' },
+  { role: 'Admin', screen: 'SCR-26', route: '/(app)/admin' },
+];
 
-let queryClient: QueryClient;
-
-function render(ui: React.ReactElement) {
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return rtlRender(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
-}
-
-describe('RootNavigator', () => {
+describe('RootNavigator (F-DASH-02)', () => {
   beforeEach(() => {
     useAuthStore.getState().clearSession();
   });
 
-  afterEach(() => {
-    queryClient?.clear();
+  it('sends an unauthenticated caller to Login (SCR-01)', () => {
+    render(<RootNavigator />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/(auth)/login');
   });
 
-  it('renders AuthStack when unauthenticated', async () => {
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('auth-stack')).toBeTruthy();
+  it.each(ROLE_HOMES)(
+    'routes $role to their Home ($screen)',
+    ({ role, route }) => {
+      useAuthStore.getState().setSession('token', role);
+
+      render(<RootNavigator />);
+
+      expect(screen.getByTestId('redirect')).toHaveTextContent(route);
+    },
+  );
+
+  it('sends a session with no role to Login rather than guessing', () => {
+    useAuthStore.setState({
+      isAuthenticated: true,
+      role: null,
+      accessToken: 'token',
+    });
+
+    render(<RootNavigator />);
+
+    expect(screen.getByTestId('redirect')).toHaveTextContent('/(auth)/login');
+  });
+});
+
+describe('roleHome (F-DASH-02 — the single role → route map)', () => {
+  it('maps every role exactly once, with no duplicate destination', () => {
+    const routes = Object.values(ROLE_HOME_ROUTES);
+
+    expect(Object.keys(ROLE_HOME_ROUTES).sort()).toEqual([
+      'Admin',
+      'Assistant',
+      'Student',
+      'Teacher',
+      'User',
+    ]);
+    expect(new Set(routes).size).toBe(routes.length);
   });
 
-  it('renders UserStack when role is User', async () => {
-    useAuthStore.getState().setSession('token', 'User');
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('user-stack')).toBeTruthy();
-  });
+  it.each(ROLE_HOMES)(
+    'resolves $role to $route ($screen)',
+    ({ role, route }) => {
+      expect(homeRouteForRole(role)).toBe(route);
+    },
+  );
 
-  it('renders StudentTabs when role is Student', async () => {
-    useAuthStore.getState().setSession('token', 'Student');
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('student-tabs')).toBeTruthy();
-  });
-
-  it('renders AssistantTabs when role is Assistant', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: [] });
-    (meApi.getMe as jest.Mock).mockRejectedValue(new Error('offline'));
-    useAuthStore.getState().setSession('token', 'Assistant');
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('assistant-tabs')).toBeTruthy();
-  });
-
-  it('renders TeacherStack when role is Teacher', async () => {
-    useAuthStore.getState().setSession('token', 'Teacher');
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('teacher-stack')).toBeTruthy();
-  });
-
-  it('renders AdminStack when role is Admin', async () => {
-    useAuthStore.getState().setSession('token', 'Admin');
-    await render(<RootNavigator />);
-    expect(screen.getByTestId('admin-stack')).toBeTruthy();
+  it('falls back to Login for a missing role (UF §9 cold start)', () => {
+    expect(homeRouteForRole(null)).toBe('/(auth)/login');
+    expect(homeRouteForRole(undefined)).toBe('/(auth)/login');
   });
 });

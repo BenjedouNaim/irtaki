@@ -134,7 +134,6 @@ describe('LoginScreen (SCR-01)', () => {
       timezone: 'Africa/Tunis',
       access_token: 'mock-jwt-access-token',
       refresh_token: 'mock-jwt-refresh-token',
-      dashboard_route: 'student',
     });
 
     const { getByTestId } = await render(<LoginScreen />);

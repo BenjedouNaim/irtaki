@@ -31,7 +31,12 @@ export interface LoginResponse {
   timezone: string;
   access_token: string;
   refresh_token: string;
-  dashboard_route: string;
+  // NOTE: API-001 still emits a `dashboard_route` hint, deliberately not
+  // declared here. TSQ-02/TDR-05 dropped it — "mobile routes from `role`
+  // alone (UF §9)" — and F-DASH-02 resolves every post-login destination
+  // through `navigation/roleHome.ts`. Typing the field would invite a
+  // future caller to route from it and reintroduce the decision the spec
+  // removed; the extra key on the wire is simply ignored.
 }
 
 export async function registerUser(
