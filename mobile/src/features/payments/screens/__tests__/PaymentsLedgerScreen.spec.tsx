@@ -183,6 +183,18 @@ describe('PaymentsLedgerScreen (SCR-20, F-PAY-02, Figma 36:401 / 53:747)', () =>
     ).toHaveTextContent('2 متأخرة');
   });
 
+  it('pushes into SCR-21 Payment Detail carrying the group the ledger was read for (UF §18)', async () => {
+    renderScreen();
+
+    await screen.findByTestId('payments-ledger-list');
+    fireEvent.press(screen.getByTestId('payment-ledger-row-m-unpaid'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/assistant/payments/[id]',
+      params: { id: 'm-unpaid', groupId: 'g-1' },
+    });
+  });
+
   it('shows the current cycle end date under the name (Figma 36:459)', async () => {
     renderScreen();
 
@@ -359,14 +371,13 @@ describe('PaymentsLedgerScreen (SCR-20, F-PAY-02, Figma 36:401 / 53:747)', () =>
     expect(await screen.findByTestId('payments-ledger-list')).toBeTruthy();
   });
 
-  it('offers no "Mark as Paid" action and no push into Payment Detail — both are F-PAY-03', async () => {
+  it('keeps "Mark as Paid" off the ledger rows — it belongs behind SCR-21’s strong confirmation (UF §18/§25)', async () => {
     renderScreen();
 
     await screen.findByTestId('payments-ledger-list');
     expect(
       screen.queryByTestId('payment-ledger-row-m-unpaid-mark-paid'),
     ).toBeNull();
-    fireEvent.press(screen.getByTestId('payment-ledger-row-m-unpaid'));
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(paymentsApi.recordPayment).not.toHaveBeenCalled();
   });
 });

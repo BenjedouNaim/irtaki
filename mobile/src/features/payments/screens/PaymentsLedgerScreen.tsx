@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Banner } from '@/shared/components/Banner';
 import { Chip } from '@/shared/components/Chip';
 import { CYCLE_STATUS_BADGE } from '@/shared/components/CycleRow';
@@ -83,10 +84,13 @@ function describeError(error: unknown): string {
  * group summary reads the unfiltered slice, so it keeps reporting the whole
  * group while a filter narrows the rows, exactly as 53:747 shows.
  *
- * There is no "Mark as Paid" action and no push into SCR-21 Payment Detail:
- * both belong to F-PAY-03 / API-047, which does not exist yet.
+ * Each row pushes into SCR-21 Payment Detail (UF §18), carrying the group
+ * id so the detail screen reads the very same cached slice rather than
+ * asking for a per-student endpoint that does not exist. "Mark as Paid"
+ * lives there, behind UF §25's strong confirmation.
  */
 export function PaymentsLedgerScreen() {
+  const router = useRouter();
   const [status, setStatus] = useState<GroupPaymentsFilter>(undefined);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
@@ -195,7 +199,19 @@ export function PaymentsLedgerScreen() {
         ) : (
           <View className="w-full gap-2.5" testID="payments-ledger-list">
             {ledgers.map((ledger) => (
-              <StudentLedgerRow key={ledger.membership_id} ledger={ledger} />
+              <StudentLedgerRow
+                key={ledger.membership_id}
+                ledger={ledger}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/assistant/payments/[id]',
+                    params: {
+                      id: ledger.membership_id,
+                      groupId: groupId ?? '',
+                    },
+                  })
+                }
+              />
             ))}
           </View>
         )}

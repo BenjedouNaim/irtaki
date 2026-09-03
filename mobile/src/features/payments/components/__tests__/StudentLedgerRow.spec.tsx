@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { GroupStudentLedgerDto } from '@/shared/api/payments.client';
 import {
   StudentLedgerRow,
@@ -105,5 +105,36 @@ describe('StudentLedgerRow (SCR-20 row, Figma 36:450)', () => {
     expect(
       screen.queryByTestId('payment-ledger-row-m-1-current-cycle'),
     ).toBeNull();
+  });
+
+  describe('the push into SCR-21 Payment Detail (UF §18)', () => {
+    it('becomes a button with the trailing chevron once a destination exists', () => {
+      const onPress = jest.fn();
+      render(<StudentLedgerRow ledger={ledger()} onPress={onPress} />);
+
+      const row = screen.getByTestId('payment-ledger-row-m-1');
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(
+        screen.getByTestId('payment-ledger-row-m-1-chevron', {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
+
+      fireEvent.press(row);
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays inert text with no chevron without one — never a dead affordance', () => {
+      render(<StudentLedgerRow ledger={ledger()} />);
+
+      expect(
+        screen.getByTestId('payment-ledger-row-m-1').props.accessibilityRole,
+      ).toBe('text');
+      expect(
+        screen.queryByTestId('payment-ledger-row-m-1-chevron', {
+          includeHiddenElements: true,
+        }),
+      ).toBeNull();
+    });
   });
 });

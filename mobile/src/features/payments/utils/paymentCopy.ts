@@ -125,3 +125,61 @@ function describeFollowUps(count: number): string {
   if (count <= 10) return `${count} متابعات`;
   return `${count} متابعة`;
 }
+
+/**
+ * SCR-21's summary figure, "90 دينارًا" (Figma 36:574): the arrears count
+ * times the fixed public fee. Same BR-31 arithmetic UF §18 authorises for
+ * the Student's arrears banner — the API returns no money amount.
+ */
+export function formatArrearsTotal(arrearsCount: number): string {
+  return `${arrearsCount * CYCLE_AMOUNT_TND} دينارًا`;
+}
+
+/**
+ * SCR-21's summary label, "3 دورات متأخرة" (Figma 36:576), agreeing in
+ * Arabic number. Figma draws the card only with arrears; the zero form is
+ * the state a fully paid-up student reaches, which the screen renders in
+ * the plain surface treatment rather than the error one.
+ */
+export function formatArrearsCountLabel(arrearsCount: number): string {
+  if (arrearsCount === 0) return 'لا دورات متأخرة';
+  if (arrearsCount === 1) return 'دورة واحدة متأخرة';
+  if (arrearsCount === 2) return 'دورتان متأخرتان';
+  if (arrearsCount <= 10) return `${arrearsCount} دورات متأخرة`;
+  return `${arrearsCount} دورة متأخرة`;
+}
+
+/** "ماي 2026" — the month a membership's cycle clock started (BR-32). */
+export function formatArabicMonthYear(iso: string): string {
+  const date = parseIsoDate(iso);
+  if (!date) return iso;
+  return `${ARABIC_MONTHS[date.month]} ${date.year}`;
+}
+
+/**
+ * SCR-21's summary meta line, "حلقة الفجر · عضو منذ ماي 2026" (Figma
+ * 36:577). "Member since" is cycle 0's start date, which BR-32 defines as
+ * `membership.started_at` itself — so it is read off the ledger rather than
+ * asked of another endpoint. Either half is dropped when unavailable
+ * instead of being invented.
+ */
+export function formatLedgerMeta(
+  groupName: string | null | undefined,
+  firstCycleStart: string | null | undefined,
+): string {
+  const parts = [
+    groupName?.trim() || null,
+    firstCycleStart
+      ? `عضو منذ ${formatArabicMonthYear(firstCycleStart)}`
+      : null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+/**
+ * The strong confirm dialog's title, "تسجيل دفعة الدورة 5 كمستلَمة؟"
+ * (Figma 36:618) — the cycle numbered as the row above it numbers it.
+ */
+export function formatMarkPaidTitle(cycle: PaymentCycleDto): string {
+  return `تسجيل دفعة الدورة ${cycle.index + 1} كمستلَمة؟`;
+}

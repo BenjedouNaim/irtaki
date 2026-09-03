@@ -7,6 +7,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
+import { Banner } from './Banner';
 import { Button } from './Button';
 import { typography } from '@/shared/theme/typography';
 import { SHADOW_FLOATING } from '@/shared/theme/colors';
@@ -32,6 +33,12 @@ export interface DialogProps {
   onCancel: () => void;
   /** Confirm shows a spinner; cancel and the backdrop are inert. */
   loading?: boolean;
+  /**
+   * Inline failure of the confirmed action, shown above the buttons as an
+   * icon + text Banner (UF §32) so the dialog can stay open for a retry —
+   * which UF §18 requires of "Record a payment" on a network/server error.
+   */
+  error?: string | null;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -52,6 +59,7 @@ export function Dialog({
   onConfirm,
   onCancel,
   loading = false,
+  error = null,
   testID = 'dialog',
   style,
 }: DialogProps) {
@@ -97,6 +105,15 @@ export function Dialog({
           >
             {body}
           </Text>
+
+          {error ? (
+            <Banner
+              message={error}
+              tone="error"
+              testID={`${testID}-error`}
+              className="mt-2"
+            />
+          ) : null}
 
           <View className="w-full pt-4 gap-2">
             <Button

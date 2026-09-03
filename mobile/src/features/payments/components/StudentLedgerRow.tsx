@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { View, Text, Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Icon } from '@/shared/components/Icon';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { CYCLE_STATUS_BADGE } from '@/shared/components/CycleRow';
 import { typography } from '@/shared/theme/typography';
@@ -21,6 +22,8 @@ export function nameInitial(fullName: string | null): string {
 
 export interface StudentLedgerRowProps {
   ledger: GroupStudentLedgerDto;
+  /** Opens SCR-21 Payment Detail; omitted, the row stays inert text. */
+  onPress?: () => void;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -35,12 +38,14 @@ export interface StudentLedgerRowProps {
  * up to today or the FR-PAY-12 stop, so the newest entry is the live one.
  * The row computes no status and no date boundary of its own.
  *
- * Figma's leading chevron and the push to SCR-21 Payment Detail are absent:
- * that screen is F-PAY-03's, and a chevron with no destination would be a
- * dead affordance (the Assistant Home group rows drop theirs the same way).
+ * With `onPress` the row becomes the push into SCR-21 Payment Detail
+ * (UF §18 "→ Payment Detail") and grows Figma's trailing chevron; without
+ * it the chevron is dropped rather than promising a destination that isn't
+ * there (the Assistant Home group rows behave the same way).
  */
 export function StudentLedgerRow({
   ledger,
+  onPress,
   testID = `payment-ledger-row-${ledger.membership_id}`,
   style,
 }: StudentLedgerRowProps) {
@@ -50,21 +55,27 @@ export function StudentLedgerRow({
     : null;
   const name = ledger.full_name?.trim() || UNNAMED_STUDENT_LABEL;
 
+  const accessibilityLabel = [
+    name,
+    badge?.label,
+    ledger.arrears_count > 0
+      ? formatArrearsBadgeLabel(ledger.arrears_count)
+      : null,
+  ]
+    .filter(Boolean)
+    .join('، ');
+
+  const rowClass = `${rowStart} items-center w-full rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-4 py-3.5 gap-2.5`;
+  const Row = onPress ? Pressable : View;
+
   return (
-    <View
+    <Row
       testID={testID}
       accessible
-      accessibilityRole="text"
-      accessibilityLabel={[
-        name,
-        badge?.label,
-        ledger.arrears_count > 0
-          ? formatArrearsBadgeLabel(ledger.arrears_count)
-          : null,
-      ]
-        .filter(Boolean)
-        .join('، ')}
-      className={`${rowStart} items-center w-full rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-4 py-3.5 gap-2.5`}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      className={`${rowClass}${onPress ? ' active:opacity-80' : ''}`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
       <View className="w-9 h-9 rounded-full bg-subtle dark:bg-subtle-dark items-center justify-center">
@@ -111,6 +122,15 @@ export function StudentLedgerRow({
           />
         ) : null}
       </View>
-    </View>
+
+      {onPress ? (
+        <Icon
+          name="chevron-left"
+          size={18}
+          tone="tertiary"
+          testID={`${testID}-chevron`}
+        />
+      ) : null}
+    </Row>
   );
 }

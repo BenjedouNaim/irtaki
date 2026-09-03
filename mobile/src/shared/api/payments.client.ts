@@ -78,3 +78,53 @@ export async function getGroupPayments(
   );
   return response.data;
 }
+
+/**
+ * API-047 `POST /memberships/{id}/payments` request body (APIS §10.11).
+ *
+ * `cycle_index` is the only field there is: BR-31 fixes the fee at 30 TND
+ * and the server takes it from its own constant, so no client can send,
+ * choose or influence an amount.
+ */
+export interface RecordPaymentPayload {
+  cycle_index: number;
+}
+
+/**
+ * `PaymentRecordDto` — API-047's `201` body: the persisted PaymentRecord.
+ * There is no reversal or correction field, and no endpoint to undo it
+ * (ISS-02/APIQ-02, an accepted MVP gap).
+ */
+export interface PaymentRecordDto {
+  id: string;
+  cycle_index: number;
+  /** BR-31's fixed 30 TND, as it was stored. */
+  amount: number;
+  /** ISO-8601 instant. */
+  paid_at: string;
+  /** The Assistant who recorded it (BR-34). */
+  recorded_by: string;
+}
+
+/** APIS §9.1 single-resource envelope. */
+export interface RecordPaymentResponse {
+  data: PaymentRecordDto;
+}
+
+/**
+ * Records one cycle as paid for a student of the Assistant's own group
+ * (API-047), unwrapping the APIS §9.1 envelope. Errors surface as
+ * `ApiError` unchanged: `409 CYCLE_ALREADY_PAID` (VR-26),
+ * `422 FUTURE_CYCLE` (VR-37) and `403 SCOPE_DENIED` for a student outside
+ * the caller's groups (VR-27).
+ */
+export async function recordPayment(
+  membershipId: string,
+  payload: RecordPaymentPayload,
+): Promise<PaymentRecordDto> {
+  const response = await apiClient.post<RecordPaymentResponse>(
+    `/memberships/${membershipId}/payments`,
+    payload,
+  );
+  return response.data;
+}

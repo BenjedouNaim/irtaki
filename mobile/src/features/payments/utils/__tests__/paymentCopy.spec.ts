@@ -9,7 +9,12 @@ import {
   formatCurrentCycleSubtitle,
   formatCycleSubtitle,
   formatCycleTitle,
+  formatArabicMonthYear,
+  formatArrearsCountLabel,
+  formatArrearsTotal,
   formatGroupLedgerSummary,
+  formatLedgerMeta,
+  formatMarkPaidTitle,
 } from '../paymentCopy';
 
 function cycle(overrides: Partial<PaymentCycleDto> = {}): PaymentCycleDto {
@@ -138,6 +143,45 @@ describe('paymentCopy (SCR-16, UF §18)', () => {
       expect(formatGroupLedgerSummary(5, 0)).toBe('5 طلاب · لا متابعات');
       expect(formatGroupLedgerSummary(0, 0)).toBe('لا طلاب · لا متابعات');
       expect(formatGroupLedgerSummary(11, 11)).toBe('11 طالبًا · 11 متابعة');
+    });
+  });
+
+  describe('the SCR-21 summary (Figma 36:573)', () => {
+    it('totals the arrears over the fixed public fee (BR-31, UF §18)', () => {
+      expect(formatArrearsTotal(3)).toBe('90 دينارًا');
+      expect(formatArrearsTotal(1)).toBe('30 دينارًا');
+    });
+
+    it('agrees in Arabic number on the arrears count, zero included', () => {
+      expect(formatArrearsCountLabel(3)).toBe('3 دورات متأخرة');
+      expect(formatArrearsCountLabel(0)).toBe('لا دورات متأخرة');
+      expect(formatArrearsCountLabel(1)).toBe('دورة واحدة متأخرة');
+      expect(formatArrearsCountLabel(2)).toBe('دورتان متأخرتان');
+      expect(formatArrearsCountLabel(11)).toBe('11 دورة متأخرة');
+    });
+
+    it('reads "member since" off cycle 0, which BR-32 makes started_at itself', () => {
+      expect(formatArabicMonthYear('2026-05-01')).toBe('ماي 2026');
+      expect(formatLedgerMeta('حلقة الفجر', '2026-05-01')).toBe(
+        'حلقة الفجر · عضو منذ ماي 2026',
+      );
+    });
+
+    it('drops a half it does not have rather than inventing one', () => {
+      expect(formatLedgerMeta(null, '2026-05-01')).toBe('عضو منذ ماي 2026');
+      expect(formatLedgerMeta('حلقة الفجر', undefined)).toBe('حلقة الفجر');
+      expect(formatLedgerMeta(null, null)).toBe('');
+    });
+  });
+
+  describe('formatMarkPaidTitle (Figma 36:618)', () => {
+    it('names the cycle the way the row above it does — 0-based index, 1-based label', () => {
+      expect(formatMarkPaidTitle(cycle({ index: 4 }))).toBe(
+        'تسجيل دفعة الدورة 5 كمستلَمة؟',
+      );
+      expect(formatMarkPaidTitle(cycle({ index: 0 }))).toBe(
+        'تسجيل دفعة الدورة 1 كمستلَمة؟',
+      );
     });
   });
 });
