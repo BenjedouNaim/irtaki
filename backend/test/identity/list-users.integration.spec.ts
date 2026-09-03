@@ -23,6 +23,14 @@ import {
 type ListUsersBody = ListUsersResponseDto;
 
 describe('GET /users (API-053 Integration)', () => {
+  // Every account this suite needs costs an argon2id hash on register and a
+  // verify on login (64 MB, t=3), on top of booting the Nest app once in
+  // `beforeAll`. That does not fit jest's 5 s default on a machine running
+  // the rest of the suite alongside it — when `beforeAll` overran it, all
+  // fifteen tests failed together. 60 s is what the other DB-backed suites
+  // in `test/` already declare.
+  jest.setTimeout(60000);
+
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
@@ -157,8 +165,11 @@ describe('GET /users (API-053 Integration)', () => {
         'الأستاذ مروان',
       );
 
+      // `limit=100` rather than the default 20: the directory holds whatever
+      // accounts the rest of the suite has registered, and this test asserts
+      // over the Teacher it created, never over the whole table.
       const res = await request(app.getHttpServer())
-        .get('/api/v1/users?role=Teacher')
+        .get('/api/v1/users?role=Teacher&limit=100')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .expect(HttpStatus.OK);
 
@@ -187,7 +198,7 @@ describe('GET /users (API-053 Integration)', () => {
       );
 
       const res = await request(app.getHttpServer())
-        .get('/api/v1/users?role=Assistant')
+        .get('/api/v1/users?role=Assistant&limit=100')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .expect(HttpStatus.OK);
 
@@ -349,21 +360,45 @@ describe('GET /users (API-053 Integration)', () => {
     });
 
     it('reaches a last page whose next_cursor is null, with no row repeated or skipped', async () => {
+      // `/users` is the whole directory and `role` is its only filter
+      // (APIS §9.3), so a walk to the last page cannot be fenced off to the
+      // rows this suite seeded the way a dated read can. What it can do is
+      // stop assuming a size: the page budget comes from the row count the
+      // directory actually holds while the test runs (`--runInBand`, no
+      // other writer), not from a fixed cap that other suites' accounts
+      // silently pushed the last page past. The walk then asserts the
+      // contract over whatever is there — `has_more` mirrors `next_cursor`,
+      // the pages tile the directory exactly once, the last one closes the
+      // cursor — and that the five seeded rows are among the rows it saw.
+      const counted: Array<{ count: number }> = await dataSource.query(
+        'SELECT count(*)::int AS count FROM users',
+      );
+      const count = counted[0].count;
+      const limit = 3;
+      const expectedPages = Math.ceil(count / limit);
+      // The seeded rows alone put the directory over one page, so this is a
+      // real multi-page walk and not a single call that ends immediately.
+      expect(expectedPages).toBeGreaterThan(1);
+
       const seen: UserListItemDto[] = [];
       let cursor: string | null = null;
       let pages = 0;
 
       do {
         const page: ListUsersBody = await fetchPage(
-          cursor ? `?limit=3&cursor=${encodeURIComponent(cursor)}` : '?limit=3',
+          cursor
+            ? `?limit=${limit}&cursor=${encodeURIComponent(cursor)}`
+            : `?limit=${limit}`,
         );
         seen.push(...page.data);
         cursor = page.pagination.next_cursor;
         expect(page.pagination.has_more).toBe(cursor !== null);
         pages += 1;
-      } while (cursor && pages < 50);
+      } while (cursor && pages <= expectedPages);
 
       expect(cursor).toBeNull();
+      expect(pages).toBe(expectedPages);
+      expect(seen).toHaveLength(count);
       expect(new Set(seen.map((u) => u.id)).size).toBe(seen.length);
       for (const expected of expectedOrder) {
         expect(seen.some((u) => u.id === expected.id)).toBe(true);
