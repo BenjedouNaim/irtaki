@@ -10,6 +10,7 @@ import { DailyReportFormScreen } from '../DailyReportFormScreen';
 import * as dailyReportsApi from '@/shared/api/dailyReports.client';
 import { ApiError, NetworkError } from '@/shared/api/types';
 import { localTodayIsoDate } from '@/features/dailyReports/utils/dailyReportForm';
+import type { TimeWindowFieldProps } from '@/features/dailyReports/components/TimeWindowField';
 
 jest.mock('@/shared/api/dailyReports.client');
 jest.mock('@/features/progress/hooks/useSurahs', () => ({
@@ -53,6 +54,88 @@ jest.mock('@/features/progress/components/QuranRangePickerSheet', () => {
           >
             <Text>تأكيد</Text>
           </Pressable>
+        </View>
+      );
+    },
+  };
+});
+
+/**
+ * The wheel sheet is TimeWindowField's own (VO-03, UF §20) and TimeWindowField
+ * .spec covers it end to end: press a bound, pick an hour, confirm, get `HH:MM`
+ * back through `onChange`, plus the icon + text error line. Mounting it here
+ * costs a Modal holding twenty-four hour rows and sixty minute rows every time
+ * a case opens it — by far the most expensive thing this screen does, and what
+ * pushed the two posting cases past their timeout on a machine running the rest
+ * of the suite alongside them.
+ *
+ * So the sheet is a double here, on the same reasoning as the range sheet
+ * above, honouring that contract exactly and typed against the real props so
+ * `tsc` catches any drift. What the cases below measure is the screen: which
+ * key each window lands under in the payload, and the VR-15 check it computes
+ * and hands down as `error`.
+ */
+jest.mock('@/features/dailyReports/components/TimeWindowField', () => {
+  const react = require('react') as typeof import('react');
+  const { View, Pressable, Text } = require('react-native');
+  const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+  return {
+    TimeWindowField: ({
+      value,
+      onChange,
+      error,
+      testID = 'time-window-field',
+    }: TimeWindowFieldProps) => {
+      const [editing, setEditing] = react.useState<'from' | 'to' | null>(null);
+      // The real sheet opens on 18:00 and its minute wheel is left alone by
+      // every case here, so the double reports whole hours.
+      const [hour, setHour] = react.useState(18);
+
+      return (
+        <View testID={testID}>
+          {(['from', 'to'] as const).map((bound) => (
+            <Pressable
+              key={bound}
+              testID={`${testID}-${bound}`}
+              onPress={() => {
+                setEditing(bound);
+                setHour(18);
+              }}
+            >
+              <Text testID={`${testID}-${bound}-value`}>
+                {value[bound] ?? '--:--'}
+              </Text>
+            </Pressable>
+          ))}
+
+          {editing === null ? null : (
+            <View testID={`${testID}-hour-wheel`}>
+              {HOURS.map((option) => (
+                <Pressable
+                  key={option}
+                  testID={`${testID}-hour-wheel-item-${option}`}
+                  onPress={() => setHour(option)}
+                >
+                  <Text>{String(option).padStart(2, '0')}</Text>
+                </Pressable>
+              ))}
+              <Pressable
+                testID={`${testID}-confirm-button`}
+                onPress={() => {
+                  onChange({
+                    ...value,
+                    [editing]: `${String(hour).padStart(2, '0')}:00`,
+                  });
+                  setEditing(null);
+                }}
+              >
+                <Text>تأكيد</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {error ? <Text>{error}</Text> : null}
         </View>
       );
     },
@@ -192,7 +275,7 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       });
     });
 
-    it('reveals memorisation fields on "Yes", the single-session question only after 50 reps = Yes, and builds the full payload', async () => {
+    it('reveals memorisation fields on "Yes" and asks the single-session question only after 50 reps = Yes', () => {
       renderScreen('Normal');
 
       fireEvent.press(screen.getByTestId('memo-gate-yes'));
@@ -202,6 +285,14 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       expect(screen.getByTestId('completed-50-toggle')).toBeTruthy();
       expect(screen.queryByTestId('single-session-toggle')).toBeNull();
 
+      fireEvent.press(screen.getByTestId('completed-50-toggle-yes'));
+      expect(screen.getByTestId('single-session-toggle')).toBeTruthy();
+    });
+
+    it('builds the full memorisation payload from the range, the window and the toggles', async () => {
+      renderScreen('Normal');
+
+      fireEvent.press(screen.getByTestId('memo-gate-yes'));
       pickRange('memo-range-field');
       expect(
         screen.getByTestId('memo-range-field-trigger-value').props.children,
@@ -210,7 +301,6 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       pickTime('memo-time-field', 'to', 19);
 
       fireEvent.press(screen.getByTestId('completed-50-toggle-yes'));
-      expect(screen.getByTestId('single-session-toggle')).toBeTruthy();
       fireEvent.press(screen.getByTestId('rev-gate-no'));
       // Single-session still unanswered → not complete.
       expect(isSubmitDisabled()).toBe(true);
@@ -241,31 +331,51 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       expect(screen.queryByTestId('single-session-toggle')).toBeNull();
     });
 
-    it('reveals revision fields on "Yes" and blocks submit on a reversed time window (VR-15 nudge)', () => {
+    it('reveals the revision fields on "Yes"', () => {
       renderScreen('Normal');
       fireEvent.press(screen.getByTestId('memo-gate-no'));
       fireEvent.press(screen.getByTestId('rev-gate-yes'));
+
       expect(screen.getByTestId('rev-details')).toBeTruthy();
+      expect(screen.getByTestId('rev-range-field')).toBeTruthy();
+      expect(screen.getByTestId('rev-time-field')).toBeTruthy();
+    });
 
-      pickRange('rev-range-field');
-      pickTime('rev-time-field', 'from', 20);
-      pickTime('rev-time-field', 'to', 19);
+    /**
+     * VR-15 read as two cases over one arrangement. Every `pickTime` opens
+     * the wheel sheet, which mounts twenty-four hour rows and sixty minute
+     * rows — by far the most expensive thing this screen does — so the
+     * window is opened here once per case instead of three times inside one.
+     */
+    describe('a revision window that runs backwards (VR-15 nudge)', () => {
+      const REVERSED_WINDOW_ERROR = 'يجب أن يكون وقت الانتهاء بعد وقت البداية';
 
-      expect(
-        screen.getByText('يجب أن يكون وقت الانتهاء بعد وقت البداية'),
-      ).toBeTruthy();
-      expect(isSubmitDisabled()).toBe(true);
+      beforeEach(() => {
+        renderScreen('Normal');
+        fireEvent.press(screen.getByTestId('memo-gate-no'));
+        fireEvent.press(screen.getByTestId('rev-gate-yes'));
+        pickRange('rev-range-field');
+        pickTime('rev-time-field', 'from', 20);
+      });
 
-      pickTime('rev-time-field', 'to', 21);
-      expect(
-        screen.queryByText('يجب أن يكون وقت الانتهاء بعد وقت البداية'),
-      ).toBeNull();
-      expect(isSubmitDisabled()).toBe(false);
+      it('nudges and blocks submit while the end is before the start', () => {
+        pickTime('rev-time-field', 'to', 19);
+
+        expect(screen.getByText(REVERSED_WINDOW_ERROR)).toBeTruthy();
+        expect(isSubmitDisabled()).toBe(true);
+      });
+
+      it('clears the nudge and enables submit once the end is after the start', () => {
+        pickTime('rev-time-field', 'to', 21);
+
+        expect(screen.queryByText(REVERSED_WINDOW_ERROR)).toBeNull();
+        expect(isSubmitDisabled()).toBe(false);
+      });
     });
   });
 
   describe('Revision', () => {
-    it('shows range + time with no gate and no memorisation/tafsir fields, and posts them', async () => {
+    it('shows range + time with no gate and no memorisation/tafsir fields', () => {
       renderScreen('Revision');
 
       expect(screen.getByTestId('rev-range-field')).toBeTruthy();
@@ -274,6 +384,10 @@ describe('DailyReportFormScreen (SCR-10, F-DR-02)', () => {
       expect(screen.queryByTestId('memo-section')).toBeNull();
       expect(screen.queryByTestId('read-tafsir-toggle')).toBeNull();
       expect(isSubmitDisabled()).toBe(true);
+    });
+
+    it('posts the range and the window it was filled with', async () => {
+      renderScreen('Revision');
 
       pickRange('rev-range-field');
       pickTime('rev-time-field', 'from', 19);
