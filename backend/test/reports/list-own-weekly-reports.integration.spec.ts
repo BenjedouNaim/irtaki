@@ -21,6 +21,7 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../src/shared/pagination/cursor.util';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -71,6 +72,10 @@ describe('GET /weekly-reports (F-WR-03 / API-035 Integration)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     // Deterministic fixtures: the 15-minute tick must not finalise the
     // Open row this suite asserts is excluded from the history.

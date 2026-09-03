@@ -28,6 +28,9 @@ import { DailyReminderEvaluator } from './application/evaluators/daily-reminder.
 import { WeeklyReportAvailableEvaluator } from './application/evaluators/weekly-report-available.evaluator';
 import { AtRiskEvaluator } from './application/evaluators/at-risk.evaluator';
 import { PaymentDueSoonEvaluator } from './application/evaluators/payment-due-soon.evaluator';
+import { DailyReminderEvaluationJob } from './infrastructure/jobs/daily-reminder-evaluation.job';
+import { AtRiskEvaluationJob } from './infrastructure/jobs/at-risk-evaluation.job';
+import { PaymentDueSoonEvaluationJob } from './infrastructure/jobs/payment-due-soon-evaluation.job';
 
 /**
  * Notifications module (SA §11): owns `device_tokens`,
@@ -100,6 +103,13 @@ import { PaymentDueSoonEvaluator } from './application/evaluators/payment-due-so
     WeeklyReportAvailableEvaluator,
     AtRiskEvaluator,
     PaymentDueSoonEvaluator,
+    // F-NOT-05: three of SA §23's five Required jobs, on ADR-024's
+    // in-process scheduler — the same @nestjs/schedule + correlationId +
+    // Healthchecks.io mechanism WeeklyReportFinalizationJob has used since
+    // F-WR-02, now shared as `runScheduledJob` rather than re-implemented.
+    DailyReminderEvaluationJob,
+    AtRiskEvaluationJob,
+    PaymentDueSoonEvaluationJob,
   ],
   // SA §11: Notifications is a module other modules never call into directly —
   // they emit events and it listens. Only the device-token pair predating

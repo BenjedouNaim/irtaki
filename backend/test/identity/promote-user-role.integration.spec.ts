@@ -16,6 +16,7 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { PromoteRoleResponseDto } from '../../src/modules/identity/application/promote-role/promote-role-response.dto';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 const EMAIL_SUFFIX = '@test-promote-role.com';
 
@@ -55,6 +56,10 @@ describe('PATCH /users/{id}/role (API-052 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();

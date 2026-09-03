@@ -4,6 +4,8 @@ import { EntityManager, In, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   ApplyCoverageMergeParams,
+  CoverageIntervalRecord,
+  CoverageReconciliationRecord,
   CoverageRecord,
   ICoverageRepository,
 } from '../domain/coverage.repository.interface';
@@ -14,6 +16,12 @@ import { HizbBoundaryTypeOrmEntity } from './hizb-boundary.typeorm-entity';
 import { CoverageConcurrencyConflictError } from '../domain/coverage.errors';
 
 interface RawAggregatedInterval {
+  start_ordinal: number | string;
+  end_ordinal: number | string;
+}
+
+interface RawSubmittedRangeRow {
+  membership_id: string;
   start_ordinal: number | string;
   end_ordinal: number | string;
 }
@@ -138,6 +146,94 @@ export class CoverageRepository implements ICoverageRepository {
     }
 
     return this.hydrate(rows[0]);
+  }
+
+  /**
+   * ADR-029's input set, in two literal parameterised statements (TS §36):
+   * the live coverage rows with their intervals, and the live daily-report
+   * memorisation ranges keyed by membership. Both are unscoped — the
+   * reconciliation is global (SA §19 "Nightly, global") — and neither
+   * locks or opens a transaction (TS §19/§20).
+   *
+   * `deleted_at IS NULL` on both sides: a terminated membership's coverage
+   * and reports are soft-deleted together (DS-09 cascade), so a removed
+   * student is simply absent from the sweep.
+   */
+  async findAllLiveForReconciliation(): Promise<
+    CoverageReconciliationRecord[]
+  > {
+    const coverageRows = await this.coverageRepo.manager.query<
+      RawCoverageWithIntervalsRow[]
+    >(
+      `SELECT c.id,
+              c.membership_id,
+              c.ahzab_completed,
+              c.last_memorized_ordinal,
+              c.updated_at,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'start_ordinal', i.start_ordinal,
+                    'end_ordinal', i.end_ordinal
+                  ) ORDER BY i.start_ordinal
+                ) FILTER (WHERE i.id IS NOT NULL),
+                '[]'::json
+              ) AS intervals
+         FROM memorization_coverage c
+         LEFT JOIN coverage_intervals i ON i.coverage_id = c.id
+        WHERE c.deleted_at IS NULL
+        GROUP BY c.id`,
+      [],
+    );
+
+    const rangeRows = await this.coverageRepo.manager.query<
+      RawSubmittedRangeRow[]
+    >(
+      `SELECT r.membership_id,
+              r.memo_from_ordinal AS start_ordinal,
+              r.memo_to_ordinal   AS end_ordinal
+         FROM daily_reports r
+        WHERE r.deleted_at IS NULL
+          AND r.memo_from_ordinal IS NOT NULL
+          AND r.memo_to_ordinal IS NOT NULL
+        ORDER BY r.membership_id, r.report_date, r.submitted_at`,
+      [],
+    );
+
+    const rangesByMembership = new Map<string, CoverageIntervalRecord[]>();
+    for (const row of rangeRows) {
+      const ranges = rangesByMembership.get(row.membership_id) ?? [];
+      ranges.push({
+        startOrdinal: Number(row.start_ordinal),
+        endOrdinal: Number(row.end_ordinal),
+      });
+      rangesByMembership.set(row.membership_id, ranges);
+    }
+
+    return coverageRows.map((row) => ({
+      ...this.hydrate(row),
+      submittedRanges: rangesByMembership.get(row.membership_id) ?? [],
+    }));
+  }
+
+  async correctAhzabCompleted(
+    coverageId: string,
+    ahzabCompleted: number,
+    expectedUpdatedAt: Date,
+  ): Promise<boolean> {
+    const rows = await this.coverageRepo.manager.query<Array<{ id: string }>>(
+      `UPDATE memorization_coverage
+          SET ahzab_completed = $2,
+              updated_at = now()
+        WHERE id = $1
+          AND (
+            updated_at = $3::timestamptz
+            OR date_trunc('milliseconds', updated_at) = date_trunc('milliseconds', $3::timestamptz)
+          )
+        RETURNING id`,
+      [coverageId, ahzabCompleted, expectedUpdatedAt.toISOString()],
+    );
+    return rows.length > 0;
   }
 
   async applyMerge(

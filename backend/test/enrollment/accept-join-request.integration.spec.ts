@@ -17,6 +17,7 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { HIZB_BOUNDARIES_DATA } from '../../seed/quran/hizb_boundaries.data';
 import { SURAHS_DATA } from '../../seed/quran/surahs.data';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () => {
   let app: INestApplication<App>;
@@ -46,6 +47,10 @@ describe('POST /join-requests/{id}/accept (F-ENR-05 / API-023 Integration)', () 
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     // Ensure reference tables exist

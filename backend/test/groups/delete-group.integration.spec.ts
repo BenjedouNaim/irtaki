@@ -17,6 +17,7 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { GroupListItemDto } from '../../src/modules/groups/application/list-groups/group-list-item.dto';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('DELETE /groups/:id (API-018 Integration)', () => {
   let app: INestApplication<App>;
@@ -46,6 +47,10 @@ describe('DELETE /groups/:id (API-018 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();

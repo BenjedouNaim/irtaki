@@ -15,6 +15,7 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -57,6 +58,10 @@ describe('GET /groups/:id/memberships (F-MEM-02 / API-026 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
 
     await cleanDatabase();

@@ -18,6 +18,7 @@ import {
   UpdateCoverageOutcome,
   UpdateCoverageUseCase,
 } from '../../src/modules/progress/application/update-coverage/update-coverage.use-case';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface IntervalRow {
   start_ordinal: number;
@@ -69,6 +70,10 @@ describe('DS-05 coverage engine (F-PRG-01 Integration)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     eventEmitter = app.get(EventEmitter2);

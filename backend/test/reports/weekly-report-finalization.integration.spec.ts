@@ -20,6 +20,7 @@ import {
   WEEKLY_REPORT_FINALIZATION_CRON_EXPRESSION,
   WeeklyReportFinalizationJob,
 } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 /** Independent UTC date arithmetic on a YYYY-MM-DD value. */
 function shift(date: string, days: number): string {
@@ -71,6 +72,10 @@ describe('WeeklyReportFinalizationService / Job (F-WR-02, DS-02, FR-WR-06 Integr
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     // The real tick is stopped: every run below is driven with a controlled
     // clock through the service/job entry points.

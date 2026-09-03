@@ -15,6 +15,7 @@ import {
   PASSWORD_HASHER,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -91,6 +92,10 @@ describe('POST /memberships/{id}/payments (F-PAY-03 / API-047 Integration)', () 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     await cleanDatabase();

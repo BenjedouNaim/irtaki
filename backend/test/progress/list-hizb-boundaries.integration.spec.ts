@@ -16,6 +16,7 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { HizbBoundaryDto } from '../../src/modules/progress/application/list-hizb-boundaries/list-hizb-boundaries-response.dto';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('GET /quran/hizb-boundaries (F-PRG-05 / API-044 Integration)', () => {
   let app: INestApplication<App>;
@@ -37,6 +38,10 @@ describe('GET /quran/hizb-boundaries (F-PRG-05 / API-044 Integration)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     await cleanDatabase();

@@ -45,6 +45,8 @@ describe('GetMembershipProgressUseCase (F-PRG-03 / API-042)', () => {
       seedFromHizbSelection: jest.fn(),
       findByMembershipId: jest.fn(),
       findActiveByUserId: jest.fn(),
+      findAllLiveForReconciliation: jest.fn(),
+      correctAhzabCompleted: jest.fn(),
       applyMerge: jest.fn(),
     };
     surahRepository = { findAll: jest.fn().mockResolvedValue(surahs) };

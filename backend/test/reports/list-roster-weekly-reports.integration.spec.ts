@@ -18,6 +18,7 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
 import { decodeCursor } from '../../src/shared/pagination/cursor.util';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -77,6 +78,10 @@ describe('GET /memberships/{id}/weekly-reports (F-WR-04 / API-036 Integration)',
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     // Deterministic fixtures: the 15-minute tick must not finalise the
     // Open row this suite asserts is excluded from the history.

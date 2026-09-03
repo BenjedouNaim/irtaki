@@ -17,6 +17,7 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { JoinRequestSubmittedEvent } from '../../src/modules/enrollment/domain/events/join-request-submitted.event';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 describe('POST /join-requests (API-019 Integration)', () => {
   let app: INestApplication<App>;
@@ -47,6 +48,10 @@ describe('POST /join-requests (API-019 Integration)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
     eventEmitter = app.get(EventEmitter2);
 

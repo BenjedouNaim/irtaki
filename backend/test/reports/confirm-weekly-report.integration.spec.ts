@@ -19,6 +19,7 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WeeklyReportFinalisedEvent } from '../../src/modules/reports/domain/events/weekly-report-finalised.event';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -94,6 +95,10 @@ describe('POST /weekly-reports/{id}/confirm (F-WR-02 / API-034 Integration)', ()
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     // Deterministic clock for this suite: the 15-minute tick must not
     // finalise the overdue Open fixtures behind the assertions.

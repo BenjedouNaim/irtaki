@@ -19,6 +19,7 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../src/shared/pagination/cursor.util';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -63,6 +64,10 @@ describe('GET /daily-reports (F-DR-05 / API-031 Integration)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+
+    // ADR-024's crons are live inside a booted AppModule; every suite
+    // drives the jobs it cares about with its own clock instead.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     await cleanDatabase();
