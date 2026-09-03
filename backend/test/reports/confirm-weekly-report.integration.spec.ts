@@ -19,7 +19,10 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WeeklyReportFinalisedEvent } from '../../src/modules/reports/domain/events/weekly-report-finalised.event';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -120,6 +123,7 @@ describe('POST /weekly-reports/{id}/confirm (F-WR-02 / API-034 Integration)', ()
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     for (const table of ['weekly_reports', 'daily_reports']) {
       await dataSource.query(
         `DELETE FROM ${table}

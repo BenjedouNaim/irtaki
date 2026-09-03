@@ -32,7 +32,10 @@ import {
   type IPushSender,
   type PushSendResult,
 } from '../../src/modules/notifications/domain/push-sender.interface';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 /** One tick of ADR-030's cron, in minutes. */
 const TICK = 15;
@@ -166,6 +169,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     const mine = `(SELECT id FROM users WHERE email LIKE $1)`;
     const params = [`%${testEmailDomain}`];
     for (const statement of [

@@ -16,7 +16,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { SurahDto } from '../../src/modules/progress/application/list-surahs/list-surahs-response.dto';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('GET /quran/surahs (F-PRG-04 / API-043 Integration)', () => {
   let app: INestApplication<App>;
@@ -55,6 +58,7 @@ describe('GET /quran/surahs (F-PRG-04 / API-043 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       'DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [`%${testEmailDomain}`],

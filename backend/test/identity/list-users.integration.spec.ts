@@ -19,7 +19,10 @@ import {
   ListUsersResponseDto,
   UserListItemDto,
 } from '../../src/modules/identity/application/list-users/user-list-item.dto';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 type ListUsersBody = ListUsersResponseDto;
 
@@ -68,6 +71,7 @@ describe('GET /users (API-053 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@test-list-users.com')",
     );

@@ -21,7 +21,10 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../src/shared/pagination/cursor.util';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -96,6 +99,7 @@ describe('GET /weekly-reports (F-WR-03 / API-035 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     for (const table of ['weekly_reports', 'daily_reports']) {
       await dataSource.query(
         `DELETE FROM ${table}

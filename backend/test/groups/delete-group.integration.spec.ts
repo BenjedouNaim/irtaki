@@ -17,7 +17,10 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { GroupListItemDto } from '../../src/modules/groups/application/list-groups/group-list-item.dto';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('DELETE /groups/:id (API-018 Integration)', () => {
   let app: INestApplication<App>;
@@ -64,6 +67,7 @@ describe('DELETE /groups/:id (API-018 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM join_request_ahzab WHERE join_request_id IN (SELECT id FROM join_requests WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-delete-group.com'))",
     );

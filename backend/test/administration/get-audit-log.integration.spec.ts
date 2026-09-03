@@ -20,7 +20,10 @@ import {
   AuditEntryDto,
   GetAuditLogResponseDto,
 } from '../../src/modules/administration/application/get-audit-log/audit-entry.dto';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 type AuditLogBody = GetAuditLogResponseDto;
 
@@ -79,6 +82,7 @@ describe('GET /audit (API-054 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%${EMAIL_SUFFIX}')`,
     );

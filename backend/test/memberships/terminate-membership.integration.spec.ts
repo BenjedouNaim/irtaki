@@ -15,7 +15,10 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -73,6 +76,7 @@ describe('DELETE /memberships/:id (F-MEM-03 / API-027 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     // Child-first ordering; scope limited to this file's email/group tags
     await dataSource.query(
       `DELETE FROM coverage_intervals WHERE coverage_id IN (

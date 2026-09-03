@@ -17,7 +17,10 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { HIZB_BOUNDARIES_DATA } from '../../seed/quran/hizb_boundaries.data';
 import { SURAHS_DATA } from '../../seed/quran/surahs.data';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () => {
   let app: INestApplication<App>;
@@ -94,6 +97,7 @@ describe('POST /join-requests/{id}/reject (F-ENR-06 / API-024 Integration)', () 
   }
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(`
       DELETE FROM coverage_intervals WHERE coverage_id IN (
         SELECT id FROM memorization_coverage WHERE membership_id IN (

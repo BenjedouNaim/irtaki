@@ -16,7 +16,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { decodeCursor } from '../../src/shared/pagination/cursor.util';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -86,6 +89,7 @@ describe('GET /memberships/{id}/daily-reports (F-DR-06 / API-032 Integration)', 
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM daily_reports
        WHERE membership_id IN (

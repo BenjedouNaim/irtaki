@@ -9,7 +9,10 @@ import {
   MAILER,
 } from '../../src/modules/identity/domain/mailer.interface';
 import { CoverageReconciliationJob } from '../../src/modules/progress/infrastructure/jobs/coverage-reconciliation.job';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface CoverageRow {
   id: string;
@@ -77,6 +80,7 @@ describe('CoverageReconciliationJob (ADR-029) Integration', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     const mine = `(SELECT id FROM users WHERE email LIKE $1)`;
     const params = [`%${testEmailDomain}`];
     for (const statement of [

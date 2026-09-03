@@ -15,7 +15,10 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('GET /join-requests/mine (F-ENR-02 / API-020 Integration)', () => {
   let app: INestApplication<App>;
@@ -62,6 +65,7 @@ describe('GET /join-requests/mine (F-ENR-02 / API-020 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(`
       DELETE FROM join_request_ahzab WHERE join_request_id IN (
         SELECT id FROM join_requests WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-mine-join-request.com')

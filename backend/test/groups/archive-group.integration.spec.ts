@@ -19,7 +19,10 @@ import { LoginResponseDto } from '../../src/modules/identity/application/login/l
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { GroupListItemDto } from '../../src/modules/groups/application/list-groups/group-list-item.dto';
 import { GroupArchivedEvent } from '../../src/modules/groups/domain/events/group-archived.event';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 describe('PATCH /groups/:id/lifecycle (API-017 Integration)', () => {
   let app: INestApplication<App>;
@@ -68,6 +71,7 @@ describe('PATCH /groups/:id/lifecycle (API-017 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM memberships WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-archive-group.com') OR group_id IN (SELECT id FROM groups WHERE teacher_id IN (SELECT id FROM users WHERE email LIKE '%@test-archive-group.com') OR assistant_id IN (SELECT id FROM users WHERE email LIKE '%@test-archive-group.com') OR created_by IN (SELECT id FROM users WHERE email LIKE '%@test-archive-group.com'))",
     );

@@ -17,7 +17,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -121,6 +124,7 @@ describe('GET /groups/{id}/performance (F-PERF-02 / API-038 Integration)', () =>
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     for (const table of ['weekly_reports', 'daily_reports']) {
       await dataSource.query(
         `DELETE FROM ${table}

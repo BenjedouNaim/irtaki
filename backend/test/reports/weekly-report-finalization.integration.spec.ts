@@ -20,7 +20,10 @@ import {
   WEEKLY_REPORT_FINALIZATION_CRON_EXPRESSION,
   WeeklyReportFinalizationJob,
 } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 /** Independent UTC date arithmetic on a YYYY-MM-DD value. */
 function shift(date: string, days: number): string {
@@ -99,6 +102,7 @@ describe('WeeklyReportFinalizationService / Job (F-WR-02, DS-02, FR-WR-06 Integr
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM weekly_reports
        WHERE membership_id IN (

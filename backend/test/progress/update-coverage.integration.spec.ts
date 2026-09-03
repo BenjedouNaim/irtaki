@@ -18,7 +18,10 @@ import {
   UpdateCoverageOutcome,
   UpdateCoverageUseCase,
 } from '../../src/modules/progress/application/update-coverage/update-coverage.use-case';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface IntervalRow {
   start_ordinal: number;
@@ -103,6 +106,7 @@ describe('DS-05 coverage engine (F-PRG-01 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM memorization_coverage
        WHERE membership_id IN (

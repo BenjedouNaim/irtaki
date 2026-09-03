@@ -15,7 +15,10 @@ import {
   PASSWORD_HASHER,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface HizbRow {
   hizb_number: number;
@@ -93,6 +96,7 @@ describe('GET /me/progress (F-PRG-02 / API-041 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM memorization_coverage
        WHERE membership_id IN (

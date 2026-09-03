@@ -16,7 +16,10 @@ import { RegisterResponseDto } from '../../src/modules/identity/application/regi
 import { LoginResponseDto } from '../../src/modules/identity/application/login/login-response.dto';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { PromoteRoleResponseDto } from '../../src/modules/identity/application/promote-role/promote-role-response.dto';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 const EMAIL_SUFFIX = '@test-promote-role.com';
 
@@ -73,6 +76,7 @@ describe('PATCH /users/{id}/role (API-052 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    await purgeNotificationLog(dataSource);
     // TS §36 — parameterised, never a SQL string built by interpolation.
     const pattern = `%${EMAIL_SUFFIX}`;
     await dataSource.query(

@@ -19,7 +19,10 @@ import {
   decodeCursor,
   encodeCursor,
 } from '../../src/shared/pagination/cursor.util';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -81,6 +84,7 @@ describe('GET /daily-reports (F-DR-05 / API-031 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM daily_reports
        WHERE membership_id IN (

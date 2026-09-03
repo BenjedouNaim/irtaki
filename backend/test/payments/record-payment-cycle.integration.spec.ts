@@ -15,7 +15,10 @@ import {
   PASSWORD_HASHER,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -109,6 +112,7 @@ describe('POST /memberships/{id}/payments (F-PAY-03 / API-047 Integration)', () 
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM payment_records
        WHERE membership_id IN (

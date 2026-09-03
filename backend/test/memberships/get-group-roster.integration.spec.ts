@@ -15,7 +15,10 @@ import {
   IPasswordHasher,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
-import { stopScheduledJobs } from '../shared/scheduled-jobs';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -75,6 +78,7 @@ describe('GET /groups/:id/memberships (F-MEM-02 / API-026 Integration)', () => {
   });
 
   async function cleanDatabase(): Promise<void> {
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       `DELETE FROM memberships
        WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)
