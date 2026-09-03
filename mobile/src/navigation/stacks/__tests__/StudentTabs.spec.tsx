@@ -7,6 +7,7 @@ import * as weeklyReportsApi from '@/shared/api/weeklyReports.client';
 import * as meApi from '@/shared/api/me.client';
 import * as membershipsApi from '@/shared/api/memberships.client';
 import * as progressApi from '@/shared/api/progress.client';
+import * as performanceApi from '@/shared/api/performance.client';
 import * as quranApi from '@/shared/api/quran.client';
 import { ApiError } from '@/shared/api/types';
 import { localTodayIsoDate } from '@/features/dailyReports/utils/dailyReportForm';
@@ -21,6 +22,7 @@ jest.mock('@/shared/api/weeklyReports.client');
 jest.mock('@/shared/api/me.client');
 jest.mock('@/shared/api/memberships.client');
 jest.mock('@/shared/api/progress.client');
+jest.mock('@/shared/api/performance.client');
 jest.mock('@/shared/api/quran.client');
 jest.mock('@/shared/api/auth.client');
 
@@ -98,6 +100,22 @@ describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:55
       is_activity_pointer_only: true,
     });
     jest.spyOn(quranApi, 'listSurahs').mockResolvedValue([]);
+    jest.spyOn(performanceApi, 'getMyPerformance').mockResolvedValue({
+      commitment_score: 86,
+      submission_rate: 90,
+      memorization_rate: 80,
+      revision_rate: 85,
+      attendance_rate: 75,
+      repetition_quality: 92,
+      day_breakdown: {
+        normal: 14,
+        revision: 5,
+        absent_excused: 3,
+        absent_other: 2,
+        no_report: 4,
+      },
+      days_since_last_report: 1,
+    });
   });
 
   afterEach(() => {
@@ -265,6 +283,15 @@ describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:55
     );
     expect(await screen.findByTestId('progress-section')).toBeTruthy();
     expect(screen.queryByTestId('student-home')).toBeNull();
+
+    // SCR-13 in Figma's order: selector · score · memorization · breakdown ·
+    // tiles · days-since · history (F-PERF-01 wrapping F-PRG-02).
+    expect(screen.getByTestId('performance-section-period')).toBeTruthy();
+    expect(await screen.findByTestId('performance-section-score')).toBeTruthy();
+    expect(screen.getByTestId('performance-section-breakdown')).toBeTruthy();
+    expect(screen.getByTestId('performance-section-quality')).toBeTruthy();
+    expect(screen.getByTestId('performance-section-attendance')).toBeTruthy();
+    expect(screen.getByTestId('performance-section-days-since')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('report-history-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/student/reports/history');

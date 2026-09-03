@@ -212,7 +212,12 @@ module.exports = {
       // from a single family name, the weight lives in the family.
       fontSize: {
         // display/lg — the auth brand wordmark only (SCR-01)
-        'display-lg': ['44px', { lineHeight: '52px', letterSpacing: '-0.5px' }],
+        'display-lg': [
+          '44px',
+          // 1.4x rather than Figma's 1.18x: Noto Sans Arabic's ascent is tall
+          // enough that a 52px line box clips the top of Latin digits in RN.
+          { lineHeight: '62px', letterSpacing: '-0.5px' },
+        ],
         'heading-xl': ['28px', { lineHeight: '40px' }],
         'heading-lg': ['22px', { lineHeight: '34px' }],
         'heading-md': ['18px', { lineHeight: '30px' }],

@@ -1,4 +1,8 @@
-import { getMyProgress, ProgressDto } from '../progress.client';
+import {
+  getMembershipProgress,
+  getMyProgress,
+  ProgressDto,
+} from '../progress.client';
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({
@@ -53,6 +57,27 @@ describe('progress.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(getMyProgress()).rejects.toBe(error);
+    });
+  });
+
+  describe('getMembershipProgress (API-042)', () => {
+    it('should call /memberships/{id}/progress and unwrap the §9.1 envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockProgress });
+
+      const result = await getMembershipProgress('membership-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/memberships/membership-1/progress',
+      );
+      expect(result).toEqual(mockProgress);
+      expect(result.is_activity_pointer_only).toBe(true);
+    });
+
+    it('should propagate apiClient errors unchanged', async () => {
+      const error = new Error('boom');
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(getMembershipProgress('membership-1')).rejects.toBe(error);
     });
   });
 });

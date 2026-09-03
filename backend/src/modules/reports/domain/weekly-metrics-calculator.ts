@@ -57,6 +57,38 @@ export interface WeeklyMetricsInput {
 }
 
 /**
+ * `classify()` (VO-09) tallied over `ExpectedDays(m, w)` — the five-segment
+ * day breakdown UF §17 renders ("Normal · Revision · Excused · Unexcused ·
+ * Missed") and `GET /me/performance` returns (APIS §10.9). Not a weekly
+ * metric: no `missed_*` rule applies, and the five counts sum to
+ * `expectedDays` by construction, `ABSENT_EXCUSED` days included.
+ */
+export interface DayBreakdown {
+  normal: number;
+  revision: number;
+  absentExcused: number;
+  absentOther: number;
+  noReport: number;
+}
+
+/**
+ * The DMS §8 `AbsenceReason` tally over the SAME `ExpectedDays(m, w)` the
+ * `DayBreakdown` is built from — the "absence-reason breakdown" UC-07 step 4
+ * names and API-038 returns as `absence_breakdown` (UF §17 "Absence reasons
+ * — Group-level donut").
+ *
+ * Derived here rather than in the Performance module so the reason split
+ * and the VO-09 classification can never disagree (TS §22): by construction
+ * `sick + studying = dayBreakdown.absentExcused` (BR-24) and
+ * `other = dayBreakdown.absentOther` (BR-25).
+ */
+export interface AbsenceBreakdown {
+  sick: number;
+  studying: number;
+  other: number;
+}
+
+/**
  * The six E-06 metrics (SAS §18.2) plus the three §18.1 denominators
  * (`|ExpectedDays|`, `|EffectiveDays|`, `|MemorizationExpectedDays|`) and the
  * "days on which memorisation actually occurred" count that §18.2 names as
@@ -77,6 +109,10 @@ export interface WeeklyMetrics {
   memorizationExpectedDays: number;
   /** `NORMAL` days bearing a memorisation range (§18.2 `missed_50_repetitions` denominator). */
   memorizationDays: number;
+  /** The VO-09 tally over `ExpectedDays(m, w)` (APIS §10.9 `day_breakdown`). */
+  dayBreakdown: DayBreakdown;
+  /** The AbsenceReason tally over the same days (APIS §10.9 `absence_breakdown`). */
+  absenceBreakdown: AbsenceBreakdown;
 }
 
 /**
@@ -103,6 +139,24 @@ function expectedDays(week: ReportingWeek, window: EffectiveWindow): string[] {
     }
   }
   return days;
+}
+
+/** Count of the expected days carrying one VO-09 classification. */
+function countOf(
+  days: readonly ClassifiedDay[],
+  classification: DayClassification,
+): number {
+  return days.filter((d) => d.classification === classification).length;
+}
+
+/** Count of the expected days filed `Absent` with one AbsenceReason (VR-19). */
+function countAbsencesFor(
+  days: readonly ClassifiedDay[],
+  reason: 'Sick' | 'Studying' | 'Other',
+): number {
+  return days.filter(
+    (d) => d.report?.type === 'Absent' && d.report.absenceReason === reason,
+  ).length;
 }
 
 /**
@@ -178,5 +232,22 @@ export function computeWeeklyMetrics(input: WeeklyMetricsInput): WeeklyMetrics {
     effectiveDays: effective.length,
     memorizationExpectedDays: memorizationExpected.length,
     memorizationDays: memorizationDays.length,
+    // VO-09 tallied over ExpectedDays — every classification, excused
+    // included, so the five counts sum to `expectedDays` (APIS §10.9).
+    dayBreakdown: {
+      normal: countOf(days, 'NORMAL'),
+      revision: countOf(days, 'REVISION'),
+      absentExcused: countOf(days, 'ABSENT_EXCUSED'),
+      absentOther: countOf(days, 'ABSENT_OTHER'),
+      noReport: countOf(days, 'NO_REPORT'),
+    },
+    // The same days split by VR-19's reason (UC-07 step 4's "absence-reason
+    // breakdown"): Sick + Studying is exactly ABSENT_EXCUSED (BR-24) and
+    // Other is exactly ABSENT_OTHER (BR-25).
+    absenceBreakdown: {
+      sick: countAbsencesFor(days, 'Sick'),
+      studying: countAbsencesFor(days, 'Studying'),
+      other: countAbsencesFor(days, 'Other'),
+    },
   };
 }

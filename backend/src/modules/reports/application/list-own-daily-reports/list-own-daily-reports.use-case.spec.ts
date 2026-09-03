@@ -68,6 +68,7 @@ describe('ListOwnDailyReportsUseCase (F-DR-05 / API-031)', () => {
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
       findDaySnapshotsByMembershipAndRange: jest.fn(),
+      findLastReportDateByMembershipId: jest.fn(),
     };
     useCase = new ListOwnDailyReportsUseCase(repository);
   });
