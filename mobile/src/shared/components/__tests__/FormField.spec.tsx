@@ -48,3 +48,29 @@ describe('FormField', () => {
     expect(screen.getByText('أدخل رقماً تونسياً صحيحاً')).toBeTruthy();
   });
 });
+
+describe('FormField — Figma 6:53 states', () => {
+  it('error paints the asterisk text/error and exposes an alert row', async () => {
+    await render(
+      <FormField label="البريد" required error="خطأ">
+        <Text>Input</Text>
+      </FormField>,
+    );
+    expect(screen.getByText('*').props.className).toContain('text-fg-error');
+    expect(screen.getByTestId('form-field-error').props.accessibilityRole).toBe(
+      'alert',
+    );
+    expect(screen.getByLabelText('تنبيه')).toBeTruthy();
+  });
+
+  it('disabled greys the label', async () => {
+    await render(
+      <FormField label="الدور" disabled>
+        <Text>Input</Text>
+      </FormField>,
+    );
+    expect(screen.getByText('الدور').props.className).toContain(
+      'text-fg-disabled',
+    );
+  });
+});

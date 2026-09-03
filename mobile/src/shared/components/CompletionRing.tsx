@@ -1,27 +1,31 @@
-import React, { useMemo } from 'react';
-import { View, Text, I18nManager, StyleProp, ViewStyle } from 'react-native';
+import React from 'react';
+import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { FullRing, RingArc } from './ring';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
 
 /** The mushaf is divided into 60 ahzab (DBD DB-CHK-19: `ahzab_completed BETWEEN 0 AND 60`). */
 export const TOTAL_AHZAB = 60;
+
+/** Figma CompletionRing (19:54) geometry. */
+export const COMPLETION_RING_SIZE = 120;
+export const COMPLETION_RING_THICKNESS = 12;
 
 export interface CompletionRingProps {
   /** Completed count — a real count, never a percentage (UF §17). */
   completed: number;
   /** Total the ring is divided into; defaults to the 60 ahzab. */
   total?: number;
-  /** Outer diameter in dp. */
+  /** Outer diameter in dp (Figma: 120). */
   size?: number;
-  /** Caption rendered under the "completed / total" value inside the ring. */
+  /** Metric name folded into the accessibility label (e.g. "حزباً مكتملاً"). */
   label?: string;
+  /** Caption under the value; defaults to Figma's "من 60 حزبًا". */
+  caption?: string;
   testID?: string;
   className?: string;
   style?: StyleProp<ViewStyle>;
 }
-
-const TICK_WIDTH = 4;
-const TICK_HEIGHT = 14;
-/** Gap between the tick ring and the centre text block. */
-const CENTRE_INSET = 6;
 
 /**
  * Cap on OS text scaling for metric values that live inside fixed-size geometry
@@ -31,41 +35,33 @@ const CENTRE_INSET = 6;
 export const METRIC_MAX_FONT_SIZE_MULTIPLIER = 1.5;
 
 /**
- * Completion ring (UF §29 component inventory — "Progress tab (ahzab completed)").
- *
- * Drawn with plain React Native Views (no SVG/chart dependency is part of the stack, SA/TS §6):
- * one tick per unit around the circle, so 60 ahzab render as 60 discrete segments and the
- * ring literally shows the count it labels. Fill advances from the top in reading
- * direction (counter-clockwise under RTL, UF §31), numerals stay Western (UF §31).
+ * Figma CompletionRing (19:54): 120px ring, subtle track, brand progress arc
+ * = completed/total advancing clockwise from the top; centre shows the real
+ * count (heading/xl) over "من 60 حزبًا" (caption). Never used for the
+ * activity pointer. Drawn with plain Views (`./ring`), Western numerals.
  */
 export function CompletionRing({
   completed,
   total = TOTAL_AHZAB,
-  size = 176,
+  size = COMPLETION_RING_SIZE,
   label,
+  caption,
   testID = 'completion-ring',
   className,
   style,
 }: CompletionRingProps) {
+  const colors = useThemeColors();
   const safeTotal = Math.max(1, Math.floor(total));
   const safeCompleted = Math.min(
     safeTotal,
     Math.max(0, Math.floor(Number.isFinite(completed) ? completed : 0)),
   );
-
-  const ticks = useMemo(() => {
-    const step = 360 / safeTotal;
-    const direction = I18nManager.isRTL ? -1 : 1;
-    return Array.from({ length: safeTotal }, (_, i) => ({
-      index: i + 1,
-      rotate: `${direction * i * step}deg`,
-    }));
-  }, [safeTotal]);
-
-  const valueText = `${safeCompleted} / ${safeTotal}`;
-  const accessibilityLabel = label
-    ? `${label}: ${safeCompleted} من ${safeTotal}`
-    : `${safeCompleted} من ${safeTotal}`;
+  const sweep = (safeCompleted / safeTotal) * 360;
+  const thickness = Math.round(
+    (COMPLETION_RING_THICKNESS * size) / COMPLETION_RING_SIZE,
+  );
+  const captionText = caption ?? `من ${safeTotal} حزبًا`;
+  const accessibilityLabel = `${label ? `${label}: ` : ''}${safeCompleted} من ${safeTotal}`;
 
   return (
     <View
@@ -77,68 +73,47 @@ export function CompletionRing({
       className={`items-center justify-center ${className ?? ''}`}
       style={[{ width: size, height: size }, style]}
     >
-      {ticks.map(({ index, rotate }) => {
-        const filled = index <= safeCompleted;
-        return (
-          <View
-            key={index}
-            pointerEvents="none"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            testID={`${testID}-tick-${index}-${filled ? 'filled' : 'empty'}`}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: size / 2 - TICK_WIDTH / 2,
-              width: TICK_WIDTH,
-              height: size,
-              transform: [{ rotate }],
-            }}
-          >
-            <View
-              className={
-                filled
-                  ? 'bg-primary dark:bg-primary-400'
-                  : 'bg-gray-200 dark:bg-gray-700'
-              }
-              style={{
-                width: TICK_WIDTH,
-                height: TICK_HEIGHT,
-                borderRadius: TICK_WIDTH / 2,
-              }}
-            />
-          </View>
-        );
-      })}
-
-      {/*
-        The centre block is bounded to the ring's inner diameter so the value can
-        shrink-to-fit under large OS text scales instead of overflowing the ticks.
-      */}
       <View
-        className="items-center px-1"
         pointerEvents="none"
-        style={{ width: size - 2 * (TICK_HEIGHT + CENTRE_INSET) }}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{ position: 'absolute', top: 0, width: size, height: size }}
+      >
+        <FullRing size={size} thickness={thickness} color={colors.bgSubtle} />
+        <RingArc
+          testID={`${testID}-progress`}
+          size={size}
+          thickness={thickness}
+          color={colors.bgPrimary}
+          startAngle={0}
+          sweepAngle={sweep}
+        />
+      </View>
+
+      {/* Bounded to the inner diameter so the value shrinks under large OS text scales instead of overflowing. */}
+      <View
+        className="items-center"
+        pointerEvents="none"
+        style={{ width: size - 2 * (thickness + 6) }}
       >
         <Text
           testID={`${testID}-value`}
-          className="text-3xl font-bold text-gray-900 dark:text-gray-100 text-center"
+          className={`${typography.headingXl} text-center text-fg dark:text-fg-dark`}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
         >
-          {valueText}
+          {String(safeCompleted)}
         </Text>
-        {label ? (
-          <Text
-            testID={`${testID}-label`}
-            className="text-xs text-gray-500 dark:text-gray-400 text-center"
-            numberOfLines={2}
-            maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
-          >
-            {label}
-          </Text>
-        ) : null}
+        <Text
+          testID={`${testID}-caption`}
+          className={`${typography.caption} text-center text-fg-secondary dark:text-fg-secondary-dark`}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
+        >
+          {captionText}
+        </Text>
       </View>
     </View>
   );
