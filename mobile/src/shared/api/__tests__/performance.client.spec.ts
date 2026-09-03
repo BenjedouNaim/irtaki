@@ -1,4 +1,9 @@
-import { getMyPerformance, PerformanceDto } from '../performance.client';
+import {
+  getGroupPerformance,
+  getMyPerformance,
+  GroupPerformanceDto,
+  PerformanceDto,
+} from '../performance.client';
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({
@@ -24,6 +29,16 @@ const mockPerformance: PerformanceDto = {
     no_report: 1,
   },
   days_since_last_report: 1,
+};
+
+const mockGroupPerformance: GroupPerformanceDto = {
+  commitment_average: 62,
+  students: [
+    { membership_id: 'm-1', full_name: 'يوسف بن سالم', commitment_score: 41 },
+    { membership_id: 'm-2', full_name: null, commitment_score: null },
+  ],
+  absence_breakdown: { sick: 2, studying: 1, other: 3 },
+  submission_rate: 83,
 };
 
 describe('performance.client', () => {
@@ -118,6 +133,67 @@ describe('performance.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(getMyPerformance()).rejects.toBe(error);
+    });
+  });
+
+  describe('getGroupPerformance (API-038)', () => {
+    it('calls /groups/{id}/performance and unwraps the §9.1 envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: mockGroupPerformance,
+      });
+
+      const result = await getGroupPerformance('group-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/groups/group-1/performance',
+        { params: {} },
+      );
+      expect(result).toEqual(mockGroupPerformance);
+    });
+
+    it('sends the ?period= filter and drops from/to on a non-custom period', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: mockGroupPerformance,
+      });
+
+      await getGroupPerformance('group-1', {
+        period: 'month',
+        from: '2026-01-01',
+        to: '2026-01-31',
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/groups/group-1/performance',
+        { params: { period: 'month' } },
+      );
+    });
+
+    it('keeps the server’s weakest-first order and every null untouched', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: {
+          ...mockGroupPerformance,
+          commitment_average: null,
+          submission_rate: null,
+        },
+      });
+
+      const result = await getGroupPerformance('group-1');
+
+      expect(result.commitment_average).toBeNull();
+      expect(result.submission_rate).toBeNull();
+      expect(result.students.map((s) => s.membership_id)).toEqual([
+        'm-1',
+        'm-2',
+      ]);
+      expect(result.students[1].commitment_score).toBeNull();
+      expect(result.students[1].full_name).toBeNull();
+    });
+
+    it('propagates apiClient errors unchanged', async () => {
+      const error = new Error('boom');
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(getGroupPerformance('group-1')).rejects.toBe(error);
     });
   });
 });

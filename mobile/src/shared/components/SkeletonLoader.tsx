@@ -19,6 +19,9 @@ import { rowStart, itemsStart } from '@/shared/theme/rtl';
  *   number, caption (UF §22).
  * - `performanceDetail`: the rest of the SCR-13 Performance stack below the
  *   memorization card — a donut card, a two-up tile row and one short row.
+ * - `groupPerformance`: the SCR-23 Group Performance stack below the period
+ *   selector — a two-up tile row, the absence-reasons donut card, the list
+ *   head and three student rows.
  */
 export type SkeletonVariant =
   | 'row'
@@ -28,7 +31,8 @@ export type SkeletonVariant =
   | 'reportRow'
   | 'metricRow'
   | 'performanceScore'
-  | 'performanceDetail';
+  | 'performanceDetail'
+  | 'groupPerformance';
 
 export interface SkeletonLoaderProps {
   variant?: SkeletonVariant;
@@ -176,6 +180,72 @@ export function SkeletonLoader({
           tone="subtle"
           className={`w-full h-[66px] ${CARD}`}
         />
+      </View>
+    );
+  }
+
+  if (variant === 'groupPerformance') {
+    return (
+      <View
+        testID={testID}
+        accessibilityLabel="جارٍ التحميل"
+        className={`w-full gap-3.5 ${className ?? ''}`}
+        style={style}
+      >
+        {/* Two-up tile row: submission rate and commitment average. */}
+        <View className={`${rowStart} gap-2.5 w-full`}>
+          <SkeletonBlock
+            testID="skeleton-group-tile-0"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+          <SkeletonBlock
+            testID="skeleton-group-tile-1"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+        </View>
+
+        {/* Absence-reasons donut card. */}
+        <View className={`w-full p-[18px] gap-3.5 ${itemsStart} ${CARD}`}>
+          <SkeletonBlock
+            testID="skeleton-group-absences-title"
+            className="w-2/5 h-5 rounded-md"
+          />
+          <View className={`${rowStart} items-center justify-between w-full`}>
+            <View className={`flex-1 gap-2 ${itemsStart}`}>
+              {[0, 1, 2].map((row) => (
+                <SkeletonBlock
+                  key={row}
+                  testID={`skeleton-group-legend-${row}`}
+                  tone="subtle"
+                  className="w-3/5 h-3 rounded-sm"
+                />
+              ))}
+            </View>
+            <SkeletonBlock
+              testID="skeleton-group-donut"
+              tone="subtle"
+              className="w-[112px] h-[112px] rounded-full"
+            />
+          </View>
+        </View>
+
+        {/* List head and the weakest-first student rows. */}
+        <SkeletonBlock
+          testID="skeleton-group-list-head"
+          className="w-1/4 h-3 rounded-sm"
+        />
+        <View className="w-full gap-2">
+          {[0, 1, 2].map((row) => (
+            <SkeletonBlock
+              key={row}
+              testID={`skeleton-group-student-${row}`}
+              tone="subtle"
+              className="w-full h-[66px] rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark"
+            />
+          ))}
+        </View>
       </View>
     );
   }

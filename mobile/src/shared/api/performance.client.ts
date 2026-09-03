@@ -70,3 +70,57 @@ export async function getMyPerformance(
   });
   return response.data;
 }
+
+/** One row of API-038's weakest-first student list. */
+export interface GroupStudentPerformanceDto {
+  membership_id: string;
+  /** Null when the student never completed their profile — never "". */
+  full_name: string | null;
+  /** Null renders "بيانات غير كافية", never `0%` (DEC-B04, UF §17). */
+  commitment_score: number | null;
+}
+
+/** The AbsenceReason tally over the period (VR-19: Sick / Studying / Other). */
+export interface GroupAbsenceBreakdownDto {
+  sick: number;
+  studying: number;
+  other: number;
+}
+
+/**
+ * API-038 `GET /groups/{id}/performance?period=` resource
+ * (`GroupPerformanceDto`, TS §13; APIS §10.9).
+ *
+ * The `students` array arrives ALREADY ordered weakest-first and with the
+ * FR-PERF-09/10 member set already applied — UF §17: "Historical periods
+ * incl. removed students · rendered as returned, the server already applies
+ * FR-PERF-09/10". The client never re-sorts and never re-filters it.
+ */
+export interface GroupPerformanceDto {
+  commitment_average: number | null;
+  students: GroupStudentPerformanceDto[];
+  absence_breakdown: GroupAbsenceBreakdownDto;
+  submission_rate: number | null;
+}
+
+/** APIS §9.1 single-resource envelope. */
+export interface GroupPerformanceResponse {
+  data: GroupPerformanceDto;
+}
+
+/**
+ * Fetches a group's performance dashboard (Teacher on an assigned group or
+ * Admin, API-038) and unwraps the APIS §9.1 envelope. Errors surface as
+ * `ApiError` unchanged — an out-of-scope group is a `403 SCOPE_DENIED`,
+ * which navigation never offers (UF §24).
+ */
+export async function getGroupPerformance(
+  groupId: string,
+  params: PerformanceParams = {},
+): Promise<GroupPerformanceDto> {
+  const response = await apiClient.get<GroupPerformanceResponse>(
+    `/groups/${groupId}/performance`,
+    { params: toQuery(params) },
+  );
+  return response.data;
+}

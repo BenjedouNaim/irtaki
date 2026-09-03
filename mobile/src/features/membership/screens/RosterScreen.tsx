@@ -1,24 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   TopBar,
   Banner,
-  Icon,
   ListRow,
   EmptyState,
   StatusBadge,
   SkeletonLoader,
 } from '@/shared/components';
 import { typography } from '@/shared/theme/typography';
-import { rowStart, itemsStart } from '@/shared/theme/rtl';
+import { rowStart } from '@/shared/theme/rtl';
 import {
   getGroupMemberships,
   RosterEntry,
 } from '@/shared/api/memberships.client';
 import { getGroupDetail, GroupListItemFull } from '@/shared/api/groups.client';
+import { GroupStudentPerformanceDto } from '@/shared/api/performance.client';
 import { ApiError } from '@/shared/api/types';
 import { EnrollmentToggle } from '@/features/groups/components/EnrollmentToggle';
+import { GroupPerformanceSection } from '@/features/performance/components/GroupPerformanceSection';
 import { getRecitationDayName } from '@/features/joinRequests/screens/JoinStepperScreen';
 import {
   formatArabicCount,
@@ -33,18 +34,19 @@ export interface RosterScreenProps {
    * `admin` (default): SCR-30 Roster · Admin (Figma 41:316) — current and
    * removed members, removed rows open SCR-31.
    * `teacher`: SCR-23 Group Detail · Teacher (Figma 37:124) — the group
-   * header, the enrollment toggle and the student list; the screen also
-   * loads the group itself (`GET /groups/{id}`, Teacher (g)).
+   * header, the enrollment toggle (F-GRP-06) and the Group Performance
+   * content (F-PERF-02); the screen also loads the group itself
+   * (`GET /groups/{id}`, Teacher (g)) and its roster for the header count.
    */
   variant?: 'admin' | 'teacher';
   /** Admin: the group name carried by the route for the list head. */
   groupName?: string | null;
   /**
-   * Active row tap. The Teacher's student list (SCR-23 roster portion)
-   * passes the way into that student's raw daily reports (SCR-25, F-DR-06);
-   * without it Active rows are not tappable (Admin's SCR-30).
+   * Teacher: student row tap on SCR-23's weakest-first list. The row leads
+   * into that student's raw daily reports (SCR-25, F-DR-06); without it the
+   * rows are not tappable — navigation never offers a missing screen (UF §8).
    */
-  onActiveMemberPress?: (entry: RosterEntry) => void;
+  onStudentPress?: (student: GroupStudentPerformanceDto) => void;
   /**
    * Whether a Terminated row opens the Admin recovery view (SCR-31). Roles
    * without that route must pass `false` — navigation never offers an
@@ -65,16 +67,11 @@ function describeError(err: unknown, fallback: string): string {
   return NETWORK_ERROR_MESSAGE;
 }
 
-function initialOf(name: string | null): string {
-  const trimmed = (name ?? '').trim();
-  return trimmed.length > 0 ? trimmed.charAt(0) : '؟';
-}
-
 export default function RosterScreen({
   groupId,
   variant = 'admin',
   groupName,
-  onActiveMemberPress,
+  onStudentPress,
   canOpenRecovery = true,
 }: RosterScreenProps) {
   const router = useRouter();
@@ -108,76 +105,19 @@ export default function RosterScreen({
   }, [fetchRoster]);
 
   const isRowPressable = (item: RosterEntry) =>
-    item.state === 'Terminated'
-      ? canOpenRecovery
-      : Boolean(onActiveMemberPress);
+    item.state === 'Terminated' && canOpenRecovery;
 
   const handleRowPress = (item: RosterEntry) => {
-    if (item.state === 'Terminated') {
-      if (canOpenRecovery) {
-        router.push({
-          pathname: '/(app)/admin/memberships/[id]/recovery' as any,
-          params: { id: item.id },
-        });
-      }
-      return;
+    if (item.state === 'Terminated' && canOpenRecovery) {
+      router.push({
+        pathname: '/(app)/admin/memberships/[id]/recovery' as any,
+        params: { id: item.id },
+      });
     }
-    onActiveMemberPress?.(item);
   };
 
   const active = entries.filter((e) => e.state === 'Active');
   const removed = entries.filter((e) => e.state === 'Terminated');
-
-  const renderTeacherRow = (item: RosterEntry) => {
-    const name = item.user.full_name || 'غير محدد';
-    const terminated = item.state === 'Terminated';
-    const pressable = isRowPressable(item);
-    return (
-      <Pressable
-        key={item.id}
-        testID={`roster-row-${item.id}`}
-        accessibilityRole="button"
-        accessibilityLabel={terminated ? `${name}، مُزال` : name}
-        accessibilityState={{ disabled: !pressable }}
-        disabled={!pressable}
-        onPress={() => handleRowPress(item)}
-        className={`${rowStart} items-center gap-2.5 w-full rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-3.5 py-3 active:opacity-80 ${
-          terminated ? 'opacity-85' : ''
-        }`}
-        style={{ borderCurve: 'continuous' }}
-      >
-        <View className="w-9 h-9 rounded-full bg-subtle dark:bg-subtle-dark items-center justify-center">
-          <Text
-            className={`${typography.labelMd} text-center text-fg-secondary dark:text-fg-secondary-dark`}
-            maxFontSizeMultiplier={1.4}
-          >
-            {initialOf(item.user.full_name)}
-          </Text>
-        </View>
-        <View className={`flex-1 gap-1 ${itemsStart}`}>
-          <Text
-            selectable
-            numberOfLines={1}
-            className={`w-full ${typography.bodyMdMedium} text-right text-fg dark:text-fg-dark`}
-          >
-            {name}
-          </Text>
-          {/* Meta slot — the "days since last report" / at-risk line needs
-              the performance module (not built); the score slot before the
-              chevron is reserved for the same reason. */}
-        </View>
-        {terminated ? (
-          <StatusBadge
-            status="مُزال"
-            variant="neutral"
-            testID={`roster-state-badge-${item.id}`}
-          />
-        ) : (
-          <Icon name="chevron-left" size={18} tone="tertiary" />
-        )}
-      </Pressable>
-    );
-  };
 
   const renderAdminRow = (item: RosterEntry) => {
     const name = item.user.full_name || 'غير محدد';
@@ -260,26 +200,16 @@ export default function RosterScreen({
           </>
         ) : null}
 
-        <View className={`${rowStart} items-center pt-1.5 w-full`}>
-          <Text
-            className={`${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
-          >
-            الطلاب
-          </Text>
-        </View>
-
-        {entries.length === 0 ? (
-          <EmptyState
-            icon="users"
-            message={EMPTY_MESSAGE}
-            testID="roster-empty"
-          />
-        ) : (
-          <View className="w-full gap-2" testID="roster-list">
-            {active.map(renderTeacherRow)}
-            {removed.map(renderTeacherRow)}
-          </View>
-        )}
+        {/* F-PERF-02: the period selector, the two tiles, the absence-reason
+            donut and the weakest-first student list — the list is API-038's
+            member set, so a removed student appears on a historical period
+            and never on the current week (FR-PERF-09/10, UF §17). It owns
+            its own query, so a performance failure never blanks the group
+            header or the enrollment toggle above it. */}
+        <GroupPerformanceSection
+          groupId={groupId}
+          onStudentPress={onStudentPress}
+        />
       </>
     );
   } else {
