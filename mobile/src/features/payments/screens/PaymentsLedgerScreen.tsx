@@ -163,8 +163,12 @@ export function PaymentsLedgerScreen() {
           onSelect={setSelectedGroupId}
         />
 
+        {/* The four chips fill the 358dp content width exactly at the
+            default text size, as Figma draws them; `flex-wrap` lets them
+            fall to a second line under OS text scaling rather than clip
+            (UF §32). */}
         <View
-          className={`${rowStart} items-start gap-2 w-full`}
+          className={`${rowStart} flex-wrap items-start gap-2 w-full`}
           accessibilityRole="radiogroup"
           testID="payments-ledger-filters"
         >
