@@ -15,6 +15,10 @@ import {
   PASSWORD_HASHER,
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 /**
  * F-TEST-04 — the five concurrency hazards of SAS §26.4 / DBD §27 / TS §20,
@@ -91,6 +95,10 @@ describe('Concurrency hazards (F-TEST-04 / TS §20)', () => {
     );
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // The real AppModule registers TS §31's five crons. Their evaluators
+    // sweep this suite's own fixtures on the next tick and write
+    // notification_log rows against users it is about to delete.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     await cleanDatabase();
@@ -170,6 +178,10 @@ describe('Concurrency hazards (F-TEST-04 / TS §20)', () => {
       'DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [byEmail],
     );
+    // DBT-17's log holds ON DELETE RESTRICT references to these users:
+    // the four event-driven notifications fire from the very requests this
+    // suite races, so the rows exist by the time it cleans up.
+    await purgeNotificationLog(dataSource);
     await dataSource.query('DELETE FROM users WHERE email LIKE $1', [byEmail]);
 
     // The seeded Admin is borrowed, not created, so it survives the sweep
@@ -360,13 +372,17 @@ describe('Concurrency hazards (F-TEST-04 / TS §20)', () => {
   describe("Hazard 1 — double accept/reject of a JoinRequest (WHERE status='Pending')", () => {
     it('two simultaneous accepts: one 200, one 409 ALREADY_DECIDED, exactly one Membership', async () => {
       const { assistant, groupId } = await seedGroup();
-      const admin = await registerAndLogin(UserRole.Admin);
       const applicant = await registerAndLogin(UserRole.User);
       const requestId = await createPendingRequest(applicant.userId, groupId);
 
+      // APIS §6.1 makes accept/reject **Assistant only** — the Admin was
+      // removed from `@Roles()` in F-TEST-02, so racing one here would
+      // only ever measure RolesGuard's 403, not the write guard. The
+      // real-world race is the assigned Assistant firing twice: a
+      // double-tapped button, or a client retry over a slow response.
       const [a, b] = await Promise.all([
         acceptRequest(requestId, assistant),
-        acceptRequest(requestId, admin),
+        acceptRequest(requestId, assistant),
       ]);
 
       expect(sorted(a, b)).toEqual([HttpStatus.OK, HttpStatus.CONFLICT]);
@@ -387,13 +403,17 @@ describe('Concurrency hazards (F-TEST-04 / TS §20)', () => {
 
     it('two simultaneous rejects: one 200, one 409 ALREADY_DECIDED', async () => {
       const { assistant, groupId } = await seedGroup();
-      const admin = await registerAndLogin(UserRole.Admin);
       const applicant = await registerAndLogin(UserRole.User);
       const requestId = await createPendingRequest(applicant.userId, groupId);
 
+      // APIS §6.1 makes accept/reject **Assistant only** — the Admin was
+      // removed from `@Roles()` in F-TEST-02, so racing one here would
+      // only ever measure RolesGuard's 403, not the write guard. The
+      // real-world race is the assigned Assistant firing twice: a
+      // double-tapped button, or a client retry over a slow response.
       const [a, b] = await Promise.all([
         rejectRequest(requestId, assistant),
-        rejectRequest(requestId, admin),
+        rejectRequest(requestId, assistant),
       ]);
 
       expect(sorted(a, b)).toEqual([HttpStatus.OK, HttpStatus.CONFLICT]);
@@ -408,13 +428,17 @@ describe('Concurrency hazards (F-TEST-04 / TS §20)', () => {
 
     it('accept racing reject: exactly one decision lands, and it is the one persisted', async () => {
       const { assistant, groupId } = await seedGroup();
-      const admin = await registerAndLogin(UserRole.Admin);
       const applicant = await registerAndLogin(UserRole.User);
       const requestId = await createPendingRequest(applicant.userId, groupId);
 
+      // APIS §6.1 makes accept/reject **Assistant only** — the Admin was
+      // removed from `@Roles()` in F-TEST-02, so racing one here would
+      // only ever measure RolesGuard's 403, not the write guard. The
+      // real-world race is the assigned Assistant firing twice: a
+      // double-tapped button, or a client retry over a slow response.
       const [accept, reject] = await Promise.all([
         acceptRequest(requestId, assistant),
-        rejectRequest(requestId, admin),
+        rejectRequest(requestId, assistant),
       ]);
 
       expect(sorted(accept, reject)).toEqual([

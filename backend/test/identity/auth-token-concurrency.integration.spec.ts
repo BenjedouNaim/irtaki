@@ -10,6 +10,10 @@ import {
 } from '../../src/modules/identity/domain/mailer.interface';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
 import { RegisterResponseDto } from '../../src/modules/identity/application/register/register-response.dto';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface DbAuthTokenRow {
   id: string;
@@ -48,6 +52,8 @@ describe('auth_tokens revocation concurrency (TS §20)', () => {
     await dataSource.query(
       "DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@test-tokenrace.com')",
     );
+    // DBT-17 holds ON DELETE RESTRICT references to these users.
+    await purgeNotificationLog(dataSource);
     await dataSource.query(
       "DELETE FROM users WHERE email LIKE '%@test-tokenrace.com'",
     );
@@ -73,6 +79,11 @@ describe('auth_tokens revocation concurrency (TS §20)', () => {
     app.setGlobalPrefix('api/v1');
 
     await app.init();
+    // TS §31's five crons are live in a real AppModule boot. Their
+    // evaluators sweep this suite's fixtures on the next tick and write
+    // notification_log rows against users it is about to delete, which
+    // fails this suite and every suite behind it on the shared database.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
     await cleanup();
   });

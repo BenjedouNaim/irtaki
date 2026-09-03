@@ -42,6 +42,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 const TEST_EMAIL_DOMAIN = '@test-rate-limiting.com';
 const TEST_GROUP_PREFIX = 'F-TEST-03 rate limit group';
@@ -84,6 +88,10 @@ describe('Rate limiting (F-TEST-03, APIS §9.8 / NFR-22)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // TS §31's five crons are live inside a real AppModule boot: their
+    // evaluators would sweep this suite's fixtures on the next tick and
+    // write notification_log rows against users it is about to delete.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     jwtService = app.get(JwtService);
@@ -146,6 +154,8 @@ describe('Rate limiting (F-TEST-03, APIS §9.8 / NFR-22)', () => {
       'DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [email],
     );
+    // DBT-17 holds ON DELETE RESTRICT references to these users.
+    await purgeNotificationLog(dataSource);
     await dataSource.query('DELETE FROM users WHERE email LIKE $1', [email]);
   }
 
