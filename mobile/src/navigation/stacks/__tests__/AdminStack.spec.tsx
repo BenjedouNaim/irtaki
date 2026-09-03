@@ -34,7 +34,9 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
     expect(screen.getByText('الطاقم والمستخدمون')).toBeTruthy();
     expect(screen.getByText('ترقية مستخدم إلى معلّم أو مساعد')).toBeTruthy();
     expect(screen.getByText('سجل التدقيق')).toBeTruthy();
-    expect(screen.getByText('الإجراءات الثلاثة المسجّلة')).toBeTruthy();
+    expect(
+      screen.getByText('تسجيل الدخول · إنشاء مجموعة · تبديل التسجيل'),
+    ).toBeTruthy();
   });
 
   it('routes to the groups list, the user directory, the audit log and the profile', () => {

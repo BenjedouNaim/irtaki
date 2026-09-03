@@ -73,8 +73,8 @@ export function AdminStack() {
           />
           <ListRow
             title="سجل التدقيق"
-            subtitle="الإجراءات الثلاثة المسجّلة"
-            leadingIcon="history"
+            subtitle="تسجيل الدخول · إنشاء مجموعة · تبديل التسجيل"
+            leadingIcon="file-text"
             onPress={() => router.push('/(app)/admin/audit' as any)}
             testID="admin-audit-button"
           />
