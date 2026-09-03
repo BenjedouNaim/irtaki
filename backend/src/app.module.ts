@@ -22,6 +22,7 @@ import { EnrollmentModule } from './modules/enrollment/enrollment.module';
 import { MembershipsModule } from './modules/memberships/memberships.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 interface ValidationDetail {
@@ -79,6 +80,7 @@ function flattenValidationErrors(
     MembershipsModule,
     ProgressModule,
     ReportsModule,
+    NotificationsModule,
   ],
 
   controllers: [AppController],
