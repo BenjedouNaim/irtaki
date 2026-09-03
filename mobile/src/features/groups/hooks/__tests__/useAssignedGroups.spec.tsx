@@ -34,7 +34,7 @@ function renderUseAssignedGroups() {
   return { ...hook, queryClient };
 }
 
-describe('useAssignedGroups (API-021)', () => {
+describe('useAssignedGroups (API-010)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

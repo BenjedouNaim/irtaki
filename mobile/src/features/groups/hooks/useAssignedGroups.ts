@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { GroupListItem, listGroups } from '@/shared/api/groups.client';
 
 /**
- * Query key for `GET /groups` (API-021), whose result is role-shaped by the
- * server: for staff it is exactly the groups they are assigned to.
+ * Query key for `GET /groups` (API-010 — APIS §8; API-021 is the Assistant
+ * join-request queue, a different endpoint), whose result is role-shaped by
+ * the server: for staff it is exactly the groups they are assigned to
+ * (APIS §6.1, `GET /groups` → Assistant "(g)").
  */
 export const ASSIGNED_GROUPS_QUERY_KEY = ['groups', 'assigned'] as const;
 
