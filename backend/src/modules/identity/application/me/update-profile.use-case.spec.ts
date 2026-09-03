@@ -13,10 +13,11 @@ describe('UpdateProfileUseCase', () => {
     mockUserRepository = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
-      findAllByRole: jest.fn(),
+      findPageByRole: jest.fn(),
       save: jest.fn().mockImplementation((u) => Promise.resolve(u)),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     useCase = new UpdateProfileUseCase(mockUserRepository);

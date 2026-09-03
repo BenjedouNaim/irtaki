@@ -21,6 +21,7 @@ import { ConfirmPasswordResetUseCase } from './application/password-reset/confir
 import { GetMeUseCase } from './application/me/get-me.use-case';
 import { UpdateProfileUseCase } from './application/me/update-profile.use-case';
 import { ListUsersUseCase } from './application/list-users/list-users.use-case';
+import { PromoteRoleUseCase } from './application/promote-role/promote-role.use-case';
 import { AuthController } from './presentation/auth.controller';
 import { MeController } from './presentation/me.controller';
 import { UsersController } from './presentation/users.controller';
@@ -62,6 +63,7 @@ import { UsersController } from './presentation/users.controller';
     GetMeUseCase,
     UpdateProfileUseCase,
     ListUsersUseCase,
+    PromoteRoleUseCase,
   ],
   exports: [
     USER_REPOSITORY,
@@ -77,6 +79,7 @@ import { UsersController } from './presentation/users.controller';
     GetMeUseCase,
     UpdateProfileUseCase,
     ListUsersUseCase,
+    PromoteRoleUseCase,
   ],
 })
 export class IdentityModule {}

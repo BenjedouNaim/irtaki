@@ -4,6 +4,7 @@ export * from './auth.client';
 export * from './me.client';
 export * from './groups.client';
 export * from './users.client';
+export * from './audit.client';
 export * from './joinRequests.client';
 export * from './memberships.client';
 export * from './quran.client';
