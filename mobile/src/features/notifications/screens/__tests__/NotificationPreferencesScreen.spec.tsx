@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as preferencesApi from '@/shared/api/notificationPreferences.client';
 import { ApiError, NetworkError } from '@/shared/api/types';
@@ -155,6 +155,127 @@ describe('NotificationPreferencesScreen (SCR-35, Figma 43:126)', () => {
       getByTestId('preference-row-N-01-toggle').props.accessibilityState
         .checked,
     ).toBe(false);
+    queryClient.clear();
+  });
+
+  it('mutes a category through API-051 with no confirmation dialog (UF §25)', async () => {
+    jest
+      .spyOn(preferencesApi, 'getNotificationPreferences')
+      .mockResolvedValue(catalogue);
+    jest
+      .spyOn(preferencesApi, 'setNotificationPreference')
+      .mockResolvedValue({ ...catalogue[0], muted: true });
+
+    const { findByTestId, queryClient } = renderScreen();
+
+    fireEvent.press(await findByTestId('preference-row-N-01-toggle'));
+
+    // TanStack v5 hands the mutationFn a second (context) argument.
+    await waitFor(() =>
+      expect(preferencesApi.setNotificationPreference).toHaveBeenCalledWith(
+        { category: 'N-01', muted: true },
+        expect.anything(),
+      ),
+    );
+    queryClient.clear();
+  });
+
+  it('unmutes a muted category', async () => {
+    jest
+      .spyOn(preferencesApi, 'getNotificationPreferences')
+      .mockResolvedValue(catalogue);
+    jest
+      .spyOn(preferencesApi, 'setNotificationPreference')
+      .mockResolvedValue({ ...catalogue[1], muted: false });
+
+    const { findByTestId, queryClient } = renderScreen();
+
+    fireEvent.press(await findByTestId('preference-row-N-02-toggle'));
+
+    await waitFor(() =>
+      expect(preferencesApi.setNotificationPreference).toHaveBeenCalledWith(
+        { category: 'N-02', muted: false },
+        expect.anything(),
+      ),
+    );
+    queryClient.clear();
+  });
+
+  it('holds the toggle in its requested position while the write is in flight', async () => {
+    jest
+      .spyOn(preferencesApi, 'getNotificationPreferences')
+      .mockResolvedValue(catalogue);
+    jest
+      .spyOn(preferencesApi, 'setNotificationPreference')
+      .mockImplementation(() => new Promise(() => {}));
+
+    const { findByTestId, getByTestId, queryClient } = renderScreen();
+
+    fireEvent.press(await findByTestId('preference-row-N-01-toggle'));
+
+    await waitFor(() =>
+      expect(
+        getByTestId('preference-row-N-01-toggle').props.accessibilityState
+          .checked,
+      ).toBe(true),
+    );
+    // Disabled until the write settles, so a double tap cannot race itself.
+    expect(
+      getByTestId('preference-row-N-01-toggle').props.accessibilityState
+        .disabled,
+    ).toBe(true);
+    queryClient.clear();
+  });
+
+  it('surfaces a failed write as an error banner, never a silent no-op (UF §24)', async () => {
+    jest
+      .spyOn(preferencesApi, 'getNotificationPreferences')
+      .mockResolvedValue(catalogue);
+    jest.spyOn(preferencesApi, 'setNotificationPreference').mockRejectedValue(
+      new ApiError({
+        statusCode: 500,
+        error: 'INTERNAL_ERROR',
+        message: 'internal detail that must never reach the user',
+      }),
+    );
+
+    const { findByTestId, findByText, queryByText, queryClient } =
+      renderScreen();
+
+    fireEvent.press(await findByTestId('preference-row-N-01-toggle'));
+
+    expect(
+      await findByTestId('notification-preferences-save-error'),
+    ).toBeTruthy();
+    expect(
+      await findByText('حدث خطأ أثناء تحديث تفضيلات الإشعارات'),
+    ).toBeTruthy();
+    // 5xx never leaks the server's own message (UF §24).
+    expect(
+      queryByText('internal detail that must never reach the user'),
+    ).toBeNull();
+    queryClient.clear();
+  });
+
+  it('shows the 4xx Arabic message verbatim (UF §24)', async () => {
+    jest
+      .spyOn(preferencesApi, 'getNotificationPreferences')
+      .mockResolvedValue(catalogue);
+    jest.spyOn(preferencesApi, 'setNotificationPreference').mockRejectedValue(
+      new ApiError({
+        statusCode: 422,
+        error: 'ACCOUNT_CRITICAL_CATEGORY',
+        message: 'هذه الفئة حساسة للحساب ولا يمكن كتمها',
+      }),
+    );
+
+    const { findByTestId, findByText, queryClient } = renderScreen();
+
+    fireEvent.press(await findByTestId('preference-row-N-01-toggle'));
+
+    expect(
+      await findByText('هذه الفئة حساسة للحساب ولا يمكن كتمها'),
+    ).toBeTruthy();
     queryClient.clear();
   });
 

@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 /**
- * API-050 resource (APIS.md §10.12). One notification category
+ * API-050 / API-051 resource (APIS.md §10.12). One notification category
  * merged with the caller's mute state.
  *
  * `category` is the DBT-15 code (`N-01` … `N-08`, SAS §22.2). `is_mutable`
@@ -25,6 +25,17 @@ export interface NotificationPreferencesResponse {
   data: NotificationPreferenceDto[];
 }
 
+/** APIS.md §9.1 single-resource envelope. */
+export interface NotificationPreferenceResponse {
+  data: NotificationPreferenceDto;
+}
+
+/** API-051 request body (APIS.md §10.12). */
+export interface SetNotificationPreferencePayload {
+  category: string;
+  muted: boolean;
+}
+
 /**
  * API-050 `GET /me/notification-preferences` — the caller's full category
  * catalogue. Unwraps the APIS.md §9.1 envelope.
@@ -34,6 +45,21 @@ export async function getNotificationPreferences(): Promise<
 > {
   const response = await apiClient.get<NotificationPreferencesResponse>(
     '/me/notification-preferences',
+  );
+  return response.data;
+}
+
+/**
+ * API-051 `PATCH /me/notification-preferences` — mute or unmute one
+ * category. A `422 ACCOUNT_CRITICAL_CATEGORY` surfaces as an `ApiError` for
+ * the caller to map; the screen never offers the toggle that would raise it.
+ */
+export async function setNotificationPreference(
+  payload: SetNotificationPreferencePayload,
+): Promise<NotificationPreferenceDto> {
+  const response = await apiClient.patch<NotificationPreferenceResponse>(
+    '/me/notification-preferences',
+    payload,
   );
   return response.data;
 }

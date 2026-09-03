@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { Banner } from '@/shared/components/Banner';
 import { PreferenceRow } from '@/shared/components/PreferenceRow';
@@ -9,6 +9,7 @@ import { itemsStart } from '@/shared/theme/rtl';
 import { ApiError } from '@/shared/api/types';
 import type { NotificationPreferenceDto } from '@/shared/api/notificationPreferences.client';
 import { useNotificationPreferences } from '../hooks/useNotificationPreferences';
+import { useSetNotificationPreference } from '../hooks/useSetNotificationPreference';
 import { categoryCopy } from '../utils/categoryCopy';
 
 const SCREEN_TITLE = 'تفضيلات الإشعارات';
@@ -23,6 +24,7 @@ const FOOTNOTE = 'الإشعار يفتح الشاشة المعنية مباشر
 
 /** UF §24: `5xx` and network never show the server's own message. */
 const LOAD_ERROR_MESSAGE = 'حدث خطأ أثناء تحميل تفضيلات الإشعارات';
+const SAVE_ERROR_MESSAGE = 'حدث خطأ أثناء تحديث تفضيلات الإشعارات';
 const NETWORK_ERROR_MESSAGE =
   'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.';
 
@@ -46,8 +48,9 @@ interface SectionProps {
   rows: NotificationPreferenceDto[];
   /** `subtle` is the Figma ground for the locked group (43:195). */
   tone: 'surface' | 'subtle';
-  /** Account-critical rows render with no toggle at all (Figma 19:159). */
-  showToggle: boolean;
+  mutedOf: (row: NotificationPreferenceDto) => boolean;
+  onToggle?: (category: string, muted: boolean) => void;
+  busyCategory?: string | null;
   testID: string;
 }
 
@@ -56,7 +59,9 @@ function PreferenceSection({
   label,
   rows,
   tone,
-  showToggle,
+  mutedOf,
+  onToggle,
+  busyCategory,
   testID,
 }: SectionProps) {
   if (rows.length === 0) {
@@ -92,7 +97,11 @@ function PreferenceSection({
                 title={copy.title}
                 subtitle={copy.subtitle}
                 // `undefined` renders no toggle — the account-critical rows.
-                value={showToggle ? row.muted : undefined}
+                value={onToggle ? mutedOf(row) : undefined}
+                onChange={
+                  onToggle ? (next) => onToggle(row.category, next) : undefined
+                }
+                disabled={busyCategory === row.category}
               />
             </View>
           );
@@ -103,21 +112,50 @@ function PreferenceSection({
 }
 
 /**
- * SCR-35 Notification Preferences (F-NOT-03, UF §28; Figma 43:126): the
- * whole API-050 catalogue as a flat list with a toggle per row, split into
- * the two Figma sections — mutable categories on a surface card,
+ * SCR-35 Notification Preferences (F-NOT-03 / F-NOT-04, UF §28; Figma
+ * 43:126): the whole API-050 catalogue as a flat list with a toggle per row,
+ * split into the two Figma sections — mutable categories on a surface card,
  * account-critical ones on a subtle card with no toggle at all.
  *
  * Hiding the toggle is presentation, not the control: the server refuses to
  * mute an account-critical category whatever the client sends (VR-38,
- * SAS §12 UC-18 E1, NFR-08).
+ * SAS §12 UC-18 E1, NFR-08). Toggling takes no confirmation — one tap
+ * either way, instantly reversible, the treatment UF §25 gives the
+ * enrollment toggle.
  *
  * Reached from SCR-34 Profile, the shared entry point for every role
- * (UF §26). Writing a preference is F-NOT-04 / API-051.
+ * (UF §26).
  */
 export function NotificationPreferencesScreen() {
   const { data, isPending, isError, error, refetch } =
     useNotificationPreferences();
+  const setPreference = useSetNotificationPreference();
+
+  /** The row being written, and the value it was asked to take. */
+  const [pending, setPending] = useState<{
+    category: string;
+    muted: boolean;
+  } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleToggle = useCallback(
+    (category: string, muted: boolean) => {
+      if (pending) {
+        return;
+      }
+      setSaveError(null);
+      setPending({ category, muted });
+      setPreference.mutate(
+        { category, muted },
+        {
+          onError: (err) =>
+            setSaveError(describeError(err, SAVE_ERROR_MESSAGE)),
+          onSettled: () => setPending(null),
+        },
+      );
+    },
+    [pending, setPreference],
+  );
 
   if (isPending) {
     return (
@@ -165,6 +203,10 @@ export function NotificationPreferencesScreen() {
   const mutable = rows.filter((row) => row.is_mutable);
   const critical = rows.filter((row) => !row.is_mutable);
 
+  /** The optimistic value while a write is in flight, the stored one after. */
+  const mutedOf = (row: NotificationPreferenceDto) =>
+    pending?.category === row.category ? pending.muted : row.muted;
+
   return (
     <View
       className="flex-1 bg-canvas dark:bg-canvas-dark"
@@ -186,11 +228,21 @@ export function NotificationPreferencesScreen() {
           {INTRO}
         </Text>
 
+        {saveError ? (
+          <Banner
+            message={saveError}
+            tone="error"
+            testID="notification-preferences-save-error"
+          />
+        ) : null}
+
         <PreferenceSection
           label={MUTABLE_LABEL}
           rows={mutable}
           tone="surface"
-          showToggle
+          mutedOf={mutedOf}
+          onToggle={handleToggle}
+          busyCategory={pending?.category ?? null}
           testID="notification-preferences-mutable"
         />
 
@@ -198,7 +250,7 @@ export function NotificationPreferencesScreen() {
           label={CRITICAL_LABEL}
           rows={critical}
           tone="subtle"
-          showToggle={false}
+          mutedOf={mutedOf}
           testID="notification-preferences-critical"
         />
 

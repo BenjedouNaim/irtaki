@@ -1,5 +1,6 @@
 import {
   getNotificationPreferences,
+  setNotificationPreference,
   NotificationPreferenceDto,
 } from '../notificationPreferences.client';
 import { apiClient } from '../client';
@@ -57,6 +58,49 @@ describe('notificationPreferences.client', () => {
       (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
 
       expect(await getNotificationPreferences()).toEqual([]);
+    });
+  });
+
+  describe('setNotificationPreference (API-051)', () => {
+    it('calls PATCH with { category, muted } and unwraps the envelope', async () => {
+      (apiClient.patch as jest.Mock).mockResolvedValue({ data: catalogue[0] });
+
+      const result = await setNotificationPreference({
+        category: 'N-01',
+        muted: true,
+      });
+
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        '/me/notification-preferences',
+        { category: 'N-01', muted: true },
+      );
+      expect(result).toEqual(catalogue[0]);
+    });
+
+    it('sends muted=false for an unmute', async () => {
+      (apiClient.patch as jest.Mock).mockResolvedValue({
+        data: { ...catalogue[0], muted: false },
+      });
+
+      const result = await setNotificationPreference({
+        category: 'N-01',
+        muted: false,
+      });
+
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        '/me/notification-preferences',
+        { category: 'N-01', muted: false },
+      );
+      expect(result.muted).toBe(false);
+    });
+
+    it('lets an ApiError propagate for the caller to map (UF §24)', async () => {
+      const failure = new Error('422');
+      (apiClient.patch as jest.Mock).mockRejectedValue(failure);
+
+      await expect(
+        setNotificationPreference({ category: 'N-03', muted: true }),
+      ).rejects.toBe(failure);
     });
   });
 });
