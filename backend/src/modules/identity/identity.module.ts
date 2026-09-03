@@ -8,6 +8,7 @@ import { MAILER } from './domain/mailer.interface';
 import { UserTypeOrmEntity } from './infrastructure/user.typeorm-entity';
 import { AuthTokenTypeOrmEntity } from './infrastructure/auth-token.typeorm-entity';
 import { AuditEntryTypeOrmEntity } from './infrastructure/audit-entry.typeorm-entity';
+import { AuthTokenRepository } from './infrastructure/auth-token.repository';
 import { UserRepository } from './infrastructure/user.repository';
 import { Argon2PasswordHasher } from './infrastructure/argon2-password-hasher';
 import { MailgunMailer } from './infrastructure/mailgun-mailer';
@@ -51,6 +52,7 @@ import { UsersController } from './presentation/users.controller';
       useClass: MailgunMailer,
     },
     UserRepository,
+    AuthTokenRepository,
     Argon2PasswordHasher,
     MailgunMailer,
     TokenService,
