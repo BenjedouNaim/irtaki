@@ -60,6 +60,7 @@ describe('ListOwnWeeklyReportsUseCase (F-WR-03 / API-035)', () => {
       findOwnById: jest.fn(),
       finaliseByStudent: jest.fn(),
       findAllOpenWithTimezone: jest.fn(),
+      countAttendedFinalisedWeeks: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),

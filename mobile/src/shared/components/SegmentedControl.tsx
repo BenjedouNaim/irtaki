@@ -6,6 +6,12 @@ import { rowStart } from '@/shared/theme/rtl';
 export interface SegmentedControlOption<T extends string | number | boolean> {
   label: string;
   value: T;
+  /**
+   * Present in the design but not selectable — the pattern the Student
+   * TabBar already uses for a screen that does not exist yet, so the
+   * control still reads as the design without faking a destination.
+   */
+  disabled?: boolean;
 }
 
 export interface SegmentedControlProps<T extends string | number | boolean> {
@@ -52,7 +58,7 @@ export function SegmentedControl<T extends string | number | boolean>({
           testID={`${testID}-${String(option.value)}`}
           label={option.label}
           selected={value !== null && option.value === value}
-          disabled={disabled}
+          disabled={disabled || option.disabled === true}
           accessibilityLabel={
             accessibilityLabel
               ? `${accessibilityLabel} ${option.label}`

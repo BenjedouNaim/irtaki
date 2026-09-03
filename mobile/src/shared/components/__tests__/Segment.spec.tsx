@@ -66,4 +66,27 @@ describe('Segment + SegmentedControl (Figma 7:6, 7:28)', () => {
         .selected,
     ).toBe(true);
   });
+
+  it('marks a single option disabled and never selects it (SCR-13 مخصص)', () => {
+    const onChange = jest.fn();
+    render(
+      <SegmentedControl
+        options={[
+          { label: 'أسبوع', value: 'week' },
+          { label: 'مخصص', value: 'custom', disabled: true },
+        ]}
+        value="week"
+        onChange={onChange}
+      />,
+    );
+
+    const custom = screen.getByTestId('segmented-control-custom');
+    expect(custom.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(custom);
+    expect(onChange).not.toHaveBeenCalled();
+
+    // The rest of the control stays live.
+    const week = screen.getByTestId('segmented-control-week');
+    expect(week.props.accessibilityState.disabled).toBe(false);
+  });
 });
