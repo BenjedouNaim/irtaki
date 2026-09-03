@@ -4,9 +4,12 @@ import {
   CYCLE_AMOUNT_TND,
   CYCLE_STATUS_VARIANT,
   formatArabicInstantDate,
+  formatArrearsBadgeLabel,
   formatArrearsMessage,
+  formatCurrentCycleSubtitle,
   formatCycleSubtitle,
   formatCycleTitle,
+  formatGroupLedgerSummary,
 } from '../paymentCopy';
 
 function cycle(overrides: Partial<PaymentCycleDto> = {}): PaymentCycleDto {
@@ -96,6 +99,45 @@ describe('paymentCopy (SCR-16, UF §18)', () => {
       expect(formatArrearsMessage(11)).toBe(
         '11 دورة غير مدفوعة — الإجمالي 330 دينارًا',
       );
+    });
+  });
+
+  describe('formatCurrentCycleSubtitle (SCR-20 row, Figma 36:459)', () => {
+    it('labels the current cycle with its end date', () => {
+      expect(
+        formatCurrentCycleSubtitle(
+          cycle({ start_date: '2026-07-01', end_date: '2026-09-30' }),
+        ),
+      ).toBe('الدورة الحالية · 30 سبتمبر');
+    });
+
+    it('adds the year when the cycle crosses one, where day/month is ambiguous', () => {
+      expect(
+        formatCurrentCycleSubtitle(
+          cycle({ start_date: '2026-11-15', end_date: '2027-02-14' }),
+        ),
+      ).toBe('الدورة الحالية · 14 فيفري 2027');
+    });
+  });
+
+  describe('formatArrearsBadgeLabel (SCR-20 arrears badge, Figma 36:466)', () => {
+    it('reads exactly as Figma writes it', () => {
+      expect(formatArrearsBadgeLabel(3)).toBe('3 متأخرة');
+      expect(formatArrearsBadgeLabel(1)).toBe('1 متأخرة');
+    });
+  });
+
+  describe('formatGroupLedgerSummary (SCR-20 selector, Figma 36:435)', () => {
+    it('matches the Figma line for a large group', () => {
+      expect(formatGroupLedgerSummary(18, 4)).toBe('18 طالبًا · 4 متابعات');
+    });
+
+    it('agrees in Arabic number on both halves', () => {
+      expect(formatGroupLedgerSummary(1, 1)).toBe('طالب واحد · متابعة واحدة');
+      expect(formatGroupLedgerSummary(2, 2)).toBe('طالبان · متابعتان');
+      expect(formatGroupLedgerSummary(5, 0)).toBe('5 طلاب · لا متابعات');
+      expect(formatGroupLedgerSummary(0, 0)).toBe('لا طلاب · لا متابعات');
+      expect(formatGroupLedgerSummary(11, 11)).toBe('11 طالبًا · 11 متابعة');
     });
   });
 });

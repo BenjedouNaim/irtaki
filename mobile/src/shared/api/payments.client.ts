@@ -46,3 +46,35 @@ export async function getMyPayments(): Promise<PaymentLedgerDto> {
   const response = await apiClient.get<PaymentLedgerResponse>('/me/payments');
   return response.data;
 }
+
+/**
+ * One member of a group ledger (`GET /groups/{id}/payments`, API-046): the
+ * same `PaymentLedgerDto` API-045 returns, named with the student it belongs
+ * to. `full_name` is nullable in the schema and is never defaulted.
+ */
+export interface GroupStudentLedgerDto extends PaymentLedgerDto {
+  membership_id: string;
+  full_name: string | null;
+}
+
+/** APIS §9.1 collection envelope — API-046 is not paginated (§9.2). */
+export interface GroupPaymentLedgerResponse {
+  data: GroupStudentLedgerDto[];
+}
+
+/**
+ * Fetches a group's per-student payment ledgers (Assistant on an assigned
+ * group, Admin anywhere — API-046) and unwraps the APIS §9.1 envelope.
+ * `status` is the APIS §9.3 filter behind SCR-20's chips; omitting it is
+ * the "All" chip. Errors surface as `ApiError` unchanged.
+ */
+export async function getGroupPayments(
+  groupId: string,
+  params: { status?: PaymentCycleStatus } = {},
+): Promise<GroupStudentLedgerDto[]> {
+  const response = await apiClient.get<GroupPaymentLedgerResponse>(
+    `/groups/${groupId}/payments`,
+    { params: { status: params.status } },
+  );
+  return response.data;
+}

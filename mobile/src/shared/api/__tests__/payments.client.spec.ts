@@ -1,4 +1,9 @@
-import { getMyPayments, PaymentLedgerDto } from '../payments.client';
+import {
+  getGroupPayments,
+  getMyPayments,
+  GroupStudentLedgerDto,
+  PaymentLedgerDto,
+} from '../payments.client';
 import { apiClient } from '../client';
 
 jest.mock('../client', () => ({
@@ -68,6 +73,52 @@ describe('payments.client', () => {
       (apiClient.get as jest.Mock).mockRejectedValue(error);
 
       await expect(getMyPayments()).rejects.toBe(error);
+    });
+  });
+
+  describe('getGroupPayments (API-046)', () => {
+    const groupLedger: GroupStudentLedgerDto = {
+      membership_id: 'membership-1',
+      full_name: 'أحمد الطرابلسي',
+      ...mockLedger,
+    };
+
+    it('calls apiClient.get with the group path and unwraps the collection envelope', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: [groupLedger] });
+
+      const result = await getGroupPayments('group-1');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/groups/group-1/payments', {
+        params: { status: undefined },
+      });
+      expect(result).toEqual([groupLedger]);
+    });
+
+    it('sends the APIS §9.3 status filter when a chip other than "All" is active', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      await getGroupPayments('group-1', { status: 'Due Soon' });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/groups/group-1/payments', {
+        params: { status: 'Due Soon' },
+      });
+    });
+
+    it('passes a null full_name through rather than defaulting it', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({
+        data: [{ ...groupLedger, full_name: null }],
+      });
+
+      const result = await getGroupPayments('group-1');
+
+      expect(result[0].full_name).toBeNull();
+    });
+
+    it('propagates apiClient errors unchanged', async () => {
+      const error = new Error('boom');
+      (apiClient.get as jest.Mock).mockRejectedValue(error);
+
+      await expect(getGroupPayments('group-1')).rejects.toBe(error);
     });
   });
 });
