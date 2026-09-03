@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 
 export interface MetricRowProps {
   label: string;
-  /** `null` renders the null-safe placeholder, never `0` (UF §29, §36). */
+  /** `null` renders the null-safe copy, never `0` (UF §29, §36, DEC-B04). */
   value: number | string | null;
   /** Optional context under the label (e.g. "of 6 expected days"). */
   hint?: string;
@@ -12,14 +14,13 @@ export interface MetricRowProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Shown for a `null` value — a dash, never a fabricated zero (UF §36). */
-export const METRIC_NULL_PLACEHOLDER = '—';
+/** Figma MetricRow.Null copy — "insufficient data", never a fabricated zero. */
+export const METRIC_NULL_PLACEHOLDER = 'بيانات غير كافية';
 
 /**
- * Metric row (UF §29): "Label + value, null-safe". Used by the Weekly
- * Report and the performance dashboards. Label on the reading side, value
- * on the far side (UF §31); the value tolerates OS text scaling without
- * clipping (UF §32 "especially metric rows"). 48dp minimum height.
+ * Figma MetricRow (16:41): 44px row, label (right, body/md secondary) +
+ * value (left, heading/md). Null renders "بيانات غير كافية" in body/sm
+ * tertiary. The value tolerates OS text scaling without clipping (UF §32).
  */
 export function MetricRow({
   label,
@@ -29,21 +30,22 @@ export function MetricRow({
   className,
   style,
 }: MetricRowProps) {
-  const display = value === null ? METRIC_NULL_PLACEHOLDER : String(value);
+  const isNull = value === null;
+  const display = isNull ? METRIC_NULL_PLACEHOLDER : String(value);
 
   return (
     <View
       testID={testID}
       accessibilityRole="text"
       accessibilityLabel={`${label}: ${display}${hint ? `، ${hint}` : ''}`}
-      className={`w-full flex-row-reverse items-center justify-between min-h-[48px] px-4 py-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-3 ${
+      className={`w-full ${rowStart} items-center justify-between min-h-[44px] gap-3 ${
         className ?? ''
       }`}
-      style={[{ borderCurve: 'continuous' }, style]}
+      style={style}
     >
-      <View className="flex-1 gap-0.5">
+      <View className={`flex-1 ${itemsStart}`}>
         <Text
-          className="text-base font-semibold text-gray-900 dark:text-gray-100 text-right"
+          className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
           testID={`${testID}-label`}
           maxFontSizeMultiplier={1.6}
         >
@@ -51,7 +53,7 @@ export function MetricRow({
         </Text>
         {hint ? (
           <Text
-            className="text-xs text-gray-500 dark:text-gray-400 text-right"
+            className={`w-full ${typography.bodySm} text-right text-fg-tertiary dark:text-fg-tertiary-dark`}
             testID={`${testID}-hint`}
             maxFontSizeMultiplier={1.6}
           >
@@ -60,7 +62,11 @@ export function MetricRow({
         ) : null}
       </View>
       <Text
-        className="text-2xl font-bold text-gray-900 dark:text-gray-100 min-w-[44px] text-left"
+        className={
+          isNull
+            ? `${typography.bodySm} text-fg-tertiary dark:text-fg-tertiary-dark text-left`
+            : `${typography.headingMd} text-fg dark:text-fg-dark text-left`
+        }
         testID={`${testID}-value`}
         numberOfLines={1}
         adjustsFontSizeToFit

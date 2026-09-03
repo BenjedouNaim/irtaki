@@ -1,13 +1,7 @@
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
-import { Button, ButtonVariant } from './Button';
+import { StyleProp, ViewStyle } from 'react-native';
+import { ButtonVariant } from './Button';
+import { Dialog, DialogWeight } from './Dialog';
 
 export interface ConfirmationDialogProps {
   visible: boolean;
@@ -15,7 +9,13 @@ export interface ConfirmationDialogProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /**
+   * Kept for existing call sites; maps onto the Figma dialog weight —
+   * `destructive` → strong, `secondary` → light, anything else → standard.
+   * Prefer `weight` in new code.
+   */
   confirmVariant?: ButtonVariant;
+  weight?: DialogWeight;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -23,6 +23,16 @@ export interface ConfirmationDialogProps {
   style?: StyleProp<ViewStyle>;
 }
 
+function weightFor(variant: ButtonVariant): DialogWeight {
+  if (variant === 'destructive') return 'strong';
+  if (variant === 'secondary') return 'light';
+  return 'standard';
+}
+
+/**
+ * UF §25 confirmation patterns on top of the Figma Dialog (14:90). The API
+ * predates the design system; internals now render `Dialog`.
+ */
 export function ConfirmationDialog({
   visible,
   title,
@@ -30,6 +40,7 @@ export function ConfirmationDialog({
   confirmLabel = 'تأكيد',
   cancelLabel = 'إلغاء',
   confirmVariant = 'destructive',
+  weight,
   loading = false,
   onConfirm,
   onCancel,
@@ -37,69 +48,18 @@ export function ConfirmationDialog({
   style,
 }: ConfirmationDialogProps) {
   return (
-    <Modal
+    <Dialog
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={loading ? undefined : onCancel}
+      title={title}
+      body={message}
+      weight={weight ?? weightFor(confirmVariant)}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      loading={loading}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
       testID={testID}
-    >
-      <View className="flex-1 items-center justify-center p-5">
-        {/* Backdrop overlay */}
-        <Pressable
-          testID={`${testID}-backdrop`}
-          onPress={loading ? undefined : onCancel}
-          className="absolute inset-0 bg-black/50"
-          accessibilityRole="button"
-          accessibilityLabel="إغلاق نافذة التأكيد"
-        />
-
-        {/* Modal Card */}
-        <View
-          className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-800 gap-4 shadow-xl z-10"
-          style={[{ borderCurve: 'continuous' }, style]}
-          accessibilityRole="alert"
-          accessibilityLabel={title}
-          testID={`${testID}-container`}
-        >
-          {/* Header & Title */}
-          <View className="gap-2">
-            <Text
-              className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right leading-6"
-              testID={`${testID}-title`}
-            >
-              {title}
-            </Text>
-            <Text
-              className="text-sm text-gray-600 dark:text-gray-300 text-right leading-5"
-              testID={`${testID}-message`}
-            >
-              {message}
-            </Text>
-          </View>
-
-          {/* Action Buttons Row (RTL: confirm on right/first, cancel on left/second) */}
-          <View className="flex-row-reverse items-center gap-3 pt-2">
-            <Button
-              label={confirmLabel}
-              variant={confirmVariant}
-              onPress={onConfirm}
-              loading={loading}
-              disabled={loading}
-              testID={`${testID}-confirm-button`}
-              className="flex-1"
-            />
-            <Button
-              label={cancelLabel}
-              variant="secondary"
-              onPress={onCancel}
-              disabled={loading}
-              testID={`${testID}-cancel-button`}
-              className="flex-1"
-            />
-          </View>
-        </View>
-      </View>
-    </Modal>
+      style={style}
+    />
   );
 }
