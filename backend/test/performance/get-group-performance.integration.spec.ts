@@ -330,6 +330,24 @@ describe('GET /groups/{id}/performance (F-PERF-02 / API-038 Integration)', () =>
     );
   }
 
+  /**
+   * The soft-delete cascade `DELETE /memberships/{id}` runs on termination
+   * (`MembershipRepository.terminate`, SAS §20.2). Reproduced verbatim so a
+   * "removed student" fixture is genuinely removed.
+   */
+  async function cascadeSoftDelete(membershipId: string): Promise<void> {
+    await dataSource.query(
+      `UPDATE daily_reports SET deleted_at = now()
+        WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+    await dataSource.query(
+      `UPDATE weekly_reports SET deleted_at = now()
+        WHERE membership_id = $1 AND deleted_at IS NULL`,
+      [membershipId],
+    );
+  }
+
   function getGroupPerformance(actor: TestActor, groupId: string, query = '') {
     return request(app.getHttpServer())
       .get(`/api/v1/groups/${groupId}/performance${query}`)
@@ -532,6 +550,13 @@ describe('GET /groups/{id}/performance (F-PERF-02 / API-038 Integration)', () =>
         await createNormalReport(terminated.membershipId, date);
       }
 
+      // The real removal path stamps `deleted_at` on the removed member's
+      // reports (SAS §20.2 "Scope", DEC-B10) — reproduced here so these
+      // fixtures test FR-PERF-09 against the data an actual termination
+      // leaves behind, not against rows a global soft-delete filter would
+      // still happen to see.
+      await cascadeSoftDelete(terminated.membershipId);
+
       return { group, active, terminated };
     }
 
@@ -609,6 +634,75 @@ describe('GET /groups/{id}/performance (F-PERF-02 / API-038 Integration)', () =>
       // member reported on every day it was expected to.
       expect(row.commitment_score).not.toBeNull();
       expect(row.commitment_score).toBeGreaterThan(0);
+    });
+
+    it('reads the removed member’s SOFT-DELETED reports on a historical period', async () => {
+      // SAS §20.2: "Teacher, historical group aggregates | Yes, but only for
+      // the period the membership was active (FR-PERF-09, DEC-C04)", and the
+      // section's own warning that this "must be implemented as a
+      // period-aware filter, not a global one". Every one of this member's
+      // reports carries `deleted_at` after removal; under a blanket
+      // `deleted_at IS NULL` the member is listed by FR-PERF-09 and then
+      // contributes nothing at all.
+      const group = await createGroup();
+      const terminated = await enrol(group.id, {
+        fullName: 'عضو مُزال',
+        endedAt: shift(today, -2),
+      });
+      for (const date of EXPECTED_DAYS.slice(0, 4)) {
+        await createNormalReport(terminated.membershipId, date);
+      }
+      await createAbsentReport(
+        terminated.membershipId,
+        shift(today, -2),
+        'Sick',
+      );
+      await cascadeSoftDelete(terminated.membershipId);
+
+      const live: Array<{ n: string }> = await dataSource.query(
+        `SELECT count(*) AS n FROM daily_reports
+          WHERE membership_id = $1 AND deleted_at IS NULL`,
+        [terminated.membershipId],
+      );
+      expect(Number(live[0].n)).toBe(0);
+
+      const { data } = (
+        await getGroupPerformance(
+          group.teacher,
+          group.id,
+          '?period=month',
+        ).expect(HttpStatus.OK)
+      ).body;
+
+      const row = data.students.find(
+        (s: { membership_id: string }) =>
+          s.membership_id === terminated.membershipId,
+      );
+      // Every component would be 0 — not null — with the rows filtered away.
+      expect(row.commitment_score).toBeGreaterThan(0);
+      // And the group's absence tally would lose the one Sick day entirely.
+      expect(data.absence_breakdown).toEqual({
+        sick: 1,
+        studying: 0,
+        other: 0,
+      });
+    });
+
+    it('still hides those rows from the current week (FR-PERF-10)', async () => {
+      const { group, active } = await seedMixedGroup();
+
+      const { data } = (
+        await getGroupPerformance(
+          group.teacher,
+          group.id,
+          '?period=week',
+        ).expect(HttpStatus.OK)
+      ).body;
+
+      expect(
+        data.students.map((s: { membership_id: string }) => s.membership_id),
+      ).toEqual([active.membershipId]);
+      expect(data.submission_rate).toBe(100);
     });
 
     it('excludes a membership whose window ended before the period began', async () => {

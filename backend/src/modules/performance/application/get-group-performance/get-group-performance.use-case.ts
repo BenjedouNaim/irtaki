@@ -21,6 +21,7 @@ import {
   GROUP_PERFORMANCE_REPOSITORY,
   type GroupMemberRecord,
   type IGroupPerformanceRepository,
+  type SoftDeleteVisibility,
 } from '../../domain/group-performance.repository.interface';
 import {
   resolvePerformancePeriod,
@@ -97,18 +98,42 @@ export class GetGroupPerformanceUseCase {
       recitationDay: context.recitationDay,
     });
 
-    const members = await this.resolveMemberSet(groupId, period, {
-      recitationDay: context.recitationDay,
-      today: callerToday,
-    });
+    // "except when `period` RESOLVES TO the current week" (APIS §10.9): the
+    // branch is decided by the resolved range, so `?period=week`, an omitted
+    // `period` and a `custom` range that happens to be exactly this
+    // reporting week all take the FR-PERF-10 path.
+    const currentWeek = reportingWeekContaining(
+      callerToday,
+      context.recitationDay,
+    );
+    const isCurrentWeek =
+      period.from === currentWeek.weekStart &&
+      period.to === currentWeek.weekEnd;
+
+    // SAS §20.2: soft-delete filtering here is period-aware, never global —
+    // the current-week view hides a removed student's rows, every other
+    // period reads them (FR-PERF-09/FR-PERF-10, DEC-C04).
+    const visibility: SoftDeleteVisibility = isCurrentWeek
+      ? 'live'
+      : 'historical';
+
+    const members = await this.resolveMemberSet(groupId, period, isCurrentWeek);
 
     const spans = members.map((member) =>
       this.spanOf(member, period, context, now),
     );
     const membershipIds = spans.map((span) => span.member.membershipId);
 
-    const snapshots = await this.readSnapshots(spans, membershipIds);
-    const attendedWeeks = await this.readAttendedWeeks(spans, membershipIds);
+    const snapshots = await this.readSnapshots(
+      spans,
+      membershipIds,
+      visibility,
+    );
+    const attendedWeeks = await this.readAttendedWeeks(
+      spans,
+      membershipIds,
+      visibility,
+    );
 
     const performances = spans.map((span) =>
       this.performanceOf(span, snapshots, attendedWeeks),
@@ -129,25 +154,14 @@ export class GetGroupPerformanceUseCase {
    * - any other period → FR-PERF-09: every membership, Terminated
    *   included, whose active window intersects `P` (DB-IDX-04).
    *
-   * "Resolves to" is read literally: the branch is decided by the RESOLVED
-   * range, so `?period=week`, an omitted `period` and a `custom` range that
-   * happens to be exactly this reporting week all take the FR-PERF-10 path.
    * The domain predicate is re-applied to the rows either way, so the two
    * halves of the rule are also unit-testable without a database.
    */
   private async resolveMemberSet(
     groupId: string,
     period: PerformancePeriod,
-    anchor: { recitationDay: number; today: string },
+    isCurrentWeek: boolean,
   ): Promise<GroupMemberRecord[]> {
-    const currentWeek = reportingWeekContaining(
-      anchor.today,
-      anchor.recitationDay,
-    );
-    const isCurrentWeek =
-      period.from === currentWeek.weekStart &&
-      period.to === currentWeek.weekEnd;
-
     const rows = isCurrentWeek
       ? await this.repository.findActiveMembers(groupId)
       : await this.repository.findMembersIntersecting(
@@ -216,6 +230,7 @@ export class GetGroupPerformanceUseCase {
   private async readSnapshots(
     spans: readonly MemberSpan[],
     membershipIds: readonly string[],
+    visibility: SoftDeleteVisibility,
   ): Promise<Map<string, DatedDailyReportSnapshot[]>> {
     const byMembership = new Map<string, DatedDailyReportSnapshot[]>();
     const bounds = spanBounds(spans, (span) =>
@@ -234,6 +249,7 @@ export class GetGroupPerformanceUseCase {
       membershipIds,
       bounds.from,
       bounds.to,
+      visibility,
     );
     for (const row of rows) {
       const bucket = byMembership.get(row.membershipId) ?? [];
@@ -247,6 +263,7 @@ export class GetGroupPerformanceUseCase {
   private async readAttendedWeeks(
     spans: readonly MemberSpan[],
     membershipIds: readonly string[],
+    visibility: SoftDeleteVisibility,
   ): Promise<Map<string, Set<string>>> {
     const byMembership = new Map<string, Set<string>>();
     const bounds = spanBounds(spans, (span) => {
@@ -263,6 +280,7 @@ export class GetGroupPerformanceUseCase {
       membershipIds,
       bounds.from,
       bounds.to,
+      visibility,
     );
     for (const row of rows) {
       const bucket = byMembership.get(row.membershipId) ?? new Set<string>();

@@ -280,6 +280,7 @@ describe('GetGroupPerformanceUseCase (F-PERF-02 / API-038)', () => {
         ['a', 'b', 'c'],
         '2026-08-29',
         '2026-09-04',
+        'live',
       );
       // No week in the current-week view has passed its recitation day, so
       // `W(P)` is empty for every member and the attendance read is skipped
@@ -310,8 +311,77 @@ describe('GetGroupPerformanceUseCase (F-PERF-02 / API-038)', () => {
         ['a'],
         '2026-08-22',
         '2026-08-22',
+        'historical',
       );
       expect(data.students[0].commitment_score).toBe(25);
+    });
+  });
+
+  describe('the soft-delete scope is PERIOD-AWARE (SAS §20.2, FR-PERF-09)', () => {
+    it('hides soft-deleted rows on the current-week view (FR-PERF-10)', async () => {
+      repository.findActiveMembers.mockResolvedValue([member('a')]);
+
+      await run({ period: 'week' });
+
+      expect(repository.findDaySnapshots).toHaveBeenCalledWith(
+        ['a'],
+        expect.any(String),
+        expect.any(String),
+        'live',
+      );
+    });
+
+    it('reveals them on every other period — the removed student’s own reports', async () => {
+      // SAS §20.2: "Teacher, historical group aggregates | Yes, but only for
+      // the period the membership was active". The termination cascade
+      // stamps `deleted_at` on a removed member's daily and weekly reports,
+      // so a global filter would list the member and then show no data.
+      repository.findMembersIntersecting.mockResolvedValue([
+        member('gone', { state: 'Terminated', endedAt: '2026-08-25' }),
+      ]);
+
+      await run({ period: 'month' });
+
+      expect(repository.findDaySnapshots).toHaveBeenCalledWith(
+        ['gone'],
+        expect.any(String),
+        expect.any(String),
+        'historical',
+      );
+    });
+
+    it('uses the historical scope for the weekly read too', async () => {
+      repository.findMembersIntersecting.mockResolvedValue([member('a')]);
+
+      await run({ period: '3months' });
+
+      expect(repository.findAttendedWeeks).toHaveBeenCalledWith(
+        ['a'],
+        expect.any(String),
+        expect.any(String),
+        'historical',
+      );
+    });
+
+    it('scores a terminated member from its own soft-deleted reports', async () => {
+      // The end-to-end consequence of the two branches above: with the rows
+      // visible the member's score is real, not the null a global filter
+      // would produce for a member FR-PERF-09 put in the list.
+      repository.findMembersIntersecting.mockResolvedValue([
+        member('gone', { state: 'Terminated', endedAt: '2026-09-01' }),
+      ]);
+      repository.findDaySnapshots.mockResolvedValue([
+        snapshot('gone', '2026-08-29'),
+        snapshot('gone', '2026-08-30'),
+        snapshot('gone', '2026-08-31'),
+        snapshot('gone', '2026-09-01'),
+      ]);
+
+      const { data } = await run({ period: 'month' });
+
+      expect(data.students[0].membership_id).toBe('gone');
+      expect(data.students[0].commitment_score).not.toBeNull();
+      expect(data.submission_rate).not.toBeNull();
     });
   });
 

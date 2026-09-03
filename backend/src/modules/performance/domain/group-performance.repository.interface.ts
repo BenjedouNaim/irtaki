@@ -35,6 +35,21 @@ export interface GroupMemberRecord extends GroupMemberWindow {
   timezone: string;
 }
 
+/**
+ * SAS §20.2's soft-delete query scope, chosen per request rather than
+ * applied globally: the section's own warning is that the Teacher "sees a
+ * removed student in a _historical_ period and not in the _current_ week",
+ * and that this "must be implemented as a **period-aware** filter, not a
+ * global one".
+ *
+ * - `live` — soft-deleted rows are hidden (every ordinary read, and the
+ *   FR-PERF-10 current-week view);
+ * - `historical` — soft-deleted rows are included, the FR-PERF-09/DEC-C04
+ *   exception, so a removed student's own reports still feed the aggregate
+ *   for the portion of the period their Membership was active.
+ */
+export type SoftDeleteVisibility = 'live' | 'historical';
+
 /** A day snapshot carrying the membership it belongs to (bulk read). */
 export interface MemberDaySnapshot extends DatedDailyReportSnapshot {
   membershipId: string;
@@ -80,26 +95,40 @@ export interface IGroupPerformanceRepository {
   ): Promise<GroupMemberRecord[]>;
 
   /**
-   * The VO-09 classification inputs of every live report of the given
-   * memberships dated within `[from, to]` — one DB-IDX-01 range walk per
-   * membership inside a single statement. Ordinals never leave the query.
+   * The VO-09 classification inputs of every report of the given memberships
+   * dated within `[from, to]` — one DB-IDX-01 range walk per membership
+   * inside a single statement. Ordinals never leave the query.
+   *
+   * `visibility` is SAS §20.2's period-aware soft-delete scope, NOT a global
+   * one: `'live'` hides the soft-deleted rows (the current-week view —
+   * "Teacher, current-week and at-risk views: No"), `'historical'` reveals
+   * them (the FR-PERF-09/DEC-C04 exception — "Teacher, historical group
+   * aggregates: **Yes**, but only for the period the membership was
+   * active"). The "only for the period" half is the caller's
+   * `EffectiveWindow(m)`, which never reaches past `ended_at`.
    */
   findDaySnapshots(
     membershipIds: readonly string[],
     from: string,
     to: string,
+    visibility: SoftDeleteVisibility,
   ): Promise<MemberDaySnapshot[]>;
 
   /**
-   * The live `Finalised` weekly reports of the given memberships with
+   * The `Finalised` weekly reports of the given memberships with
    * `attended_recitation_call = true` whose `week_start` falls inside
    * `[fromWeekStart, toWeekStart]` — one DB-IDX-02 range scan. Rows, not a
    * count, because each member's `W(P)` ends at their own effective window
    * (SAS §18.3) and the caller pairs them off per member.
+   *
+   * `visibility` carries the same SAS §20.2 period-aware exception as
+   * `findDaySnapshots`: a removed student's finalised weeks are soft-deleted
+   * by the termination cascade and must still feed a historical aggregate.
    */
   findAttendedWeeks(
     membershipIds: readonly string[],
     fromWeekStart: string,
     toWeekStart: string,
+    visibility: SoftDeleteVisibility,
   ): Promise<MemberAttendedWeek[]>;
 }

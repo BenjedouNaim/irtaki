@@ -7,6 +7,7 @@ import {
   IGroupPerformanceRepository,
   MemberAttendedWeek,
   MemberDaySnapshot,
+  SoftDeleteVisibility,
 } from '../domain/group-performance.repository.interface';
 
 interface RawContextRow {
@@ -40,6 +41,56 @@ interface RawAttendedWeekRow {
   membership_id: string;
   week_start: string;
 }
+
+/**
+ * The four reads below are written out as complete, literal, parameterised
+ * statements — one per soft-delete scope — rather than one statement whose
+ * `WHERE` is assembled at run time (TS §36: no raw SQL string
+ * concatenation). The pairs differ only in the `deleted_at` predicate,
+ * which SAS §20.2 requires to be period-aware rather than global.
+ */
+const DAY_SNAPSHOTS_PROJECTION = `SELECT r.membership_id,
+              r.report_date::text AS report_date,
+              r.type,
+              r.absence_reason,
+              r.no_memorization_today,
+              r.no_revision_today,
+              (r.memo_from_ordinal IS NOT NULL) AS has_memo_range,
+              r.completed_50_repetitions,
+              r.repetitions_in_single_session
+         FROM daily_reports r
+        WHERE r.membership_id = ANY($1::uuid[])
+          AND r.report_date >= $2::date
+          AND r.report_date <= $3::date`;
+
+/** Ordinary scope — soft-deleted rows are invisible (SAS §20.2). */
+const DAY_SNAPSHOTS_LIVE_SQL = `${DAY_SNAPSHOTS_PROJECTION}
+          AND r.deleted_at IS NULL
+        ORDER BY r.membership_id ASC, r.report_date ASC`;
+
+/**
+ * FR-PERF-09 / DEC-C04 scope — the removed student's own reports, stamped
+ * `deleted_at` by the termination cascade, still feed a historical group
+ * aggregate. Bounded by the caller's period and, per member, by
+ * `EffectiveWindow(m)`, which is SAS §20.2's "only for the period the
+ * membership was active".
+ */
+const DAY_SNAPSHOTS_HISTORICAL_SQL = `${DAY_SNAPSHOTS_PROJECTION}
+        ORDER BY r.membership_id ASC, r.report_date ASC`;
+
+const ATTENDED_WEEKS_PROJECTION = `SELECT w.membership_id,
+              w.week_start::text AS week_start
+         FROM weekly_reports w
+        WHERE w.membership_id = ANY($1::uuid[])
+          AND w.week_start >= $2::date
+          AND w.week_start <= $3::date
+          AND w.state = 'Finalised'
+          AND w.attended_recitation_call = true`;
+
+const ATTENDED_WEEKS_LIVE_SQL = `${ATTENDED_WEEKS_PROJECTION}
+          AND w.deleted_at IS NULL`;
+
+const ATTENDED_WEEKS_HISTORICAL_SQL = ATTENDED_WEEKS_PROJECTION;
 
 /**
  * The member-set projection shared by both FR-PERF-09/10 branches. Kept as
@@ -151,6 +202,7 @@ export class GroupPerformanceRepository implements IGroupPerformanceRepository {
     membershipIds: readonly string[],
     from: string,
     to: string,
+    visibility: SoftDeleteVisibility,
   ): Promise<MemberDaySnapshot[]> {
     if (membershipIds.length === 0) {
       return [];
@@ -159,22 +211,16 @@ export class GroupPerformanceRepository implements IGroupPerformanceRepository {
     // a single statement. Only the VO-09 classification inputs are
     // projected; the memorisation range is reduced to its presence so no
     // ordinal leaves the query.
+    //
+    // Two complete literal statements, never one built by concatenation
+    // (TS §36): the soft-delete scope is SAS §20.2's period-aware exception,
+    // so the historical branch reads the rows the termination cascade
+    // stamped `deleted_at` on — without them a removed student would be
+    // listed by FR-PERF-09 and then contribute no data at all.
     const rows = await this.dataSource.query<RawMemberDaySnapshotRow[]>(
-      `SELECT r.membership_id,
-              r.report_date::text AS report_date,
-              r.type,
-              r.absence_reason,
-              r.no_memorization_today,
-              r.no_revision_today,
-              (r.memo_from_ordinal IS NOT NULL) AS has_memo_range,
-              r.completed_50_repetitions,
-              r.repetitions_in_single_session
-         FROM daily_reports r
-        WHERE r.membership_id = ANY($1::uuid[])
-          AND r.report_date >= $2::date
-          AND r.report_date <= $3::date
-          AND r.deleted_at IS NULL
-        ORDER BY r.membership_id ASC, r.report_date ASC`,
+      visibility === 'historical'
+        ? DAY_SNAPSHOTS_HISTORICAL_SQL
+        : DAY_SNAPSHOTS_LIVE_SQL,
       [membershipIds, from, to],
     );
 
@@ -195,23 +241,19 @@ export class GroupPerformanceRepository implements IGroupPerformanceRepository {
     membershipIds: readonly string[],
     fromWeekStart: string,
     toWeekStart: string,
+    visibility: SoftDeleteVisibility,
   ): Promise<MemberAttendedWeek[]> {
     if (membershipIds.length === 0) {
       return [];
     }
     // One DB-IDX-02 (membership_id, week_start) range scan. Only `Finalised`
     // rows count: an `Open` row carries no confirmed answer yet (ST-06,
-    // FR-WR-06).
+    // FR-WR-06). The soft-delete scope is the same SAS §20.2 period-aware
+    // exception `findDaySnapshots` applies.
     const rows = await this.dataSource.query<RawAttendedWeekRow[]>(
-      `SELECT w.membership_id,
-              w.week_start::text AS week_start
-         FROM weekly_reports w
-        WHERE w.membership_id = ANY($1::uuid[])
-          AND w.week_start >= $2::date
-          AND w.week_start <= $3::date
-          AND w.state = 'Finalised'
-          AND w.attended_recitation_call = true
-          AND w.deleted_at IS NULL`,
+      visibility === 'historical'
+        ? ATTENDED_WEEKS_HISTORICAL_SQL
+        : ATTENDED_WEEKS_LIVE_SQL,
       [membershipIds, fromWeekStart, toWeekStart],
     );
 
