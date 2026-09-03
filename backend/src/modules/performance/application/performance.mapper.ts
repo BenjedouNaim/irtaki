@@ -3,7 +3,7 @@ import type { CommitmentScore } from '../domain/commitment-score';
 import type {
   PerformanceDayBreakdownDto,
   PerformanceDto,
-} from './get-own-performance/performance-response.dto';
+} from './performance.dto';
 
 export interface PerformanceView {
   score: CommitmentScore;
@@ -13,7 +13,7 @@ export interface PerformanceView {
 }
 
 /**
- * Folds VO-06 and its companions into the API-037 wire shape (APIS §11:
+ * Folds VO-06 and its companions into the API-037 / API-039 wire shape (APIS §11:
  * `DomainEntity ↛ ResponseDTO`, built by an application-layer mapper).
  *
  * Nothing is rounded or coerced: a null component stays null (DEC-B04),

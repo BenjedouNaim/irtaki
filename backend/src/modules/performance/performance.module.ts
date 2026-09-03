@@ -1,12 +1,18 @@
 import { Module } from '@nestjs/common';
 import { ReportsModule } from '../reports/reports.module';
 import { GetGroupPerformanceUseCase } from './application/get-group-performance/get-group-performance.use-case';
+import { GetMembershipPerformanceUseCase } from './application/get-membership-performance/get-membership-performance.use-case';
 import { GetOwnPerformanceUseCase } from './application/get-own-performance/get-own-performance.use-case';
 import { GROUP_PERFORMANCE_REPOSITORY } from './domain/group-performance.repository.interface';
 import { GROUP_PERFORMANCE_SCOPE } from './domain/group-performance-scope.interface';
+import { MEMBERSHIP_PERFORMANCE_REPOSITORY } from './domain/membership-performance.repository.interface';
+import { MEMBERSHIP_PERFORMANCE_SCOPE } from './domain/membership-performance-scope.interface';
 import { GroupPerformanceRepository } from './infrastructure/group-performance.repository';
 import { GroupPerformanceScope } from './infrastructure/group-performance-scope';
+import { MembershipPerformanceRepository } from './infrastructure/membership-performance.repository';
+import { MembershipPerformanceScope } from './infrastructure/membership-performance-scope';
 import { GroupPerformanceScopeGuard } from './presentation/guards/group-performance-scope.guard';
+import { MembershipPerformanceScopeGuard } from './presentation/guards/membership-performance-scope.guard';
 import { PerformanceController } from './presentation/performance.controller';
 
 /**
@@ -23,6 +29,12 @@ import { PerformanceController } from './presentation/performance.controller';
  * `GroupPerformanceScope`), so it never injects another module's repository
  * to resolve scope (SA §14 / TS §15.2). The same posture the Reports module
  * takes with `MembershipReportScope`.
+ *
+ * API-039 (UC-08) adds only what it cannot borrow: its own scope resolver
+ * and its own one-row `memberships ⋈ groups ⋈ users` context read. The
+ * per-membership report reads are Reports' own — the very queries API-037
+ * already issues — so DS-03 runs over identical data whether the membership
+ * is the caller's or a caller-supplied id.
  *
  * DS-03 `CommitmentScoreCalculator` lives in `domain/` as a pure,
  * framework-free calculator (TS §9, §24) and is invoked directly by the use
@@ -44,6 +56,17 @@ import { PerformanceController } from './presentation/performance.controller';
     },
     GroupPerformanceScopeGuard,
     GetGroupPerformanceUseCase,
+    // F-PERF-03: API-039's context read and its route-specific ScopeGuard.
+    {
+      provide: MEMBERSHIP_PERFORMANCE_REPOSITORY,
+      useClass: MembershipPerformanceRepository,
+    },
+    {
+      provide: MEMBERSHIP_PERFORMANCE_SCOPE,
+      useClass: MembershipPerformanceScope,
+    },
+    MembershipPerformanceScopeGuard,
+    GetMembershipPerformanceUseCase,
   ],
 })
 export class PerformanceModule {}
