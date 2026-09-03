@@ -51,10 +51,17 @@ export function StudentTabs() {
           Student Tabs Stub
         </Text>
 
-        {/* SCR-08 Daily Report CTA (F-DR-01). Home → Type Selection (UF §26). */}
+        {/* SCR-08 Daily Report CTA (F-DR-01). Home → Type Selection (UF §26);
+            already_submitted → today's report, read-only (SCR-15, F-DR-07). */}
         <ReportStatusCard
           onSubmitReport={() =>
             router.push('/(app)/student/daily-report/type-selection')
+          }
+          onViewReport={(report) =>
+            router.push({
+              pathname: '/(app)/student/reports/[id]',
+              params: { id: report.id },
+            })
           }
           className="mb-6"
         />
