@@ -6,6 +6,7 @@ import * as dailyReportsApi from '@/shared/api/dailyReports.client';
 import * as weeklyReportsApi from '@/shared/api/weeklyReports.client';
 import * as meApi from '@/shared/api/me.client';
 import * as membershipsApi from '@/shared/api/memberships.client';
+import * as paymentsApi from '@/shared/api/payments.client';
 import * as progressApi from '@/shared/api/progress.client';
 import * as quranApi from '@/shared/api/quran.client';
 import { ApiError } from '@/shared/api/types';
@@ -20,6 +21,7 @@ jest.mock('@/shared/api/dailyReports.client');
 jest.mock('@/shared/api/weeklyReports.client');
 jest.mock('@/shared/api/me.client');
 jest.mock('@/shared/api/memberships.client');
+jest.mock('@/shared/api/payments.client');
 jest.mock('@/shared/api/progress.client');
 jest.mock('@/shared/api/quran.client');
 jest.mock('@/shared/api/auth.client');
@@ -66,7 +68,7 @@ function renderTabs() {
   );
 }
 
-describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:553)', () => {
+describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:2 / 30:553 / 30:701)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(meApi, 'getMe').mockResolvedValue({
@@ -98,6 +100,18 @@ describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:55
       is_activity_pointer_only: true,
     });
     jest.spyOn(quranApi, 'listSurahs').mockResolvedValue([]);
+    jest.spyOn(paymentsApi, 'getMyPayments').mockResolvedValue({
+      cycles: [
+        {
+          index: 0,
+          start_date: '2026-01-15',
+          end_date: '2026-04-14',
+          status: 'Unpaid',
+        },
+      ],
+      next_due_date: '2026-04-14',
+      arrears_count: 0,
+    });
   });
 
   afterEach(() => {
@@ -273,7 +287,7 @@ describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:55
     expect(await screen.findByTestId('student-home')).toBeTruthy();
   });
 
-  it('lists the Payment tab dimmed and never selects it (SCR-16 not built)', async () => {
+  it('switches to the Payment tab: SCR-16 with its own TopBar (F-PAY-01)', async () => {
     jest
       .spyOn(dailyReportsApi, 'getTodayReportStatus')
       .mockResolvedValue({ can_submit: true });
@@ -282,13 +296,22 @@ describe('StudentTabs (SCR-08 Student Home + SCR-13 Progress, Figma 24:2 / 30:55
     await screen.findByTestId('submit-report-button');
 
     const payment = screen.getByTestId('student-tab-bar-payment');
-    expect(payment.props.accessibilityState.disabled).toBe(true);
+    expect(payment.props.accessibilityState.disabled).toBeUndefined();
     fireEvent.press(payment);
-    expect(screen.getByTestId('student-home')).toBeTruthy();
+
+    expect(screen.getByTestId('payment-screen')).toBeTruthy();
+    expect(screen.getByTestId('payment-top-bar-title').props.children).toBe(
+      'الدفع',
+    );
+    expect(await screen.findByTestId('payment-content')).toBeTruthy();
+    expect(screen.queryByTestId('student-home')).toBeNull();
     expect(
-      screen.getByTestId('student-tab-bar-home').props.accessibilityState
+      screen.getByTestId('student-tab-bar-payment').props.accessibilityState
         .selected,
     ).toBe(true);
+
+    fireEvent.press(screen.getByTestId('student-tab-bar-home'));
+    expect(await screen.findByTestId('student-home')).toBeTruthy();
   });
 
   it('routes "View Today\'s Report" to SCR-15 by the id of the report already fetched (F-DR-07)', async () => {
