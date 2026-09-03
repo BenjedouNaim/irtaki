@@ -7,13 +7,15 @@ import {
   ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { validate } from './config/app.config';
+import { validate, EnvironmentVariables } from './config/app.config';
+import { buildThrottlerOptions } from './config/rate-limit.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
@@ -73,6 +75,22 @@ function flattenValidationErrors(
       isGlobal: true,
     }),
     EventEmitterModule.forRoot(),
+    // APIS §9.8 / NFR-22: two named throttlers, applied per route by
+    // RateLimitGuard — never globally, since `/auth/*` and
+    // `POST /join-requests` are the whole throttled surface for MVP.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) =>
+        buildThrottlerOptions({
+          authPerWindow: config.get('RATE_LIMIT_AUTH_PER_MINUTE', {
+            infer: true,
+          }),
+          joinRequestsPerWindow: config.get(
+            'RATE_LIMIT_JOIN_REQUESTS_PER_MINUTE',
+            { infer: true },
+          ),
+        }),
+    }),
     // ADR-024: in-process cron, registered once; jobs live in their modules.
     ScheduleModule.forRoot(),
     SharedModule,

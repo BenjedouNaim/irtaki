@@ -9,6 +9,7 @@ import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware'
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { ScopeGuard } from './guards/scope.guard';
+import { RateLimitGuard } from './guards/rate-limit.guard';
 
 @Global()
 @Module({
@@ -20,6 +21,7 @@ import { ScopeGuard } from './guards/scope.guard';
     AuthGuard,
     RolesGuard,
     ScopeGuard,
+    RateLimitGuard,
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
@@ -44,6 +46,7 @@ import { ScopeGuard } from './guards/scope.guard';
     AuthGuard,
     RolesGuard,
     ScopeGuard,
+    RateLimitGuard,
   ],
 })
 export class SharedModule {}

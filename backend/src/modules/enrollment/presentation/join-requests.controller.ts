@@ -9,9 +9,12 @@ import {
   Post,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
-import { Roles } from '../../../shared';
+import { RateLimitGuard, Roles } from '../../../shared';
+import { AUTH_THROTTLER } from '../../../config/rate-limit.config';
 import { UserRole } from '../../identity/domain/user-role.enum';
 import { SubmitJoinRequestUseCase } from '../application/submit-join-request/submit-join-request.use-case';
 import { SubmitJoinRequestDto } from '../application/submit-join-request/submit-join-request.dto';
@@ -114,7 +117,15 @@ export class JoinRequestsController {
     return this.rejectJoinRequestUseCase.execute(req.user.id, id);
   }
 
+  /**
+   * APIS §9.8 / ISS-19: the ONLY throttled non-auth endpoint. TS §16 makes
+   * it per-user, so `RateLimitGuard`'s `join-requests` throttler keys on
+   * `req.user.id`; the `auth` throttler is skipped so a submission never
+   * consumes the caller's login budget.
+   */
   @Roles(UserRole.User)
+  @UseGuards(RateLimitGuard)
+  @SkipThrottle({ [AUTH_THROTTLER]: true })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async submit(

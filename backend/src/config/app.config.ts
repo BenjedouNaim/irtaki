@@ -10,6 +10,10 @@ import {
   MinLength,
   validateSync,
 } from 'class-validator';
+import {
+  DEFAULT_AUTH_RATE_LIMIT,
+  DEFAULT_JOIN_REQUEST_RATE_LIMIT,
+} from './rate-limit.config';
 
 export enum Environment {
   Development = 'development',
@@ -106,6 +110,22 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   HEALTHCHECKS_PING_URL_COVERAGE_RECONCILIATION?: string;
+
+  /**
+   * Rate limiting (APIS §9.8, NFR-22). SAS §3201 records the numeric
+   * target as undefined, so `rate-limit.config.ts` ships conservative
+   * defaults and these keys let an environment tune them without a code
+   * change (TS §32). Both count requests per 60-second window.
+   */
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  RATE_LIMIT_AUTH_PER_MINUTE: number = DEFAULT_AUTH_RATE_LIMIT;
+
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  RATE_LIMIT_JOIN_REQUESTS_PER_MINUTE: number = DEFAULT_JOIN_REQUEST_RATE_LIMIT;
 }
 
 /**
