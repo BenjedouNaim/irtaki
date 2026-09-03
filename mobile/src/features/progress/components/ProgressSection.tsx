@@ -76,6 +76,7 @@ export function ProgressSection({
   if (isLoading && !data) {
     return (
       <View
+        key="skeleton"
         testID={`${testID}-skeleton`}
         className={`w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 ${
           className ?? ''
@@ -92,6 +93,7 @@ export function ProgressSection({
 
     return (
       <View
+        key="error"
         testID={`${testID}-error`}
         accessibilityRole="alert"
         className={`w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3 ${
@@ -134,6 +136,7 @@ export function ProgressSection({
 
   return (
     <View
+      key="data"
       testID={testID}
       accessibilityRole="summary"
       className={`w-full p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm gap-5 ${
