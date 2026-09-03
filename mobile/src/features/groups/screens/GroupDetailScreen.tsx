@@ -1,9 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button } from '@/shared/components/Button';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import {
+  TopBar,
+  Button,
+  Banner,
+  Toast,
+  Icon,
+  ListRow,
+  StatusBadge,
+  FormField,
+  SkeletonLoader,
+  getInputClassName,
+} from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart } from '@/shared/theme/rtl';
 import {
   getGroupDetail,
   updateGroupName,
@@ -21,8 +33,19 @@ export interface GroupDetailScreenProps {
   groupId: string;
 }
 
+/** Rename pill is 30px tall; the slop reaches the 48dp target (UF §32). */
+const RENAME_HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
+
+/**
+ * SCR-29 Group Detail · Admin (Figma 41:207, inline rename 52:797). The
+ * "الأداء والتقارير" row of the frame needs the unbuilt performance module
+ * and the roster row's member counts are not in the group payload, so
+ * neither is rendered. The group's creation month is not exposed either;
+ * the meta line carries day and gender only.
+ */
 export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const router = useRouter();
+  const colors = useThemeColors();
   const role = useAuthStore((s) => s.role);
   const [group, setGroup] = useState<GroupListItemFull | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +56,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const [nameDraft, setNameDraft] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
     setIsLoading(true);
@@ -43,7 +66,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
       setGroup(response.data as GroupListItemFull);
     } catch (err) {
       if (err instanceof ApiError) {
-        setErrorMessage(err.message || 'تعذر تحميل تفاصيل الحلقة');
+        setErrorMessage(err.message || 'تعذر تحميل تفاصيل المجموعة');
       } else {
         setErrorMessage('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
       }
@@ -56,11 +79,13 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
     fetchDetail();
   }, [fetchDetail]);
 
+  const dismissToast = useCallback(() => setToastMessage(null), []);
+
   const handleStartEditing = () => {
     if (!group) return;
     setNameDraft(group.name);
     setRenameError(null);
-    setSubmitSuccess(false);
+    setToastMessage(null);
     setIsEditing(true);
   };
 
@@ -73,38 +98,37 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const handleOpenRoster = () => {
     router.push({
       pathname: '/(app)/admin/groups/[id]/roster' as any,
-      params: { id: groupId },
+      params: { id: groupId, name: group?.name ?? '' },
     });
   };
 
   const handleSaveName = async () => {
     const trimmed = nameDraft.trim();
     if (!trimmed) {
-      setRenameError('اسم الحلقة مطلوب');
+      setRenameError('اسم المجموعة مطلوب');
       return;
     }
 
     setIsRenaming(true);
     setRenameError(null);
-    setSubmitSuccess(false);
 
     try {
       const response = await updateGroupName(groupId, { name: trimmed });
       setGroup(response.data as GroupListItemFull);
       setIsEditing(false);
-      setSubmitSuccess(true);
+      setToastMessage('تم تحديث اسم المجموعة');
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.statusCode === 409) {
-          setRenameError('اسم الحلقة مستخدم بالفعل');
+          setRenameError('اسم المجموعة مستخدم بالفعل');
         } else if (err.statusCode === 422) {
           if (err.details && err.details.length > 0) {
             setRenameError(err.details[0].message);
           } else {
-            setRenameError(err.message || 'اسم الحلقة غير صالح');
+            setRenameError(err.message || 'اسم المجموعة غير صالح');
           }
         } else {
-          setRenameError(err.message || 'حدث خطأ أثناء تحديث اسم الحلقة');
+          setRenameError(err.message || 'حدث خطأ أثناء تحديث اسم المجموعة');
         }
       } else {
         setRenameError('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
@@ -114,95 +138,129 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
     }
   };
 
+  const title = isEditing ? 'تعديل الاسم' : (group?.name ?? '');
+
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
-      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="group-detail-screen"
     >
-      {isLoading ? (
-        <View testID="group-detail-skeleton" className="gap-4">
-          <SkeletonLoader variant="dashboard" />
-          <SkeletonLoader count={3} variant="row" />
-        </View>
-      ) : errorMessage ? (
-        <View
-          className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
-          style={{ borderCurve: 'continuous' }}
-          testID="group-detail-error"
-        >
-          <Text
-            selectable
-            className="text-sm font-medium text-destructive-700 dark:text-destructive-300 text-right leading-5"
-          >
-            {errorMessage}
-          </Text>
-          <Button
-            label="إعادة المحاولة"
-            variant="outline"
-            onPress={fetchDetail}
-            testID="retry-button"
+      <TopBar
+        title={title}
+        onBack={isEditing ? handleCancelEditing : undefined}
+        testID="group-detail-top-bar"
+      />
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+          gap: 14,
+        }}
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        {isLoading ? (
+          <View testID="group-detail-skeleton" className="gap-4">
+            <SkeletonLoader variant="card" />
+            <SkeletonLoader count={3} variant="row" />
+          </View>
+        ) : errorMessage ? (
+          <Banner
+            tone="error"
+            message={errorMessage}
+            onRetry={fetchDetail}
+            testID="group-detail-error"
           />
-        </View>
-      ) : group ? (
-        <View className="gap-4">
-          {submitSuccess ? (
-            <View
-              className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4"
-              style={{ borderCurve: 'continuous' }}
-              testID="group-detail-success-banner"
-            >
+        ) : group ? (
+          <>
+            {/* Header: meta (right) · badges · rename pill (left) */}
+            <View className={`${rowStart} items-center gap-2 w-full`}>
               <Text
-                selectable
-                className="text-emerald-800 dark:text-emerald-200 text-sm font-semibold text-center"
+                numberOfLines={1}
+                className={`flex-1 ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                testID="group-detail-meta"
               >
-                تم تحديث اسم الحلقة بنجاح
+                {`${getRecitationDayName(group.recitation_day)} · ${
+                  group.gender === 'Male' ? 'ذكور' : 'إناث'
+                }`}
               </Text>
-            </View>
-          ) : null}
-
-          {/* Header Card */}
-          <View
-            className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-3"
-            style={{ borderCurve: 'continuous' }}
-          >
-            {isEditing ? (
-              <View className="gap-3" testID="group-detail-edit-container">
-                <Text className="text-sm font-bold text-gray-700 dark:text-gray-200 text-right">
-                  تعديل اسم الحلقة
-                </Text>
-                <TextInput
-                  testID="group-detail-name-input"
-                  className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                    renameError
-                      ? 'border-destructive bg-white dark:bg-gray-950'
-                      : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                  value={nameDraft}
-                  onChangeText={(text) => {
-                    setNameDraft(text);
-                    if (renameError) setRenameError(null);
-                  }}
-                  placeholder="اسم الحلقة"
-                  placeholderTextColor="#9ca3af"
-                  autoFocus
-                  editable={!isRenaming}
-                  textAlign="right"
+              <View className={`${rowStart} items-center gap-1.5`}>
+                <StatusBadge
+                  status={
+                    group.lifecycle_state === 'Active' ? 'نشطة' : 'مؤرشفة'
+                  }
+                  variant={
+                    group.lifecycle_state === 'Active' ? 'success' : 'neutral'
+                  }
+                  testID="group-detail-lifecycle-badge"
                 />
-                {renameError ? (
+                <StatusBadge
+                  status={
+                    group.enrollment_status === 'Open'
+                      ? 'التسجيل مفتوح'
+                      : 'التسجيل مغلق'
+                  }
+                  variant={
+                    group.enrollment_status === 'Open' ? 'success' : 'neutral'
+                  }
+                  testID="group-detail-enrollment-badge"
+                />
+              </View>
+              {role === 'Admin' && !isEditing ? (
+                <Pressable
+                  onPress={handleStartEditing}
+                  hitSlop={RENAME_HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel="تعديل اسم المجموعة"
+                  testID="group-detail-name-edit-button"
+                  className={`${rowStart} items-center gap-1.5 rounded-full bg-subtle dark:bg-subtle-dark px-2.5 py-1.5 active:opacity-80`}
+                >
                   <Text
-                    selectable
-                    className="text-xs text-destructive text-right font-medium"
-                    testID="group-detail-name-error"
+                    className={`${typography.labelSm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
                   >
-                    {renameError}
+                    تعديل الاسم
                   </Text>
-                ) : null}
-                <View className="flex-row-reverse items-center gap-2 pt-1">
+                  <Icon name="pen" size={14} tone="secondary" />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {isEditing ? (
+              <View
+                className="w-full gap-2.5"
+                testID="group-detail-edit-container"
+              >
+                <FormField
+                  label="اسم المجموعة"
+                  required
+                  helpText="يجب أن يكون فريدًا · الحقل الوحيد القابل للتعديل"
+                  error={renameError ?? undefined}
+                  className="mb-0"
+                >
+                  <TextInput
+                    testID="group-detail-name-input"
+                    className={getInputClassName({
+                      error: Boolean(renameError),
+                      focused: true,
+                    })}
+                    style={{ borderCurve: 'continuous' }}
+                    value={nameDraft}
+                    onChangeText={(text) => {
+                      setNameDraft(text);
+                      if (renameError) setRenameError(null);
+                    }}
+                    placeholder="اسم المجموعة"
+                    placeholderTextColor={colors.textTertiary}
+                    autoFocus
+                    editable={!isRenaming}
+                    textAlign="right"
+                    selectionColor={colors.textBrand}
+                  />
+                </FormField>
+                <View className={`${rowStart} items-center gap-2.5 w-full`}>
                   <Button
-                    label="حفظ"
+                    label="حفظ الاسم"
                     variant="primary"
                     onPress={handleSaveName}
                     loading={isRenaming}
@@ -212,7 +270,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
                   />
                   <Button
                     label="إلغاء"
-                    variant="secondary"
+                    variant="ghost"
                     onPress={handleCancelEditing}
                     disabled={isRenaming}
                     testID="group-detail-name-cancel"
@@ -220,189 +278,76 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
                   />
                 </View>
               </View>
-            ) : (
-              <View className="flex-row-reverse items-center justify-between gap-3">
-                <Text
-                  selectable
-                  className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right flex-1"
-                  testID="group-detail-name"
-                >
-                  {group.name}
-                </Text>
-                <Pressable
-                  onPress={handleStartEditing}
-                  accessibilityRole="button"
-                  accessibilityLabel="تعديل اسم الحلقة"
-                  testID="group-detail-name-edit-button"
-                  className="p-2.5 rounded-lg bg-gray-100 dark:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700 items-center justify-center min-w-[40px] min-h-[40px]"
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text className="text-base text-gray-700 dark:text-gray-300">
-                    ✏️
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* Badges Row */}
-            <View className="flex-row-reverse items-center gap-2 flex-wrap pt-1">
-              <StatusBadge
-                status={
-                  group.enrollment_status === 'Open'
-                    ? 'مفتوح للتسجيل'
-                    : 'مغلق للتسجيل'
-                }
-                variant={
-                  group.enrollment_status === 'Open' ? 'success' : 'neutral'
-                }
-                testID="group-detail-enrollment-badge"
-              />
-              <StatusBadge
-                status={group.lifecycle_state === 'Active' ? 'نشطة' : 'مؤرشفة'}
-                variant={
-                  group.lifecycle_state === 'Active' ? 'info' : 'warning'
-                }
-                testID="group-detail-lifecycle-badge"
-              />
-            </View>
+            ) : null}
 
             {role === 'Admin' ? (
-              <Button
-                label="قائمة الطلاب"
-                variant="secondary"
-                onPress={handleOpenRoster}
-                testID="group-detail-roster-button"
+              <>
+                <StaffReassignmentPanel
+                  groupId={groupId}
+                  currentTeacher={group.teacher}
+                  currentAssistant={group.assistant}
+                  onReassigned={(updatedGroup) => {
+                    setGroup(updatedGroup);
+                    setToastMessage('تم إعادة إسناد الطاقم');
+                  }}
+                />
+                <ListRow
+                  title="قائمة الطلاب"
+                  leadingIcon="graduation"
+                  onPress={handleOpenRoster}
+                  testID="group-detail-roster-button"
+                />
+                <GroupLifecyclePanel
+                  groupId={groupId}
+                  lifecycleState={group.lifecycle_state}
+                  groupName={group.name}
+                  onChanged={(updatedGroup) => {
+                    setGroup(updatedGroup);
+                    setToastMessage(
+                      updatedGroup.lifecycle_state === 'Archived'
+                        ? 'تمت أرشفة المجموعة'
+                        : 'تم إلغاء أرشفة المجموعة',
+                    );
+                  }}
+                />
+                <DeleteGroupPanel
+                  groupId={groupId}
+                  groupName={group.name}
+                  onDeleted={() => {
+                    if (router.canGoBack()) {
+                      router.back();
+                    } else {
+                      router.replace('/(app)/admin');
+                    }
+                  }}
+                />
+              </>
+            ) : null}
+
+            {role === 'Teacher' ? (
+              <EnrollmentToggle
+                groupId={groupId}
+                enrollmentStatus={group.enrollment_status}
+                onToggled={(newStatus) => {
+                  setGroup((prev) =>
+                    prev ? { ...prev, enrollment_status: newStatus } : null,
+                  );
+                }}
               />
             ) : null}
-          </View>
+          </>
+        ) : null}
+      </ScrollView>
 
-          {/* Group Details Card */}
-          <View
-            className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-4"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right mb-1">
-              معلومات الحلقة
-            </Text>
-
-            {/* Recitation Day */}
-            <View className="flex-row-reverse items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                يوم التسميع
-              </Text>
-              <Text
-                selectable
-                className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                testID="group-detail-recitation-day"
-              >
-                {getRecitationDayName(group.recitation_day)}
-              </Text>
-            </View>
-
-            {/* Target Gender */}
-            <View className="flex-row-reverse items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                الفئة المستهدفة
-              </Text>
-              <Text
-                selectable
-                className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                testID="group-detail-gender"
-              >
-                {group.gender === 'Male' ? 'ذكور (بنين)' : 'إناث (بنات)'}
-              </Text>
-            </View>
-
-            {/* Teacher */}
-            <View className="flex-row-reverse items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                المعلم المشرف
-              </Text>
-              <Text
-                selectable
-                className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                testID="group-detail-teacher"
-              >
-                {group.teacher?.full_name || 'غير محدد'}
-              </Text>
-            </View>
-
-            {/* Assistant */}
-            <View className="flex-row-reverse items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                المساعد الإداري
-              </Text>
-              <Text
-                selectable
-                className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                testID="group-detail-assistant"
-              >
-                {group.assistant?.full_name || 'غير محدد'}
-              </Text>
-            </View>
-
-            {/* Riwaya */}
-            <View className="flex-row-reverse items-center justify-between py-2">
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                الرواية
-              </Text>
-              <Text
-                selectable
-                className="text-sm font-semibold text-gray-900 dark:text-gray-100"
-                testID="group-detail-riwaya"
-              >
-                قالون عن نافع
-              </Text>
-            </View>
-          </View>
-
-          {/* Admin Panels */}
-          {role === 'Admin' ? (
-            <>
-              <StaffReassignmentPanel
-                groupId={groupId}
-                currentTeacher={group.teacher}
-                currentAssistant={group.assistant}
-                onReassigned={(updatedGroup) => {
-                  setGroup(updatedGroup);
-                  setSubmitSuccess(true);
-                }}
-              />
-              <GroupLifecyclePanel
-                groupId={groupId}
-                lifecycleState={group.lifecycle_state}
-                onChanged={(updatedGroup) => {
-                  setGroup(updatedGroup);
-                  setSubmitSuccess(true);
-                }}
-              />
-              <DeleteGroupPanel
-                groupId={groupId}
-                onDeleted={() => {
-                  if (router.canGoBack()) {
-                    router.back();
-                  } else {
-                    router.replace('/(app)/admin');
-                  }
-                }}
-              />
-            </>
-          ) : null}
-
-          {/* Teacher Enrollment Toggle Panel */}
-          {role === 'Teacher' ? (
-            <EnrollmentToggle
-              groupId={groupId}
-              enrollmentStatus={group.enrollment_status}
-              onToggled={(newStatus) => {
-                setGroup((prev) =>
-                  prev ? { ...prev, enrollment_status: newStatus } : null,
-                );
-              }}
-            />
-          ) : null}
+      {toastMessage ? (
+        <View className="absolute left-4 right-4 bottom-6" pointerEvents="none">
+          <Toast
+            message={toastMessage}
+            onDismiss={dismissToast}
+            testID="group-detail-success-banner"
+          />
         </View>
       ) : null}
-    </ScrollView>
+    </View>
   );
 }

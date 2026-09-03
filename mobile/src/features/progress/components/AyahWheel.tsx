@@ -5,6 +5,8 @@ import {
   WheelPickerItem,
 } from '../../../shared/components/WheelPicker';
 import { SurahDto } from '../../../shared/api/quran.client';
+import { typography } from '../../../shared/theme/typography';
+import { rowStart } from '../../../shared/theme/rtl';
 import { AyahPosition, isAyahDisabledForTo } from '../utils/ayahRange';
 
 export interface AyahWheelProps {
@@ -16,6 +18,12 @@ export interface AyahWheelProps {
   testID?: string;
 }
 
+/**
+ * Figma SCR-11 ayah step "WheelCard" (27:607): a canvas-toned card holding
+ * the "الآية" label (right) and a 120px WheelPicker (19:88) over
+ * 1..ayah_count. Options before the FROM ordinal render disabled (VR-14a).
+ * The surah name and count live in the sheet header.
+ */
 export function AyahWheel({
   surah,
   surahIndex,
@@ -41,25 +49,28 @@ export function AyahWheel({
   }, [surah.ayah_count, surah.number, surahIndex, fromPosition]);
 
   return (
-    <View className="w-full gap-4 items-center" testID={testID}>
-      <View className="items-center gap-1">
+    <View
+      className="w-full py-5 items-center justify-center rounded-xl bg-canvas dark:bg-canvas-dark"
+      style={{ borderCurve: 'continuous' }}
+      testID={testID}
+      accessibilityLabel={`سورة ${surah.name_ar}، عدد الآيات ${surah.ayah_count}`}
+    >
+      <View className={`${rowStart} items-center gap-6`}>
         <Text
-          className="text-lg font-bold text-gray-900 dark:text-gray-100"
-          testID={`${testID}-surah-title`}
+          className={`${typography.labelLg} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          testID={`${testID}-label`}
         >
-          سورة {surah.name_ar}
+          الآية
         </Text>
-        <Text className="text-xs text-gray-500 dark:text-gray-400">
-          عدد الآيات: {surah.ayah_count}
-        </Text>
+        <View className="w-[120px]">
+          <WheelPicker
+            items={items}
+            selectedValue={selectedAyah}
+            onValueChange={(val) => onSelectAyah(Number(val))}
+            testID={`${testID}-picker`}
+          />
+        </View>
       </View>
-
-      <WheelPicker
-        items={items}
-        selectedValue={selectedAyah}
-        onValueChange={(val) => onSelectAyah(Number(val))}
-        testID={`${testID}-picker`}
-      />
     </View>
   );
 }

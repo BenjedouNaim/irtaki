@@ -16,8 +16,9 @@ describe('ForgotPasswordConfirmScreen (SCR-04)', () => {
       <ForgotPasswordConfirmScreen token="valid-reset-token" />,
     );
 
-    expect(getByText('إرتقِ')).toBeTruthy();
-    expect(getByText('تعيين كلمة مرور جديدة')).toBeTruthy();
+    expect(getByText('كلمة مرور جديدة')).toBeTruthy();
+    expect(getByText('اختر كلمة مرور جديدة')).toBeTruthy();
+    expect(getByText('8 أحرف على الأقل')).toBeTruthy();
     expect(getByTestId('forgot-password-confirm-password-input')).toBeTruthy();
     expect(getByTestId('forgot-password-confirm-submit-button')).toBeTruthy();
   });
@@ -31,8 +32,11 @@ describe('ForgotPasswordConfirmScreen (SCR-04)', () => {
       />,
     );
 
-    expect(getByText('الرابط غير صالح أو منتهي الصلاحية')).toBeTruthy();
+    expect(getByText('انتهت صلاحية الرابط')).toBeTruthy();
     expect(getByTestId('forgot-password-invalid-token-state')).toBeTruthy();
+    expect(
+      getByTestId('forgot-password-invalid-token-state-icon'),
+    ).toBeTruthy();
     expect(queryByTestId('forgot-password-confirm-password-input')).toBeNull();
 
     await act(async () => {
@@ -134,7 +138,7 @@ describe('ForgotPasswordConfirmScreen (SCR-04)', () => {
       fireEvent.press(getByTestId('forgot-password-confirm-submit-button'));
     });
 
-    expect(await findByText('الرابط غير صالح أو منتهي الصلاحية')).toBeTruthy();
+    expect(await findByText('انتهت صلاحية الرابط')).toBeTruthy();
     expect(getByTestId('forgot-password-invalid-token-state')).toBeTruthy();
 
     await act(async () => {
@@ -202,5 +206,18 @@ describe('ForgotPasswordConfirmScreen (SCR-04)', () => {
       await findByText('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.'),
     ).toBeTruthy();
     expect(getByTestId('forgot-password-confirm-general-error')).toBeTruthy();
+  });
+
+  it('calls onBack from the TopBar back control', async () => {
+    const onBack = jest.fn();
+    const { getByTestId } = await render(
+      <ForgotPasswordConfirmScreen token="valid-reset-token" onBack={onBack} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('forgot-password-confirm-top-bar-back'));
+    });
+
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

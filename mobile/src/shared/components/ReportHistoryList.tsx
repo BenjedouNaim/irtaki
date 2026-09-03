@@ -1,14 +1,16 @@
 import React, { useCallback } from 'react';
 import {
   View,
-  Text,
   FlatList,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { Button } from './Button';
+import { Banner } from './Banner';
+import { EmptyState } from './EmptyState';
+import { IconName } from './icons';
 import { SkeletonLoader } from './SkeletonLoader';
 import { ApiError } from '@/shared/api/types';
+import { useThemeColors } from '@/shared/theme/colors';
 
 /**
  * The slice of a flattened infinite query (TanStack `useInfiniteQuery`
@@ -33,6 +35,8 @@ export interface ReportHistoryListProps<T extends { id: string }> {
   renderRow: (item: T) => React.ReactElement;
   /** UF §23 factual empty-state copy for this history. */
   emptyMessage: string;
+  /** Figma EmptyState glyph for this history; defaults to icon/file-text. */
+  emptyIcon?: IconName;
   testID: string;
 }
 
@@ -57,47 +61,6 @@ function describeError(error: unknown): string {
   return NETWORK_ERROR_MESSAGE;
 }
 
-function ErrorBanner({
-  message,
-  onRetry,
-  testID,
-}: {
-  message: string;
-  onRetry: () => void;
-  testID: string;
-}) {
-  return (
-    <View
-      testID={testID}
-      accessibilityRole="alert"
-      className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-4 gap-3"
-      style={{ borderCurve: 'continuous' }}
-    >
-      <View className="flex-row-reverse items-center gap-2">
-        <Text
-          testID={`${testID}-icon`}
-          accessibilityLabel="تنبيه"
-          className="text-base"
-        >
-          ⚠️
-        </Text>
-        <Text
-          className="flex-1 text-destructive-800 dark:text-destructive-200 text-sm text-right leading-relaxed"
-          testID={`${testID}-message`}
-        >
-          {message}
-        </Text>
-      </View>
-      <Button
-        label="إعادة المحاولة"
-        variant="outline"
-        onPress={onRetry}
-        testID={`${testID}-retry-button`}
-      />
-    </View>
-  );
-}
-
 /**
  * The one chronological history list of SCR-14 / SCR-25 (UF §15 "Report
  * History"): cursor-paginated infinite scroll, skeleton rows on first load,
@@ -111,8 +74,10 @@ export function ReportHistoryList<T extends { id: string }>({
   query,
   renderRow,
   emptyMessage,
+  emptyIcon = 'file-text',
   testID,
 }: ReportHistoryListProps<T>) {
+  const colors = useThemeColors();
   const {
     data,
     error,
@@ -144,7 +109,8 @@ export function ReportHistoryList<T extends { id: string }>({
   // a failed *next* page is appended below the rows already shown.
   if (isError && !data) {
     return (
-      <ErrorBanner
+      <Banner
+        tone="error"
         message={describeError(error)}
         onRetry={() => void refetch()}
         testID={`${testID}-error`}
@@ -156,15 +122,11 @@ export function ReportHistoryList<T extends { id: string }>({
 
   if (rows.length === 0) {
     return (
-      <View
+      <EmptyState
+        message={emptyMessage}
+        icon={emptyIcon}
         testID={`${testID}-empty`}
-        className="w-full p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 items-center gap-2"
-        style={{ borderCurve: 'continuous' }}
-      >
-        <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-center">
-          {emptyMessage}
-        </Text>
-      </View>
+      />
     );
   }
 
@@ -174,25 +136,27 @@ export function ReportHistoryList<T extends { id: string }>({
       data={rows}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => renderRow(item)}
-      contentContainerStyle={{ gap: 12, paddingBottom: 40 }}
+      contentContainerStyle={{ gap: 10, paddingBottom: 40 }}
       onEndReached={loadMore}
       onEndReachedThreshold={0.4}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching && !isFetchingNextPage}
           onRefresh={() => void refetch()}
+          tintColor={colors.textBrand}
         />
       }
       ListFooterComponent={
         isFetchingNextPage ? (
           <View
             testID={`${testID}-loading-more`}
-            className="py-4 items-center justify-center"
+            className="pt-2 pb-4 items-center justify-center"
           >
-            <ActivityIndicator size="small" />
+            <ActivityIndicator size="small" color={colors.textTertiary} />
           </View>
         ) : isFetchNextPageError ? (
-          <ErrorBanner
+          <Banner
+            tone="error"
             message={describeError(error)}
             onRetry={() => void fetchNextPage()}
             testID={`${testID}-page-error`}

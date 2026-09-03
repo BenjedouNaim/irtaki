@@ -3,10 +3,21 @@ import { render as rtlRender, screen } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from '../RootNavigator';
 import { useAuthStore } from '../../shared/auth/authStore';
+import * as groupsApi from '@/shared/api/groups.client';
+import * as meApi from '@/shared/api/me.client';
 
 // StudentTabs hosts the Daily Report CTA card (F-DR-01), which reads API-029
 // through TanStack Query — RootLayout provides the QueryClient in the app.
 jest.mock('@/shared/api/dailyReports.client');
+
+// AssistantTabs draws the Assistant tab bar (safe-area bottom inset) and
+// reads GET /groups + GET /me — no SafeAreaProvider or network here.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+jest.mock('@/shared/api/groups.client');
+jest.mock('@/shared/api/me.client');
 
 let queryClient: QueryClient;
 
@@ -46,6 +57,8 @@ describe('RootNavigator', () => {
   });
 
   it('renders AssistantTabs when role is Assistant', async () => {
+    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: [] });
+    (meApi.getMe as jest.Mock).mockRejectedValue(new Error('offline'));
     useAuthStore.getState().setSession('token', 'Assistant');
     await render(<RootNavigator />);
     expect(screen.getByTestId('assistant-tabs')).toBeTruthy();

@@ -1,14 +1,19 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
+import { ReportTypeCard, ReportType } from '@/shared/components/ReportTypeCard';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import { TopBar } from '@/shared/components/TopBar';
 import { ApiError } from '@/shared/api/types';
 import {
   DailyReportBlockReason,
   DailyReportType,
 } from '@/shared/api/dailyReports.client';
 import { useTodayReportStatus } from '@/features/dailyReports/hooks/useTodayReportStatus';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart } from '@/shared/theme/rtl';
 
 export interface ReportTypeSelectionScreenProps {
   /**
@@ -39,44 +44,25 @@ function describeError(error: unknown): string {
 const BLOCK_MESSAGES: Record<DailyReportBlockReason, string> = {
   already_submitted: 'تم إرسال تقرير اليوم مسبقاً.',
   recitation_day: 'اليوم هو يوم التسميع، ولا يُرسل فيه تقرير يومي.',
-  group_archived: 'حلقتك لم تعد نشطة.',
-  membership_inactive: 'عضويتك في الحلقة غير نشطة.',
+  group_archived: 'مجموعتك لم تعد نشطة. لا يمكن إرسال التقارير حاليًا.',
+  membership_inactive:
+    'عضويتك في الحلقة غير نشطة. لا يمكن إرسال التقارير حاليًا.',
 };
 
-interface ReportTypeCard {
-  type: DailyReportType;
-  title: string;
-  description: string;
-  testID: string;
-}
-
 /**
- * Three equal-weight cards, no default pre-selected (UF §15: labelling one as
- * "default" would quietly discourage honest Absent/Revision reporting).
+ * Three equal-weight cards in the Figma order, no default pre-selected
+ * (UF §15: labelling one as "default" would quietly discourage honest
+ * Absent/Revision reporting). Card copy lives in the shared ReportTypeCard.
  */
-const REPORT_TYPE_CARDS: ReportTypeCard[] = [
-  {
-    type: 'Normal',
-    title: 'تقرير عادي',
-    description: 'حفظ ومراجعة يومية',
-    testID: 'report-type-card-normal',
-  },
-  {
-    type: 'Revision',
-    title: 'تقرير مراجعة',
-    description: 'مراجعة فقط، دون حفظ جديد',
-    testID: 'report-type-card-revision',
-  },
-  {
-    type: 'Absent',
-    title: 'تقرير غياب',
-    description: 'لم أتمكن من الحفظ اليوم',
-    testID: 'report-type-card-absent',
-  },
+const REPORT_TYPES: Array<{ card: ReportType; type: DailyReportType }> = [
+  { card: 'normal', type: 'Normal' },
+  { card: 'revision', type: 'Revision' },
+  { card: 'absent', type: 'Absent' },
 ];
 
 /**
- * SCR-09 Report Type Selection (F-DR-01, UF §15 "Type selection").
+ * SCR-09 Report Type Selection (F-DR-01, UF §15 "Type selection"; Figma
+ * 26:331): TopBar "تقرير اليوم", heading + one line, ReportTypeCard ×3.
  *
  * Reachable only when `can_submit = true` (UF §28): the screen re-reads
  * API-029 and, if the server says submission is blocked, shows the reason
@@ -109,121 +95,83 @@ export function ReportTypeSelectionScreen({
     );
   } else if (isError || !data) {
     content = (
-      <View
+      <Banner
+        tone="error"
+        message={describeError(error)}
+        onRetry={() => void refetch()}
         testID="report-type-selection-error"
-        accessibilityRole="alert"
-        className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3"
-        style={{ borderCurve: 'continuous' }}
-      >
-        <View className="flex-row items-center justify-center gap-2">
-          <Text
-            testID="report-type-selection-error-icon"
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-          <Text className="text-destructive-800 dark:text-destructive-200 text-base font-semibold text-center">
-            خطأ في تحميل البيانات
-          </Text>
-        </View>
-        <Text
-          className="text-destructive-700 dark:text-destructive-300 text-sm text-center leading-relaxed"
-          testID="report-type-selection-error-message"
-        >
-          {describeError(error)}
-        </Text>
-        <Button
-          label="إعادة المحاولة"
-          variant="outline"
-          onPress={() => void refetch()}
-          testID="report-type-selection-retry-button"
-        />
-      </View>
+      />
     );
   } else if (!data.can_submit) {
     const reason: DailyReportBlockReason =
       data.block_reason ?? 'membership_inactive';
     content = (
-      <View
-        testID="report-type-selection-blocked"
-        accessibilityRole="alert"
-        className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 gap-3"
-        style={{ borderCurve: 'continuous' }}
-      >
-        <View className="flex-row items-center justify-end gap-2">
-          <Text className="text-base font-semibold text-gray-900 dark:text-gray-100 text-right">
-            لا يمكن إرسال تقرير اليوم
-          </Text>
-          <Text
-            testID="report-type-selection-blocked-icon"
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-        </View>
-        <Text
-          className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed"
-          testID="report-type-selection-blocked-reason"
-        >
-          {BLOCK_MESSAGES[reason]}
-        </Text>
+      <View className="w-full gap-4" testID="report-type-selection-blocked">
+        <Banner
+          tone="warning"
+          message={BLOCK_MESSAGES[reason]}
+          testID="report-type-selection-blocked-banner"
+        />
         <Button
           label="العودة"
           variant="outline"
           onPress={goBack}
           testID="report-type-selection-back-button"
+          className="w-full"
         />
       </View>
     );
   } else {
     content = (
       <View className="w-full gap-3" testID="report-type-cards">
-        {REPORT_TYPE_CARDS.map((card) => (
-          <Pressable
-            key={card.type}
-            testID={card.testID}
-            accessibilityRole="button"
-            accessibilityLabel={`${card.title}: ${card.description}`}
-            onPress={() => onSelectType?.(card.type)}
-            className="w-full min-h-[48px] p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 active:bg-primary-50 dark:active:bg-primary-950 active:border-primary gap-1"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right">
-              {card.title}
-            </Text>
-            <Text className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed">
-              {card.description}
-            </Text>
-          </Pressable>
+        {REPORT_TYPES.map(({ card, type }) => (
+          <ReportTypeCard
+            key={type}
+            type={card}
+            onPress={() => onSelectType?.(type)}
+          />
         ))}
       </View>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-white dark:bg-gray-950"
-      contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="report-type-selection-screen"
     >
-      <View className="w-full max-w-md self-center gap-5">
-        <View className="gap-1">
+      <TopBar
+        title="تقرير اليوم"
+        onBack={goBack}
+        testID="report-type-selection-top-bar"
+      />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 24,
+          gap: 24,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <View className={`w-full gap-1 ${itemsStart}`}>
           <Text
-            className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
+            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
             accessibilityRole="header"
           >
-            اختر نوع التقرير
+            ما نوع تقرير اليوم؟
           </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-right">
-            تقرير اليوم يُرسل مرة واحدة ولا يمكن تعديله بعد الإرسال.
+          <Text
+            className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          >
+            لا خيار افتراضي — اختر ما يصف يومك بصدق.
           </Text>
         </View>
 
         {content}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

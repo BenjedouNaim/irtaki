@@ -10,6 +10,8 @@ export interface TabBarItem {
   key: string;
   label: string;
   icon: IconName;
+  /** Inert tab (feature not built yet): text/disabled tint, no press. */
+  disabled?: boolean;
 }
 
 /** Figma TabBar.Role sets — first item is the rightmost tab (UF §31). */
@@ -69,20 +71,24 @@ export function TabBar({
     >
       {tabs.map((tab) => {
         const active = tab.key === activeKey;
+        const disabled = Boolean(tab.disabled);
         return (
           <Pressable
             key={tab.key}
             testID={`${testID}-${tab.key}`}
             onPress={() => onSelect(tab.key)}
+            disabled={disabled || undefined}
             accessibilityRole="tab"
             accessibilityLabel={tab.label}
-            accessibilityState={{ selected: active }}
+            accessibilityState={
+              disabled ? { selected: active, disabled } : { selected: active }
+            }
             className="flex-1 items-center gap-1 pt-1.5 min-h-[52px]"
           >
             <Icon
               name={tab.icon}
               size={24}
-              tone={active ? 'brand' : 'tertiary'}
+              tone={active ? 'brand' : disabled ? 'disabled' : 'tertiary'}
             />
             <Text
               numberOfLines={1}
@@ -90,7 +96,9 @@ export function TabBar({
               className={`text-center ${
                 active
                   ? 'font-sans-semibold text-label-sm text-brand dark:text-brand-dark'
-                  : `${typography.labelSm} text-fg-tertiary dark:text-fg-tertiary-dark`
+                  : disabled
+                    ? `${typography.labelSm} text-fg-disabled`
+                    : `${typography.labelSm} text-fg-tertiary dark:text-fg-tertiary-dark`
               }`}
             >
               {tab.label}

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text } from 'react-native';
-import { Button } from '@/shared/components/Button';
+import { View, Text, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
+import { TopBar, Button, ListRow } from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
 import { logoutUser } from '@/shared/api/auth.client';
 import {
   useAuthStore,
@@ -8,8 +10,13 @@ import {
   deleteStoredRefreshToken,
 } from '@/shared/auth/authStore';
 
-import { useRouter } from 'expo-router';
-
+/**
+ * SCR-26 Admin Home (Figma 39:2, UF §10 "Menu hub"). The four MetricTiles
+ * of the frame (staff, groups, pending recoveries, students) are dashboard
+ * aggregates the app does not fetch yet, and the Staff & Users / Audit Log
+ * rows lead to screens that do not exist in the MVP inventory — both are
+ * left out rather than faked (UF §8: never offer an out-of-scope screen).
+ */
 export function AdminStack() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -31,36 +38,51 @@ export function AdminStack() {
   };
 
   return (
-    <View
-      className="flex-1 items-center justify-center p-4 bg-white dark:bg-gray-950"
-      testID="admin-stack"
-    >
-      <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
-        شاشة الإدارة (المجموعات · الكادر · سجل التدقيق)
-      </Text>
-      <Text className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Admin Stack Stub
-      </Text>
-      <Button
-        label="الحلقات"
-        onPress={() => router.push('/(app)/admin/groups' as any)}
-        testID="admin-groups-button"
-        className="mb-3"
-      />
-      <Button
-        label="الملف الشخصي"
-        variant="outline"
-        onPress={() => router.push('/(app)/profile')}
-        testID="profile-button"
-        className="mb-3"
-      />
-      <Button
-        label="تسجيل الخروج"
-        variant="destructive"
-        loading={isLoggingOut}
-        onPress={handleLogout}
-        testID="logout-button"
-      />
+    <View className="flex-1 bg-canvas dark:bg-canvas-dark" testID="admin-stack">
+      <TopBar title="الإدارة" back={false} testID="admin-top-bar" />
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: 24,
+          gap: 14,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <Text
+          className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          testID="admin-greeting"
+        >
+          مدير · قراءة كاملة، وإعدادات هيكلية فقط
+        </Text>
+
+        <View className="w-full gap-2.5 pt-1.5" testID="admin-menu">
+          <ListRow
+            title="المجموعات"
+            subtitle="إنشاء · أرشفة · إسناد الطاقم · القوائم"
+            leadingIcon="layers"
+            onPress={() => router.push('/(app)/admin/groups' as any)}
+            testID="admin-groups-button"
+          />
+          <ListRow
+            title="الملف الشخصي"
+            leadingIcon="user"
+            onPress={() => router.push('/(app)/profile')}
+            testID="profile-button"
+          />
+        </View>
+
+        <View className="w-full mt-auto pt-4">
+          <Button
+            label="تسجيل الخروج"
+            variant="secondary"
+            loading={isLoggingOut}
+            onPress={handleLogout}
+            testID="logout-button"
+          />
+        </View>
+      </ScrollView>
     </View>
   );
 }

@@ -26,20 +26,20 @@ function report(overrides: Partial<WeeklyReportDto> = {}): WeeklyReportDto {
   };
 }
 
-describe('WeeklyReportRow (SCR-14 Weekly sub-tab list row, F-WR-03)', () => {
-  it('shows the week range, a factual summary from the stored counts and the attendance badge', () => {
+describe('WeeklyReportRow (SCR-14 Weekly sub-tab list row, F-WR-03, Figma 31:892)', () => {
+  it('shows the week range, a factual summary from the stored counts and the finalisation badge', () => {
     render(<WeeklyReportRow report={report()} />);
 
     expect(
       screen.getByTestId('weekly-report-row-w1-range').props.children,
-    ).toBe('من 2026-08-15 إلى 2026-08-21');
+    ).toBe('أسبوع 15 — 21 أوت');
     expect(
       screen.getByTestId('weekly-report-row-w1-summary').props.children,
-    ).toBe('التقارير اليومية الفائتة: 2 من 6');
-    expect(screen.getByText('حضر جلسة التسميع')).toBeTruthy();
+    ).toBe('فائت: تقريران · 4 مراجعة · حضر التسميع');
+    expect(screen.getByText('مؤكَّد')).toBeTruthy();
   });
 
-  it('states a missed recitation call as text, never colour alone (UF §32)', () => {
+  it('states a missed recitation call as text, never colour alone (UF §32), and a scheduler close as "أُغلق تلقائيًا"', () => {
     render(
       <WeeklyReportRow
         report={report({
@@ -49,8 +49,11 @@ describe('WeeklyReportRow (SCR-14 Weekly sub-tab list row, F-WR-03)', () => {
       />,
     );
 
-    expect(screen.getByText('لم يحضر جلسة التسميع')).toBeTruthy();
-    expect(screen.queryByText('حضر جلسة التسميع')).toBeNull();
+    expect(
+      screen.getByTestId('weekly-report-row-w1-summary').props.children,
+    ).toBe('فائت: تقريران · 4 مراجعة · لم يحضر');
+    expect(screen.getByText('أُغلق تلقائيًا')).toBeTruthy();
+    expect(screen.queryByText('مؤكَّد')).toBeNull();
   });
 
   it('is one 48dp+ button carrying the whole summary as its label and hands the row back on tap', () => {
@@ -60,17 +63,38 @@ describe('WeeklyReportRow (SCR-14 Weekly sub-tab list row, F-WR-03)', () => {
     const row = screen.getByTestId('weekly-report-row-w1');
     expect(row.props.accessibilityRole).toBe('button');
     expect(row.props.accessibilityLabel).toBe(
-      'تقرير الأسبوع من 2026-08-15 إلى 2026-08-21: حضر جلسة التسميع. التقارير اليومية الفائتة: 2 من 6',
+      'أسبوع 15 — 21 أوت: مؤكَّد. فائت: تقريران · 4 مراجعة · حضر التسميع',
     );
 
     fireEvent.press(row);
     expect(onPress).toHaveBeenCalledWith(report());
   });
 
-  it('exposes the helpers used by the row', () => {
-    expect(describeWeekRange(report())).toBe('من 2026-08-15 إلى 2026-08-21');
-    expect(describeWeeklyReport(report({ missed_daily_reports: 0 }))).toBe(
-      'التقارير اليومية الفائتة: 0 من 6',
-    );
+  it('exposes the helpers used by the row — no arithmetic, the stored counts only', () => {
+    expect(describeWeekRange(report())).toBe('أسبوع 15 — 21 أوت');
+    expect(
+      describeWeekRange(
+        report({ week_start: '2026-08-28', week_end: '2026-09-03' }),
+      ),
+    ).toBe('أسبوع 28 أوت — 3 سبتمبر');
+    expect(
+      describeWeeklyReport(
+        report({ missed_daily_reports: 0, missed_daily_revision: 0 }),
+      ),
+    ).toBe('فائت: 0 · حضر التسميع');
+    expect(
+      describeWeeklyReport(
+        report({ missed_daily_reports: 1, missed_daily_revision: 2 }),
+      ),
+    ).toBe('فائت: 1 تقرير · 2 مراجعة · حضر التسميع');
+    expect(
+      describeWeeklyReport(
+        report({
+          missed_daily_reports: 3,
+          missed_daily_revision: 0,
+          attended_recitation_call: false,
+        }),
+      ),
+    ).toBe('فائت: 3 تقارير · لم يحضر');
   });
 });

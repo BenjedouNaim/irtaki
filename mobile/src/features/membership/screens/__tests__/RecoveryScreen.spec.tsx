@@ -5,8 +5,11 @@ import * as membershipsApi from '@/shared/api/memberships.client';
 import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/memberships.client');
+jest.mock('expo-router', () => ({
+  router: { back: jest.fn() },
+}));
 
-describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
+describe('RecoveryScreen (F-MEM-04 / SCR-31, Figma 41:429)', () => {
   const mockMembershipId = '22222222-2222-2222-2222-222222222222';
 
   const mockRecoveryEmptyHistory: membershipsApi.MembershipRecoveryResponse = {
@@ -79,6 +82,29 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
           absence_reason: null,
           deleted_at: '2026-05-01T12:00:00.000Z',
         },
+        {
+          id: 'dr-2',
+          membership_id: mockMembershipId,
+          report_date: '2026-02-03',
+          type: 'Absent',
+          submitted_at: '2026-02-03T10:00:00.000Z',
+          submitted_timezone: 'Africa/Tunis',
+          no_memorization_today: null,
+          memo_from_ordinal: null,
+          memo_to_ordinal: null,
+          memo_time_from: null,
+          memo_time_to: null,
+          completed_50_repetitions: null,
+          repetitions_in_single_session: null,
+          no_revision_today: null,
+          rev_from_ordinal: null,
+          rev_to_ordinal: null,
+          rev_time_from: null,
+          rev_time_to: null,
+          read_tafsir: null,
+          absence_reason: 'Sick',
+          deleted_at: '2026-05-01T12:00:00.000Z',
+        },
       ],
       weekly_reports: [
         {
@@ -87,7 +113,7 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
           week_start: '2026-02-01',
           week_end: '2026-02-07',
           expected_days: 6,
-          missed_daily_reports: 0,
+          missed_daily_reports: 2,
           missed_daily_memorization: 0,
           missed_daily_revision: 0,
           missed_50_repetitions: 0,
@@ -131,7 +157,7 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
     expect(queryByTestId('daily-reports-card')).toBeNull();
   });
 
-  it('renders error view with retry button on API failure, and retries on press', async () => {
+  it('renders the retry banner on API failure, and retries on press', async () => {
     jest.spyOn(membershipsApi, 'getMembershipRecovery').mockRejectedValueOnce(
       new ApiError({
         statusCode: 404,
@@ -145,48 +171,52 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
     );
 
     expect(await findByText('المورد المطلوب غير موجود')).toBeTruthy();
-    expect(getByTestId('recovery-error')).toBeTruthy();
+    expect(getByTestId('recovery-error').props.accessibilityRole).toBe('alert');
     expect(queryByTestId('recovery-skeleton')).toBeNull();
 
-    // Mock successful retry
     jest
       .spyOn(membershipsApi, 'getMembershipRecovery')
       .mockResolvedValueOnce(mockRecoveryEmptyHistory);
 
     await act(async () => {
-      fireEvent.press(getByTestId('retry-button'));
+      fireEvent.press(getByTestId('recovery-error-retry-button'));
     });
 
     expect(await findByText('علي بن أحمد')).toBeTruthy();
     expect(queryByTestId('recovery-error')).toBeNull();
   });
 
-  it('renders membership details and clean empty state sections when arrays are empty', async () => {
+  it('names the screen after the student and renders the info banner, the summary and empty sections', async () => {
     jest
       .spyOn(membershipsApi, 'getMembershipRecovery')
       .mockResolvedValueOnce(mockRecoveryEmptyHistory);
 
-    const { getByTestId, findByText } = render(
+    const { getByTestId, findByText, getByText, getAllByText } = render(
       <RecoveryScreen membershipId={mockMembershipId} />,
     );
 
-    // Membership details
     expect(await findByText('علي بن أحمد')).toBeTruthy();
-    expect(await findByText('ذكر')).toBeTruthy();
-    expect(await findByText('حلقة الإمام قالون')).toBeTruthy();
-    expect(await findByText('الجمعة')).toBeTruthy();
-    expect(await findByText('2026-01-01')).toBeTruthy();
-    expect(await findByText('2026-03-01')).toBeTruthy();
-    expect(await findByText('محذوفة')).toBeTruthy();
+    expect(getByTestId('recovery-top-bar-title').props.children).toBe(
+      'علي بن أحمد',
+    );
+    expect(getByTestId('recovery-info-banner')).toHaveTextContent(
+      'سجلات محذوفة منطقيًا — عرض للقراءة فقط، لا استعادة للعضوية.',
+    );
 
-    // Empty state cards
+    // Summary rows (Tunisian month names, Western numerals)
+    expect(getByText('حلقة الإمام قالون')).toBeTruthy();
+    expect(getByText('1 جانفي 2026')).toBeTruthy();
+    expect(getByText('1 مارس 2026')).toBeTruthy();
+    expect(getByTestId('membership-state-badge')).toHaveTextContent('منتهية');
+
+    // Empty sections
     expect(getByTestId('daily-reports-empty')).toBeTruthy();
     expect(getByTestId('weekly-reports-empty')).toBeTruthy();
     expect(getByTestId('payment-records-empty')).toBeTruthy();
-
-    expect(await findByText('لا توجد تقارير يومية محذوفة')).toBeTruthy();
-    expect(await findByText('لا توجد تقارير أسبوعية محذوفة')).toBeTruthy();
-    expect(await findByText('لا توجد سجلات دفع محذوفة')).toBeTruthy();
+    expect(getByText('لا توجد تقارير يومية محذوفة')).toBeTruthy();
+    expect(getByText('لا توجد تقارير أسبوعية محذوفة')).toBeTruthy();
+    expect(getByText('لا توجد سجلات دفع محذوفة')).toBeTruthy();
+    expect(getAllByText('لا تقارير')).toHaveLength(2);
   });
 
   it('renders populated soft-deleted history entries for daily reports, weekly reports, and payments', async () => {
@@ -194,30 +224,38 @@ describe('RecoveryScreen (F-MEM-04 / SCR-31)', () => {
       .spyOn(membershipsApi, 'getMembershipRecovery')
       .mockResolvedValueOnce(mockRecoveryPopulated);
 
-    const { getByTestId, findByText, queryByTestId } = render(
+    const { getByTestId, findByText, getByText, queryByTestId } = render(
       <RecoveryScreen membershipId={mockMembershipId} />,
     );
 
     expect(await findByText('مريم التونسية')).toBeTruthy();
-    expect(await findByText('أنثى')).toBeTruthy();
-    expect(await findByText('الاثنين')).toBeTruthy();
 
-    // Daily report rendered
-    expect(getByTestId('daily-report-row-dr-1')).toBeTruthy();
-    expect(await findByText('2026-02-02')).toBeTruthy();
-    expect(await findByText('عادي')).toBeTruthy();
+    // Daily reports: date · summary, count in the section head
+    expect(getByTestId('daily-report-row-dr-1')).toHaveTextContent(/2 فيفري/);
+    expect(getByTestId('daily-report-row-dr-1')).toHaveTextContent(/عادي/);
+    expect(getByTestId('daily-report-row-dr-2')).toHaveTextContent(
+      /غياب — مريض/,
+    );
+    expect(getByText('تقريران')).toBeTruthy();
     expect(queryByTestId('daily-reports-empty')).toBeNull();
 
-    // Weekly report rendered
-    expect(getByTestId('weekly-report-row-wr-1')).toBeTruthy();
-    expect(await findByText('2026-02-01 إلى 2026-02-07')).toBeTruthy();
-    expect(await findByText('مؤكد')).toBeTruthy();
+    // Weekly report
+    expect(getByTestId('weekly-report-row-wr-1')).toHaveTextContent(
+      /أسبوع 1 فيفري — 7 فيفري/,
+    );
+    expect(getByTestId('weekly-report-row-wr-1')).toHaveTextContent(
+      /فائت 2 · حضر/,
+    );
     expect(queryByTestId('weekly-reports-empty')).toBeNull();
 
-    // Payment record rendered
-    expect(getByTestId('payment-record-row-pr-1')).toBeTruthy();
-    expect(await findByText('الدورة 1')).toBeTruthy();
-    expect(await findByText('30.00 د.ت')).toBeTruthy();
+    // Payment record
+    expect(getByTestId('payment-record-row-pr-1')).toHaveTextContent(
+      /الدورة 1/,
+    );
+    expect(getByTestId('payment-record-row-pr-1')).toHaveTextContent(
+      /30\.00 د\.ت · مدفوع في 1 فيفري/,
+    );
+    expect(getByText('دورة واحدة')).toBeTruthy();
     expect(queryByTestId('payment-records-empty')).toBeNull();
   });
 });

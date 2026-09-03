@@ -36,7 +36,7 @@ function mockStatus(status: dailyReportsApi.TodayReportStatusDto) {
   jest.spyOn(dailyReportsApi, 'getTodayReportStatus').mockResolvedValue(status);
 }
 
-describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
+describe('ReportStatusCard (SCR-08 DailyCTA hero, F-DR-01, Figma 24:27)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -67,8 +67,13 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
 
     expect(await screen.findByTestId('report-status-card')).toBeTruthy();
     expect(dailyReportsApi.getTodayReportStatus).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('لم يُرسل تقرير اليوم بعد')).toBeTruthy();
+    expect(screen.getByText('اليوم يوم حفظ')).toBeTruthy();
+    expect(
+      screen.getByText('لم تُرسل تقرير اليوم بعد. يستغرق أقل من دقيقة.'),
+    ).toBeTruthy();
     expect(screen.getByText('إرسال تقرير اليوم')).toBeTruthy();
+    // Figma day pill: the local calendar date in Arabic, Western numerals.
+    expect(screen.getByTestId('report-status-card-day-pill')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('submit-report-button'));
     expect(onSubmitReport).toHaveBeenCalledTimes(1);
@@ -76,7 +81,7 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     expect(screen.queryByTestId('weekly-report-button')).toBeNull();
   });
 
-  it('renders "View Today\'s Report" with a success badge for already_submitted', async () => {
+  it('renders "View Today\'s Report" with the submitted report\'s day for already_submitted', async () => {
     mockStatus({
       can_submit: false,
       block_reason: 'already_submitted',
@@ -103,8 +108,8 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     renderCard({ onViewReport });
 
     expect(await screen.findByTestId('report-status-card')).toBeTruthy();
-    expect(screen.getByText('تم الإرسال')).toBeTruthy();
     expect(screen.getByText('تم إرسال تقرير اليوم')).toBeTruthy();
+    expect(screen.getByText('الأربعاء 2 سبتمبر')).toBeTruthy();
     expect(
       screen.getByText('لا يمكن تعديل التقرير أو حذفه بعد إرساله.'),
     ).toBeTruthy();
@@ -135,8 +140,8 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     renderCard({ onCompleteWeeklyReport, onSubmitReport: jest.fn() });
 
     expect(await screen.findByTestId('report-status-card')).toBeTruthy();
-    expect(screen.getByText('يوم التسميع')).toBeTruthy();
-    expect(screen.getByText('اليوم هو يوم التسميع')).toBeTruthy();
+    expect(screen.getByText('إكمال التقرير الأسبوعي')).toBeTruthy();
+    expect(screen.getByText('اليوم يوم التسميع')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('weekly-report-button'));
     expect(onCompleteWeeklyReport).toHaveBeenCalledTimes(1);
@@ -150,7 +155,9 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
 
     const banner = await screen.findByTestId('report-status-card-banner');
     expect(banner.props.accessibilityRole).toBe('alert');
-    expect(screen.getByText('حلقتك لم تعد نشطة')).toBeTruthy();
+    expect(
+      screen.getByText('مجموعتك لم تعد نشطة. لا يمكن إرسال التقارير حاليًا.'),
+    ).toBeTruthy();
     expect(screen.getByTestId('report-status-card-banner-icon')).toBeTruthy();
     expect(screen.getByLabelText('تنبيه')).toBeTruthy();
     expect(screen.queryAllByRole('button')).toHaveLength(0);
@@ -163,7 +170,11 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     renderCard({ onSubmitReport: jest.fn() });
 
     expect(await screen.findByTestId('report-status-card-banner')).toBeTruthy();
-    expect(screen.getByText('عضويتك في الحلقة غير نشطة')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'عضويتك في الحلقة غير نشطة. لا يمكن إرسال التقارير حاليًا.',
+      ),
+    ).toBeTruthy();
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
@@ -241,8 +252,8 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     const banner = await screen.findByTestId('report-status-card-error');
     expect(banner.props.accessibilityRole).toBe('alert');
     const icon = screen.getByTestId('report-status-card-error-icon');
-    expect(icon.props.children).toBe('⚠️');
     expect(icon.props.accessibilityLabel).toBe('تنبيه');
+    expect(icon.props.accessibilityRole).toBe('image');
   });
 
   it('retries the fetch when the retry action is pressed', async () => {
@@ -260,7 +271,9 @@ describe('ReportStatusCard (SCR-08 Daily Report CTA, F-DR-01)', () => {
     renderCard({ onSubmitReport: jest.fn() });
 
     await screen.findByTestId('report-status-card-error');
-    fireEvent.press(screen.getByTestId('report-status-card-retry-button'));
+    fireEvent.press(
+      screen.getByTestId('report-status-card-error-retry-button'),
+    );
 
     expect(await screen.findByTestId('report-status-card')).toBeTruthy();
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));

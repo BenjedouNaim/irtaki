@@ -1,17 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  KeyboardAvoidingView,
-  ScrollView,
-} from 'react-native';
+import { View, Text, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
+import { Banner } from '@/shared/components/Banner';
+import { Toast } from '@/shared/components/Toast';
+import { TopBar } from '@/shared/components/TopBar';
+import { Icon } from '@/shared/components/Icon';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
+import { TextInputField } from '@/features/auth/components/TextInputField';
 import { getMe, updateProfile, MeResponse } from '@/shared/api/me.client';
+import { logoutUser } from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
+import {
+  useAuthStore,
+  getStoredRefreshToken,
+  deleteStoredRefreshToken,
+} from '@/shared/auth/authStore';
 
 export const updateProfileSchema = z.object({
   timezone: z.string().trim().min(1, 'المنطقة الزمنية مطلوبة'),
@@ -27,6 +35,45 @@ const ROLE_LABELS: Record<string, string> = {
   User: 'مستخدم جديد',
 };
 
+const NOT_SET_YET = 'غير محدد بعد';
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+  /** Latin values (email) are LTR-embedded at the left of the row. */
+  ltr?: boolean;
+  testID: string;
+}
+
+/** Figma 43:81 — 44px label (right, body/md secondary) + value (left, body/md-medium). */
+function InfoRow({ label, value, ltr = false, testID }: InfoRowProps) {
+  return (
+    <View
+      className={`w-full ${rowStart} items-center justify-between min-h-[44px] gap-3`}
+      accessibilityRole="text"
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      <Text
+        className={`flex-1 ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        maxFontSizeMultiplier={1.6}
+      >
+        {label}
+      </Text>
+      <Text
+        testID={testID}
+        className={`${typography.bodyMdMedium} text-fg dark:text-fg-dark ${
+          ltr ? 'text-left' : 'text-right'
+        }`}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.6}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/** SCR-34 Profile / Account — Figma 43:42. */
 export function ProfileScreen() {
   const [profile, setProfile] = useState<MeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +84,7 @@ export function ProfileScreen() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const fetchProfile = async () => {
     setIsLoading(true);
@@ -113,13 +161,34 @@ export function ProfileScreen() {
     }
   };
 
+  // UF §9 Logout: single tap, no confirmation, fire-and-forget; clearing the
+  // session lets the authenticated layout bounce to Login.
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const refreshToken = await getStoredRefreshToken();
+      if (refreshToken) {
+        await logoutUser(refreshToken);
+      }
+    } catch {
+      // Best effort logout on API failure
+    } finally {
+      await deleteStoredRefreshToken();
+      useAuthStore.getState().clearSession();
+      setIsLoggingOut(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View
-        className="flex-1 bg-white dark:bg-gray-950 p-6 justify-center"
+        className="flex-1 bg-canvas dark:bg-canvas-dark"
         testID="profile-loading-skeleton"
       >
-        <SkeletonLoader variant="row" count={4} />
+        <TopBar title="الحساب" testID="profile-top-bar" />
+        <View className="px-4 pt-1">
+          <SkeletonLoader variant="row" count={3} />
+        </View>
       </View>
     );
   }
@@ -127,25 +196,16 @@ export function ProfileScreen() {
   if (loadError) {
     return (
       <View
-        className="flex-1 bg-white dark:bg-gray-950 p-6 justify-center items-center"
+        className="flex-1 bg-canvas dark:bg-canvas-dark"
         testID="profile-load-error-container"
       >
-        <View
-          className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 mb-6"
-          style={{ borderCurve: 'continuous' }}
-          testID="profile-load-error-banner"
-        >
-          <Text className="text-destructive-800 dark:text-destructive-200 text-base font-semibold text-center mb-2">
-            خطأ في تحميل البيانات
-          </Text>
-          <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center leading-relaxed mb-4">
-            {loadError}
-          </Text>
-          <Button
-            label="إعادة المحاولة"
-            variant="outline"
-            onPress={() => void fetchProfile()}
-            testID="profile-retry-button"
+        <TopBar title="الحساب" testID="profile-top-bar" />
+        <View className="px-4 pt-1">
+          <Banner
+            message={loadError}
+            tone="error"
+            onRetry={() => void fetchProfile()}
+            testID="profile-load-error-banner"
           />
         </View>
       </View>
@@ -153,134 +213,132 @@ export function ProfileScreen() {
   }
 
   const roleLabel = profile ? ROLE_LABELS[profile.role] || profile.role : '';
-  const fullNameDisplay = profile?.full_name || 'غير محدد بعد';
+  const fullNameDisplay = profile?.full_name?.trim() || NOT_SET_YET;
+  const initial = profile?.full_name?.trim().charAt(0) ?? '';
   const genderDisplay =
     profile?.gender === 'Male'
       ? 'ذكر'
       : profile?.gender === 'Female'
         ? 'أنثى'
-        : 'غير محدد بعد';
+        : NOT_SET_YET;
 
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-white dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="profile-screen"
     >
+      <TopBar title="الحساب" testID="profile-top-bar" />
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingVertical: 32,
+          paddingTop: 4,
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+          gap: 14,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="items-center mb-8">
-          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
-            إرتقِ
+        {/* Header — avatar initial, name, role badge */}
+        <View className="w-full items-center py-2 gap-2.5">
+          <View
+            testID="profile-avatar"
+            className="w-[72px] h-[72px] rounded-full bg-primary-subtle dark:bg-primary-subtle-dark items-center justify-center"
+            accessibilityLabel={fullNameDisplay}
+          >
+            {initial ? (
+              <Text
+                className={`${typography.headingXl} text-center text-brand dark:text-brand-dark`}
+                maxFontSizeMultiplier={1.2}
+              >
+                {initial}
+              </Text>
+            ) : (
+              <Icon name="user" size={30} tone="brand" />
+            )}
+          </View>
+          <Text
+            testID="profile-fullname-display"
+            accessibilityRole="header"
+            className={`${typography.headingLg} text-center ${
+              profile?.full_name
+                ? 'text-fg dark:text-fg-dark'
+                : 'text-fg-secondary dark:text-fg-secondary-dark'
+            }`}
+          >
+            {fullNameDisplay}
           </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
-            الملف الشخصي
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            عرض وتحديث معلومات الحساب والمنطقة الزمنية
-          </Text>
+          <StatusBadge
+            status={roleLabel}
+            variant="success"
+            className="self-center"
+            testID="profile-role-display"
+          />
         </View>
 
         {generalError ? (
-          <View
-            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
+          <Banner
+            message={generalError}
+            tone="error"
             testID="profile-general-error"
-          >
-            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
-              {generalError}
-            </Text>
-          </View>
+          />
         ) : null}
 
         {submitSuccess ? (
-          <View
-            className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 mb-4"
-            style={{ borderCurve: 'continuous' }}
+          <Toast
+            message="تم تحديث الملف الشخصي بنجاح"
+            onDismiss={() => setSubmitSuccess(false)}
             testID="profile-success-banner"
-          >
-            <Text className="text-emerald-800 dark:text-emerald-200 text-sm font-semibold text-center">
-              تم تحديث الملف الشخصي بنجاح
-            </Text>
-          </View>
+          />
         ) : null}
 
-        <View className="w-full">
-          {/* Read-Only: Email */}
-          <FormField label="البريد الإلكتروني" testID="profile-email-field">
-            <TextInput
-              testID="profile-email-display"
-              className="w-full h-12 border border-gray-200 dark:border-gray-800 rounded-lg px-3.5 text-base text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 text-right"
-              style={{ borderCurve: 'continuous' }}
-              value={profile?.email || ''}
-              editable={false}
-              textAlign="right"
-            />
-          </FormField>
+        {/* Info card — read-only account data */}
+        <View
+          className={`w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark px-4 py-2.5 gap-1 ${itemsStart}`}
+          style={{ borderCurve: 'continuous' }}
+          testID="profile-info-card"
+        >
+          <InfoRow
+            label="البريد الإلكتروني"
+            value={profile?.email || ''}
+            ltr
+            testID="profile-email-display"
+          />
+          <InfoRow
+            label="الجنس"
+            value={genderDisplay}
+            testID="profile-gender-display"
+          />
+        </View>
 
-          {/* Read-Only: Full Name */}
-          <FormField label="الاسم الكامل" testID="profile-fullname-field">
-            <TextInput
-              testID="profile-fullname-display"
-              className="w-full h-12 border border-gray-200 dark:border-gray-800 rounded-lg px-3.5 text-base text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 text-right"
-              style={{ borderCurve: 'continuous' }}
-              value={fullNameDisplay}
-              editable={false}
-              textAlign="right"
-            />
-          </FormField>
+        <Text
+          className={`w-full ${typography.caption} text-right text-fg-tertiary dark:text-fg-tertiary-dark`}
+        >
+          الاسم والجنس والدور تُحدَّد عبر الانضمام والإدارة فقط — لا تُعدَّل
+          هنا.
+        </Text>
 
-          {/* Read-Only: Gender */}
-          <FormField label="الجنس" testID="profile-gender-field">
-            <TextInput
-              testID="profile-gender-display"
-              className="w-full h-12 border border-gray-200 dark:border-gray-800 rounded-lg px-3.5 text-base text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 text-right"
-              style={{ borderCurve: 'continuous' }}
-              value={genderDisplay}
-              editable={false}
-              textAlign="right"
-            />
-          </FormField>
-
-          {/* Read-Only: Role */}
-          <FormField label="الدور / الصلاحية" testID="profile-role-field">
-            <TextInput
-              testID="profile-role-display"
-              className="w-full h-12 border border-gray-200 dark:border-gray-800 rounded-lg px-3.5 text-base text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 text-right font-medium"
-              style={{ borderCurve: 'continuous' }}
-              value={roleLabel}
-              editable={false}
-              textAlign="right"
-            />
-          </FormField>
-
-          {/* Editable: Timezone */}
+        {/* Timezone — the only editable field (UF SCR-34) */}
+        <View className={`w-full pt-1.5 gap-4 ${itemsStart}`}>
           <FormField
             label="المنطقة الزمنية"
             required
             error={errors.timezone}
+            disabled={isSubmitting}
             helpText="معرّف المنطقة الزمنية القياسي (مثل Africa/Tunis أو Europe/Paris)"
             testID="profile-timezone-field"
+            style={{ marginBottom: 0 }}
           >
-            <TextInput
+            <TextInputField
               testID="profile-timezone-input"
-              className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                errors.timezone
-                  ? 'border-destructive bg-white dark:bg-gray-950'
-                  : 'border-gray-300 dark:border-gray-700'
-              }`}
-              style={{ borderCurve: 'continuous' }}
+              ltr
               placeholder="Africa/Tunis"
-              placeholderTextColor="#9ca3af"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isSubmitting}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+              error={Boolean(errors.timezone)}
+              disabled={isSubmitting}
               value={timezone}
               onChangeText={(text) => {
                 setTimezone(text);
@@ -288,7 +346,6 @@ export function ProfileScreen() {
                   setErrors((prev) => ({ ...prev, timezone: undefined }));
                 }
               }}
-              textAlign="right"
             />
           </FormField>
 
@@ -298,9 +355,21 @@ export function ProfileScreen() {
             loading={isSubmitting}
             disabled={isSubmitting}
             testID="profile-submit-button"
-            className="mt-4"
           />
         </View>
+
+        <View className="flex-1" />
+
+        <Button
+          label="تسجيل الخروج"
+          variant="ghost"
+          textClassName="text-fg-error"
+          onPress={handleLogout}
+          loading={isLoggingOut}
+          disabled={isLoggingOut || isSubmitting}
+          accessibilityLabel="تسجيل الخروج"
+          testID="profile-logout-button"
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

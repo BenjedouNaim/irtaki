@@ -76,3 +76,37 @@ export function isAyahDisabledForTo(
 
   return candidateOrdinal < fromOrdinal;
 }
+
+/** "البقرة" from the reference data, or "سورة 2" while it is unavailable. */
+export function surahDisplayName(
+  surahIndex: Map<number, SurahDto>,
+  surahNumber: number,
+): string {
+  return surahIndex.get(surahNumber)?.name_ar ?? `سورة ${surahNumber}`;
+}
+
+/** "البقرة 82" — one position, Western numerals (UF §31). */
+export function formatAyahPosition(
+  surahIndex: Map<number, SurahDto>,
+  position: AyahPosition,
+): string {
+  return `${surahDisplayName(surahIndex, position.surah)} ${position.ayah}`;
+}
+
+/**
+ * Figma RangeTrigger summary "Surah ayah ← Surah ayah" ("البقرة 82 ← البقرة
+ * 101"). With `collapse`, a range inside one surah reads "البقرة 62 ← 81"
+ * (history rows and the read-only detail).
+ */
+export function formatAyahRange(
+  surahIndex: Map<number, SurahDto>,
+  range: AyahRange,
+  options: { collapse?: boolean } = {},
+): string {
+  const from = formatAyahPosition(surahIndex, range.from);
+  const to =
+    options.collapse && range.from.surah === range.to.surah
+      ? String(range.to.ayah)
+      : formatAyahPosition(surahIndex, range.to);
+  return `${from} ← ${to}`;
+}

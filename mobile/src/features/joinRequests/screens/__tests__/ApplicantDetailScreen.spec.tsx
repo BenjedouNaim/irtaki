@@ -63,7 +63,10 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
     );
 
     expect(getByTestId('applicant-detail-screen')).toBeTruthy();
-    expect(await findByText('الملف الشخصي للمتقدم')).toBeTruthy();
+    expect(await findByText('أحمد التونسي')).toBeTruthy();
+    expect(getByTestId('applicant-detail-top-bar-title')).toHaveTextContent(
+      'طلب الانضمام',
+    );
     expect(queryByTestId('applicant-detail-skeleton')).toBeNull();
 
     // Profile card elements
@@ -77,7 +80,6 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
     );
 
     // Individual fields
-    expect(getByTestId('field-full-name')).toHaveTextContent('أحمد التونسي');
     expect(getByTestId('field-gender')).toHaveTextContent('ذكر');
     expect(getByTestId('field-age')).toHaveTextContent('26 سنة');
     expect(getByTestId('field-phone')).toHaveTextContent('+21698123456');
@@ -86,18 +88,22 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
     expect(getByTestId('field-tajweed-level')).toHaveTextContent('متوسط');
     expect(getByTestId('field-tajweed-theory')).toHaveTextContent('نعم');
     expect(getByTestId('field-studied-qalun')).toHaveTextContent('نعم');
-    expect(getByTestId('field-program-goal')).toHaveTextContent(
-      'حفظ القرآن الكريم',
+    expect(getByTestId('field-program-goal')).toHaveTextContent('حفظ');
+    expect(getByTestId('field-fee-agreement')).toHaveTextContent('نعم');
+    expect(getByTestId('field-created-at')).toHaveTextContent(
+      'قُدِّم في 2026-08-20',
     );
-    expect(getByTestId('field-fee-agreement')).toHaveTextContent(
-      'نعم (تمت الموافقة)',
-    );
-    expect(getByTestId('field-created-at')).toHaveTextContent('2026-08-20');
 
-    // Ahzab section
+    // Ahzab section — read-only compact grid, filled/empty (UF §19)
     expect(getByTestId('applicant-ahzab-section')).toBeTruthy();
-    expect(getByTestId('applicant-ahzab-count')).toHaveTextContent('8 حزباً');
+    expect(getByTestId('applicant-ahzab-count')).toHaveTextContent('8 أحزاب');
     expect(getByTestId('applicant-ahzab-grid')).toBeTruthy();
+    expect(getByTestId('ahzab-chip-1').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(getByTestId('ahzab-chip-9').props.accessibilityState.selected).toBe(
+      false,
+    );
   });
 
   it('positively asserts email is never rendered anywhere in the component (APIQ-04)', async () => {
@@ -139,7 +145,7 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
 
     // Tap retry
     await act(async () => {
-      fireEvent.press(getByTestId('retry-button'));
+      fireEvent.press(getByTestId('applicant-detail-error-retry-button'));
     });
 
     expect(await findByTestId('applicant-full-name')).toBeTruthy();
@@ -175,7 +181,7 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
 
     await findByTestId('applicant-full-name');
 
-    fireEvent.press(getByTestId('back-button'));
+    fireEvent.press(getByTestId('applicant-detail-top-bar-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
@@ -237,7 +243,7 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
 
       expect(getByTestId('accept-confirm-dialog')).toBeTruthy();
       expect(getByTestId('accept-confirm-dialog-title')).toHaveTextContent(
-        'قبول طلب الانضمام',
+        'قبول طلب أحمد التونسي؟',
       );
 
       // Cancel dialog
@@ -384,7 +390,7 @@ describe('ApplicantDetailScreen (SCR-19 / F-ENR-04)', () => {
 
       expect(getByTestId('reject-confirm-dialog')).toBeTruthy();
       expect(getByTestId('reject-confirm-dialog-title')).toHaveTextContent(
-        'رفض طلب الانضمام',
+        'رفض طلب أحمد التونسي؟',
       );
 
       // Cancel dialog

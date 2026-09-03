@@ -23,8 +23,9 @@ describe('RegisterScreen (SCR-02)', () => {
   it('renders email and password inputs, submit button, and app title', async () => {
     const { getByText, getByTestId } = await render(<RegisterScreen />);
 
-    expect(getByText('إرتقِ')).toBeTruthy();
-    expect(getByText('إنشاء حساب جديد')).toBeTruthy();
+    expect(getByText('إنشاء حساب')).toBeTruthy();
+    expect(getByText('ابدأ من هنا')).toBeTruthy();
+    expect(getByText('8 أحرف على الأقل')).toBeTruthy();
     expect(getByTestId('register-email-input')).toBeTruthy();
     expect(getByTestId('register-password-input')).toBeTruthy();
     expect(getByTestId('register-submit-button')).toBeTruthy();
@@ -168,6 +169,19 @@ describe('RegisterScreen (SCR-02)', () => {
 
     await act(async () => {
       fireEvent.press(getByTestId('register-login-link'));
+    });
+
+    expect(onNavigateToLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onNavigateToLogin from the TopBar back control (top-right, UF §31)', async () => {
+    const onNavigateToLogin = jest.fn();
+    const { getByTestId } = await render(
+      <RegisterScreen onNavigateToLogin={onNavigateToLogin} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('register-top-bar-back'));
     });
 
     expect(onNavigateToLogin).toHaveBeenCalledTimes(1);

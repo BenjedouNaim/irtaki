@@ -109,12 +109,8 @@ function renderScreen(report: dailyReportsApi.DailyReportDto) {
   );
 }
 
-function isDisabled(testID: string): boolean {
-  return Boolean(screen.getByTestId(testID).props.accessibilityState?.disabled);
-}
-
-function isSelected(testID: string): boolean {
-  return Boolean(screen.getByTestId(testID).props.accessibilityState?.selected);
+function value(testID: string): unknown {
+  return screen.getByTestId(`${testID}-value`).props.children;
 }
 
 function expectNoNetworkCall() {
@@ -126,7 +122,7 @@ function expectNoNetworkCall() {
   expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
 }
 
-describe('ReportDetailScreen (SCR-15, F-DR-07)', () => {
+describe('ReportDetailScreen (SCR-15, F-DR-07, Figma 31:981)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
@@ -136,144 +132,119 @@ describe('ReportDetailScreen (SCR-15, F-DR-07)', () => {
     queryClient?.clear();
   });
 
-  it('renders a full Normal report in the SCR-10 layout with every field disabled and no submit', () => {
+  it('renders a full Normal report as read-only rows per SCR-10 section, with no submit', () => {
     renderScreen(fullNormal);
 
     expect(screen.getByTestId('report-detail-title').props.children).toBe(
-      'تقرير عادي',
+      'تقرير الأربعاء 5 أوت',
     );
-    expect(screen.getByTestId('report-detail-date').props.children).toBe(
-      'تقرير يوم 2026-08-05',
+    expect(screen.getByText('عادي')).toBeTruthy();
+    expect(screen.getByTestId('report-detail-date').props.children).toMatch(
+      /^أُرسل في \d{2}:\d{2}$/,
     );
+    expect(
+      screen.getByTestId('report-detail-note-message').props.children,
+    ).toBe('التقارير المرسلة نهائية — لا تعديل ولا حذف.');
     expect(screen.getByTestId('memo-section')).toBeTruthy();
     expect(screen.getByTestId('rev-section')).toBeTruthy();
     expect(screen.getByTestId('tafsir-section')).toBeTruthy();
 
     // Section A reflects the row: gate Yes, range, time, 50 reps Yes, single session No.
-    expect(isSelected('memo-gate-yes')).toBe(true);
+    expect(value('report-detail-memo-gate')).toBe('نعم');
     expect(screen.getByTestId('memo-details')).toBeTruthy();
-    expect(screen.getByTestId('memo-range-field-summary').props.children).toBe(
-      'من سورة البقرة آية 1 إلى سورة البقرة آية 20',
-    );
-    expect(
-      screen.getByTestId('memo-time-field-from-value').props.children,
-    ).toBe('18:00');
-    expect(screen.getByTestId('memo-time-field-to-value').props.children).toBe(
-      '18:45',
-    );
-    expect(isSelected('completed-50-toggle-yes')).toBe(true);
-    expect(isSelected('single-session-toggle-no')).toBe(true);
+    expect(value('report-detail-memo-range')).toBe('البقرة 1 ← 20');
+    expect(value('report-detail-memo-time')).toBe('18:00 — 18:45');
+    expect(value('report-detail-completed-50')).toBe('نعم');
+    expect(value('report-detail-single-session')).toBe('لا');
 
     // Section B and tafsir.
-    expect(isSelected('rev-gate-yes')).toBe(true);
+    expect(value('report-detail-rev-gate')).toBe('نعم');
     expect(screen.getByTestId('rev-details')).toBeTruthy();
-    expect(screen.getByTestId('rev-range-field-summary').props.children).toBe(
-      'من سورة الفاتحة آية 1 إلى سورة الفاتحة آية 7',
-    );
-    expect(isSelected('read-tafsir-toggle-yes')).toBe(true);
+    expect(value('report-detail-rev-range')).toBe('الفاتحة 1 ← 7');
+    expect(value('report-detail-rev-time')).toBe('19:00 — 19:10');
+    expect(value('report-detail-read-tafsir')).toBe('نعم');
 
-    // All fields disabled (UF §28 "all fields disabled").
-    for (const id of [
-      'memo-gate-yes',
-      'memo-gate-no',
-      'memo-range-field-trigger',
-      'memo-time-field-from',
-      'memo-time-field-to',
-      'completed-50-toggle-yes',
-      'single-session-toggle-no',
-      'rev-gate-yes',
-      'rev-range-field-trigger',
-      'rev-time-field-from',
-      'read-tafsir-toggle-yes',
-    ]) {
-      expect(isDisabled(id)).toBe(true);
-    }
-
-    // Read-only: no submit, no discard dialog, no error banner.
+    // Read-only: no controls at all (BR-22), no submit, no discard dialog, no error banner.
+    expect(screen.queryByRole('radio')).toBeNull();
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
     expect(screen.queryByTestId('discard-report-dialog')).toBeNull();
     expect(screen.queryByTestId('daily-report-form-banner')).toBeNull();
     expectNoNetworkCall();
   });
 
-  it('disabled fields ignore taps — the row is immutable (BR-22)', () => {
-    renderScreen(fullNormal);
-
-    fireEvent.press(screen.getByTestId('memo-gate-no'));
-    fireEvent.press(screen.getByTestId('memo-range-field-trigger'));
-    fireEvent.press(screen.getByTestId('memo-time-field-from'));
-
-    expect(isSelected('memo-gate-yes')).toBe(true);
-    expect(isSelected('memo-gate-no')).toBe(false);
-    expect(screen.getByTestId('memo-details')).toBeTruthy();
-    expect(screen.queryByTestId('memo-range-field-sheet')).toBeNull();
-    expectNoNetworkCall();
-  });
-
   it('renders a Normal report with neither section (BR-48): both gates No, no details, tafsir unanswered', () => {
     renderScreen(bareNormal);
 
-    expect(isSelected('memo-gate-no')).toBe(true);
-    expect(isSelected('rev-gate-no')).toBe(true);
+    expect(value('report-detail-memo-gate')).toBe('لا');
+    expect(value('report-detail-rev-gate')).toBe('لا');
     expect(screen.queryByTestId('memo-details')).toBeNull();
     expect(screen.queryByTestId('rev-details')).toBeNull();
-    expect(screen.queryByTestId('single-session-toggle')).toBeNull();
-    expect(isSelected('read-tafsir-toggle-yes')).toBe(false);
-    expect(isSelected('read-tafsir-toggle-no')).toBe(false);
+    expect(screen.queryByTestId('report-detail-single-session')).toBeNull();
+    expect(value('report-detail-read-tafsir')).toBe('—');
     expectNoNetworkCall();
   });
 
-  it('renders an Absent report as the disabled reason picker only', () => {
+  it('hides the single-session row when the 50 repetitions were not completed (VR-18)', () => {
+    renderScreen({
+      ...fullNormal,
+      completed_50_repetitions: false,
+      repetitions_in_single_session: null,
+    });
+
+    expect(value('report-detail-completed-50')).toBe('لا');
+    expect(screen.queryByTestId('report-detail-single-session')).toBeNull();
+  });
+
+  it('renders an Absent report as the reason row only, with the missed-day note for Other', () => {
     renderScreen(absent);
 
     expect(screen.getByTestId('report-detail-title').props.children).toBe(
-      'تقرير غياب',
+      'تقرير الأربعاء 5 أوت',
     );
-    expect(screen.getByTestId('absence-reason-picker')).toBeTruthy();
-    expect(isSelected('absence-reason-picker-other')).toBe(true);
-    expect(isDisabled('absence-reason-picker-other')).toBe(true);
-    expect(isDisabled('absence-reason-picker-sick')).toBe(true);
+    expect(screen.getByText('يوم فائت')).toBeTruthy();
+    expect(screen.getByTestId('absence-section')).toBeTruthy();
+    expect(value('report-detail-absence-reason')).toBe('سبب آخر');
+    expect(
+      screen.getByTestId('report-detail-absence-reason-hint').props.children,
+    ).toBe('سيُحتسب هذا كيوم فائت');
     expect(screen.queryByTestId('memo-section')).toBeNull();
     expect(screen.queryByTestId('rev-section')).toBeNull();
     expect(screen.queryByTestId('tafsir-section')).toBeNull();
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('absence-reason-picker-sick'));
-    expect(isSelected('absence-reason-picker-other')).toBe(true);
+    screen.unmount();
+    renderScreen({ ...absent, absence_reason: 'Sick' });
+    expect(screen.getByText('غياب بعذر')).toBeTruthy();
+    expect(value('report-detail-absence-reason')).toBe('مريض');
+    expect(
+      screen.queryByTestId('report-detail-absence-reason-hint'),
+    ).toBeNull();
     expectNoNetworkCall();
   });
 
-  it('renders a Revision report as disabled range + time with no gate, memorisation or tafsir fields', () => {
+  it('renders a Revision report as range + time with no gate, memorisation or tafsir rows', () => {
     renderScreen(revision);
 
-    expect(screen.getByTestId('report-detail-title').props.children).toBe(
-      'تقرير مراجعة',
-    );
-    expect(screen.getByTestId('rev-range-field-summary').props.children).toBe(
-      'من سورة الفاتحة آية 1 إلى سورة الفاتحة آية 7',
-    );
-    expect(screen.getByTestId('rev-time-field-from-value').props.children).toBe(
-      '19:00',
-    );
-    expect(isDisabled('rev-range-field-trigger')).toBe(true);
-    expect(isDisabled('rev-time-field-to')).toBe(true);
-    expect(screen.queryByTestId('rev-gate')).toBeNull();
+    expect(screen.getByText('مراجعة')).toBeTruthy();
+    expect(value('report-detail-rev-range')).toBe('الفاتحة 1 ← 7');
+    expect(value('report-detail-rev-time')).toBe('19:00 — 19:10');
+    expect(screen.queryByTestId('report-detail-rev-gate')).toBeNull();
     expect(screen.queryByTestId('memo-section')).toBeNull();
-    expect(screen.queryByTestId('read-tafsir-toggle')).toBeNull();
+    expect(screen.queryByTestId('tafsir-section')).toBeNull();
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
     expectNoNetworkCall();
   });
 
   it('goes back from the top-right control (UF §31)', () => {
     renderScreen(absent);
-    fireEvent.press(screen.getByTestId('report-detail-back-button'));
+    fireEvent.press(screen.getByTestId('report-detail-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to Home when there is no history', () => {
     mockCanGoBack.mockReturnValue(false);
     renderScreen(absent);
-    fireEvent.press(screen.getByTestId('report-detail-back-button'));
+    fireEvent.press(screen.getByTestId('report-detail-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/student');
   });
 });

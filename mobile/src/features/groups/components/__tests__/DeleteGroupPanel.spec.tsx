@@ -6,43 +6,50 @@ import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/groups.client');
 
-describe('DeleteGroupPanel Component', () => {
+describe('DeleteGroupPanel (Figma SCR-29 Danger card + Delete confirm)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders delete group action button and description text', () => {
+  it('renders the danger row with the available copy and the small destructive button', () => {
     render(<DeleteGroupPanel groupId={mockGroupId} onDeleted={jest.fn()} />);
 
     expect(screen.getByTestId('delete-group-panel')).toBeTruthy();
-    expect(screen.getAllByText('حذف الحلقة').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('حذف المجموعة نهائيًا')).toBeTruthy();
+    expect(screen.getByTestId('delete-group-description')).toHaveTextContent(
+      'الحذف نهائي ولا يمكن التراجع عنه — ممكن فقط لمجموعة لم ينضم إليها أحد قط.',
+    );
     expect(screen.getByTestId('delete-group-button')).toBeTruthy();
+    expect(screen.getByText('حذف')).toBeTruthy();
   });
 
-  it('opens confirmation modal on button press and executes hard delete on confirm', async () => {
+  it('opens the strong confirmation naming the group and hard-deletes on confirm', async () => {
     const onDeletedMock = jest.fn();
     const deleteGroupSpy = jest
       .spyOn(groupsApi, 'deleteGroup')
       .mockResolvedValueOnce(undefined);
 
     render(
-      <DeleteGroupPanel groupId={mockGroupId} onDeleted={onDeletedMock} />,
+      <DeleteGroupPanel
+        groupId={mockGroupId}
+        groupName="حلقة الرحمة"
+        onDeleted={onDeletedMock}
+      />,
     );
 
-    // Press delete button to open confirmation dialog
     fireEvent.press(screen.getByTestId('delete-group-button'));
 
     expect(screen.getByTestId('delete-group-confirm-dialog')).toBeTruthy();
-    expect(screen.getByText('تأكيد حذف الحلقة')).toBeTruthy();
+    expect(screen.getByText('حذف حلقة الرحمة نهائيًا؟')).toBeTruthy();
     expect(
       screen.getByText(
-        'هل أنت متأكد من رغبتك في حذف هذه الحلقة نهائياً؟ هذا الإجراء لا يمكن التراجع عنه وسيتم حذف بيانات الحلقة بالكامل.',
+        'لا يمكن التراجع عن هذا الإجراء. تُحذف المجموعة من القاعدة بالكامل.',
       ),
     ).toBeTruthy();
+    expect(screen.getByText('حذف نهائيًا')).toBeTruthy();
 
-    // Confirm deletion
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('delete-group-confirm-dialog-confirm-button'),
@@ -58,11 +65,9 @@ describe('DeleteGroupPanel Component', () => {
 
     render(<DeleteGroupPanel groupId={mockGroupId} onDeleted={jest.fn()} />);
 
-    // Press delete button to open dialog
     fireEvent.press(screen.getByTestId('delete-group-button'));
     expect(screen.getByTestId('delete-group-confirm-dialog')).toBeTruthy();
 
-    // Press cancel button
     fireEvent.press(
       screen.getByTestId('delete-group-confirm-dialog-cancel-button'),
     );
@@ -70,7 +75,7 @@ describe('DeleteGroupPanel Component', () => {
     expect(deleteGroupSpy).not.toHaveBeenCalled();
   });
 
-  it('displays specific inline error message when 409 GROUP_HAS_HISTORY is returned', async () => {
+  it('turns the action unavailable with the Figma copy when 409 GROUP_HAS_HISTORY is returned', async () => {
     jest.spyOn(groupsApi, 'deleteGroup').mockRejectedValueOnce(
       new ApiError({
         statusCode: 409,
@@ -81,10 +86,8 @@ describe('DeleteGroupPanel Component', () => {
 
     render(<DeleteGroupPanel groupId={mockGroupId} onDeleted={jest.fn()} />);
 
-    // Press delete button to open dialog
     fireEvent.press(screen.getByTestId('delete-group-button'));
 
-    // Confirm
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('delete-group-confirm-dialog-confirm-button'),
@@ -93,8 +96,11 @@ describe('DeleteGroupPanel Component', () => {
 
     expect(screen.getByTestId('delete-group-error')).toBeTruthy();
     expect(
-      screen.getByText('لا يمكن حذف حلقة سبق أن انضم إليها طلاب'),
+      screen.getByText('لا يمكن حذف مجموعة سبق أن انضم إليها طلاب'),
     ).toBeTruthy();
+    expect(screen.getByTestId('delete-group-description')).toHaveTextContent(
+      'غير متاح — للمجموعة سجل عضويات. الحذف ممكن فقط لمجموعة لم ينضم إليها أحد قط.',
+    );
   });
 
   it('displays generic error banner when API fails with 500 error', async () => {
@@ -108,10 +114,8 @@ describe('DeleteGroupPanel Component', () => {
 
     render(<DeleteGroupPanel groupId={mockGroupId} onDeleted={jest.fn()} />);
 
-    // Press delete button to open dialog
     fireEvent.press(screen.getByTestId('delete-group-button'));
 
-    // Confirm
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('delete-group-confirm-dialog-confirm-button'),

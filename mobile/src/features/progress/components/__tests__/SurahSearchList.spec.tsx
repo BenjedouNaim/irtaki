@@ -31,9 +31,9 @@ describe('SurahSearchList Component', () => {
       />,
     );
 
-    expect(screen.getByText('سورة الفاتحة')).toBeTruthy();
-    expect(screen.getByText('سورة البقرة')).toBeTruthy();
-    expect(screen.getByText('سورة آل عمران')).toBeTruthy();
+    expect(screen.getByText('الفاتحة')).toBeTruthy();
+    expect(screen.getByText('البقرة')).toBeTruthy();
+    expect(screen.getByText('آل عمران')).toBeTruthy();
 
     const row1 = screen.getByTestId('surah-row-1');
     const row2 = screen.getByTestId('surah-row-2');
@@ -53,9 +53,9 @@ describe('SurahSearchList Component', () => {
     const input = screen.getByTestId('surah-list-search-input');
     fireEvent.changeText(input, 'عمران');
 
-    expect(screen.getByText('سورة آل عمران')).toBeTruthy();
-    expect(screen.queryByText('سورة الفاتحة')).toBeNull();
-    expect(screen.queryByText('سورة البقرة')).toBeNull();
+    expect(screen.getByText('آل عمران')).toBeTruthy();
+    expect(screen.queryByText('الفاتحة')).toBeNull();
+    expect(screen.queryByText('البقرة')).toBeNull();
   });
 
   it('filters surahs by number prefix', () => {
@@ -70,10 +70,10 @@ describe('SurahSearchList Component', () => {
     const input = screen.getByTestId('surah-list-search-input');
     fireEvent.changeText(input, '11');
 
-    expect(screen.getByText('سورة الإخلاص')).toBeTruthy();
-    expect(screen.getByText('سورة الفلق')).toBeTruthy();
-    expect(screen.getByText('سورة الناس')).toBeTruthy();
-    expect(screen.queryByText('سورة الفاتحة')).toBeNull();
+    expect(screen.getByText('الإخلاص')).toBeTruthy();
+    expect(screen.getByText('الفلق')).toBeTruthy();
+    expect(screen.getByText('الناس')).toBeTruthy();
+    expect(screen.queryByText('الفاتحة')).toBeNull();
   });
 
   it('renders inline no-results state when search yields no matches', () => {
@@ -107,8 +107,8 @@ describe('SurahSearchList Component', () => {
     const clearButton = screen.getByTestId('surah-list-clear-search');
     fireEvent.press(clearButton);
 
-    expect(screen.getByText('سورة الفاتحة')).toBeTruthy();
-    expect(screen.getByText('سورة البقرة')).toBeTruthy();
+    expect(screen.getByText('الفاتحة')).toBeTruthy();
+    expect(screen.getByText('البقرة')).toBeTruthy();
   });
 
   it('calls onSelectSurah with selected surah object on press', () => {
@@ -124,5 +124,24 @@ describe('SurahSearchList Component', () => {
     fireEvent.press(row2);
 
     expect(onSelectSurahMock).toHaveBeenCalledWith(mockSurahs[1]);
+  });
+
+  it('marks the selected surah with a check and exposes the ayah count', () => {
+    render(
+      <SurahSearchList
+        surahs={mockSurahs}
+        selectedSurahNumber={2}
+        onSelectSurah={onSelectSurahMock}
+        testID="surah-list"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('surah-row-2').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('surah-row-1').props.accessibilityState.selected,
+    ).toBe(false);
+    expect(screen.getByText('286 آية')).toBeTruthy();
   });
 });

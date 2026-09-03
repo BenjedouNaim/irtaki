@@ -1,13 +1,18 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { Icon, IconName, IconTone } from '@/shared/components/Icon';
 import {
   StatusBadge,
   StatusBadgeVariant,
 } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/components/Button';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
+
+export type JoinRequestStatus = 'Pending' | 'Accepted' | 'Rejected';
 
 export interface JoinRequestStatusCardProps {
-  status: 'Pending' | 'Accepted' | 'Rejected';
+  status: JoinRequestStatus;
   onApplyAgain?: () => void;
   testID?: string;
   className?: string;
@@ -17,38 +22,55 @@ export interface JoinRequestStatusCardProps {
 interface StatusConfig {
   badgeStatus: string;
   badgeVariant: StatusBadgeVariant;
+  icon: IconName;
+  iconTone: IconTone;
+  ring: string;
   title: string;
   description: string;
   showApplyAgain: boolean;
 }
 
-const STATUS_CONFIGS: Record<
-  'Pending' | 'Accepted' | 'Rejected',
-  StatusConfig
-> = {
+/**
+ * Figma SCR-05 status cards (22:81 pending · 22:125 rejected). The accepted
+ * state has no frame — an accepted applicant becomes a Student — so it
+ * reuses the same construction with the success tone.
+ */
+const STATUS_CONFIGS: Record<JoinRequestStatus, StatusConfig> = {
   Pending: {
     badgeStatus: 'قيد المراجعة',
     badgeVariant: 'warning',
-    title: 'طلب الانضمام قيد المراجعة',
+    icon: 'clock',
+    iconTone: 'warning',
+    ring: 'bg-warning-subtle dark:bg-warning-subtle-dark',
+    title: 'طلبك قيد المراجعة',
     description:
-      'طلبك للانضمام إلى الحلقة قيد المراجعة من قبل المشرف. سيتم إشعارك بالنتيجة فور اتخاذ القرار.',
+      'سيصلك إشعار فور البتّ في طلبك. لا يمكن تقديم طلب آخر حتى ذلك الحين.',
     showApplyAgain: false,
   },
   Rejected: {
-    badgeStatus: 'لم يتم القبول',
-    badgeVariant: 'error',
-    title: 'لم يتم قبول الطلب هذه المرة',
-    description: 'يمكنك إعادة التقديم واختيار حلقة أخرى تناسب جدولك ومستواك.',
+    badgeStatus: 'لم يُقبل',
+    badgeVariant: 'neutral',
+    icon: 'circle-x',
+    iconTone: 'secondary',
+    ring: 'bg-subtle dark:bg-subtle-dark',
+    title: 'لم يُقبل طلبك هذه المرة',
+    description: 'يمكنك التقديم مجددًا فورًا على أي مجموعة متاحة.',
     showApplyAgain: true,
   },
   Accepted: {
     badgeStatus: 'تم القبول',
     badgeVariant: 'success',
+    icon: 'circle-check',
+    iconTone: 'success',
+    ring: 'bg-success-subtle',
     title: 'تم قبول طلبك',
-    description: 'مبارك! تم قبول انضمامك إلى الحلقة بنجاح.',
+    description: 'قُبل انضمامك إلى المجموعة.',
     showApplyAgain: false,
   },
 };
+
+const CARD_CLASS =
+  'w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark p-5 gap-4';
 
 export function JoinRequestStatusCard({
   status,
@@ -64,42 +86,94 @@ export function JoinRequestStatusCard({
       testID={testID}
       accessibilityRole="summary"
       accessibilityLabel={`حالة طلب الانضمام: ${config.badgeStatus}. ${config.title}`}
-      className={`w-full p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm ${
-        className ?? ''
-      }`}
+      className={`${CARD_CLASS} ${itemsStart} ${className ?? ''}`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
-      <View className="flex-row items-center justify-between mb-3">
+      <View className={`${rowStart} items-center justify-between w-full`}>
+        <View
+          className={`w-12 h-12 rounded-full items-center justify-center ${config.ring}`}
+        >
+          <Icon name={config.icon} size={21} tone={config.iconTone} />
+        </View>
         <StatusBadge
           status={config.badgeStatus}
           variant={config.badgeVariant}
           testID="join-request-status-badge"
+          style={{ alignSelf: 'center' }}
         />
       </View>
 
       <Text
-        className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2 text-right"
+        className={`w-full ${typography.headingMd} text-right text-fg dark:text-fg-dark`}
         testID="join-request-status-title"
       >
         {config.title}
       </Text>
 
       <Text
-        className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed mb-4"
+        className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
         testID="join-request-status-description"
       >
         {config.description}
       </Text>
 
-      {config.showApplyAgain && onApplyAgain && (
+      {config.showApplyAgain && onApplyAgain ? (
         <Button
-          label="التقديم مجدداً"
+          label="التقديم مجددًا"
           variant="primary"
           onPress={onApplyAgain}
           testID="apply-again-button"
-          className="w-full mt-1"
+          className="w-full"
         />
-      )}
+      ) : null}
+    </View>
+  );
+}
+
+export interface NoJoinRequestCardProps {
+  onBrowseGroups: () => void;
+  testID?: string;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+/** Figma SCR-05 · no request (22:38): the "Browse Groups" CTA card (UF §10). */
+export function NoJoinRequestCard({
+  onBrowseGroups,
+  testID = 'no-join-request-card',
+  className,
+  style,
+}: NoJoinRequestCardProps) {
+  return (
+    <View
+      testID={testID}
+      accessibilityRole="summary"
+      accessibilityLabel="لم تنضم إلى مجموعة بعد"
+      className={`${CARD_CLASS} ${itemsStart} ${className ?? ''}`}
+      style={[{ borderCurve: 'continuous' }, style]}
+    >
+      <View className="w-14 h-14 rounded-full items-center justify-center bg-primary-subtle dark:bg-primary-subtle-dark">
+        <Icon name="layers" size={24} tone="brand" />
+      </View>
+      <Text
+        className={`w-full ${typography.headingMd} text-right text-fg dark:text-fg-dark`}
+        testID={`${testID}-title`}
+      >
+        لم تنضم إلى مجموعة بعد
+      </Text>
+      <Text
+        className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+        testID={`${testID}-description`}
+      >
+        تصفّح المجموعات المتاحة وقدّم طلب انضمام واحد.
+      </Text>
+      <Button
+        label="تصفّح المجموعات"
+        variant="primary"
+        onPress={onBrowseGroups}
+        testID="browse-groups-button"
+        className="w-full"
+      />
     </View>
   );
 }

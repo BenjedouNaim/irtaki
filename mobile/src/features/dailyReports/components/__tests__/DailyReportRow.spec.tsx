@@ -1,7 +1,12 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { DailyReportRow, describeDailyReport } from '../DailyReportRow';
+import {
+  DailyReportRow,
+  dailyReportBadge,
+  describeDailyReport,
+} from '../DailyReportRow';
 import { DailyReportDto } from '@/shared/api/dailyReports.client';
+import { buildSurahIndex } from '@/features/progress/utils/ayahRange';
 
 const base: DailyReportDto = {
   id: 'report-1',
@@ -21,33 +26,50 @@ const base: DailyReportDto = {
   absence_reason: null,
 };
 
-describe('DailyReportRow (SCR-14 list row)', () => {
-  it('renders the date, the type badge and a summary, as one 48dp+ button (UF §32)', () => {
+const surahIndex = buildSurahIndex([
+  { number: 1, name_ar: 'الفاتحة', ayah_count: 7, ordinal_offset: 0 },
+  { number: 2, name_ar: 'البقرة', ayah_count: 286, ordinal_offset: 7 },
+]);
+
+describe('DailyReportRow (SCR-14 list row, Figma 31:782)', () => {
+  it('renders the Arabic day, the type badge and a named-range summary, as one 48dp+ button (UF §32)', () => {
     const onPress = jest.fn();
-    render(<DailyReportRow report={base} onPress={onPress} />);
+    render(
+      <DailyReportRow
+        report={base}
+        surahIndex={surahIndex}
+        onPress={onPress}
+      />,
+    );
 
     const row = screen.getByTestId('daily-report-row-report-1');
     expect(row.props.accessibilityRole).toBe('button');
     expect(row.props.accessibilityLabel).toBe(
-      'تقرير 2026-08-05: عادي. حفظ ومراجعة',
+      'تقرير الأربعاء 5 أوت: عادي. حفظ: البقرة 1 ← 20 · مراجعة: الفاتحة 1 ← 7',
     );
     expect(
       screen.getByTestId('daily-report-row-report-1-date').props.children,
-    ).toBe('2026-08-05');
+    ).toBe('الأربعاء 5 أوت');
     expect(screen.getByText('عادي')).toBeTruthy();
     expect(
       screen.getByTestId('daily-report-row-report-1-summary').props.children,
-    ).toBe('حفظ ومراجعة');
+    ).toBe('حفظ: البقرة 1 ← 20 · مراجعة: الفاتحة 1 ← 7');
 
     fireEvent.press(row);
     expect(onPress).toHaveBeenCalledWith(base);
+  });
+
+  it('falls back to surah numbers while the reference data is unavailable', () => {
+    expect(describeDailyReport(base)).toBe(
+      'حفظ: سورة 2 1 ← 20 · مراجعة: سورة 1 1 ← 7',
+    );
   });
 
   it.each<[string, Partial<DailyReportDto>, string]>([
     [
       'memorisation only',
       { rev_range: null, rev_time: null, no_revision_today: true },
-      'حفظ',
+      'حفظ: البقرة 1 ← 20 · بدون مراجعة',
     ],
     [
       'revision only',
@@ -58,7 +80,7 @@ describe('DailyReportRow (SCR-14 list row)', () => {
         completed_50_repetitions: null,
         repetitions_in_single_session: null,
       },
-      'مراجعة فقط',
+      'بدون حفظ · مراجعة: الفاتحة 1 ← 7',
     ],
     [
       'neither (BR-48)',
@@ -84,7 +106,7 @@ describe('DailyReportRow (SCR-14 list row)', () => {
         repetitions_in_single_session: null,
         read_tafsir: null,
       },
-      'مراجعة',
+      'مراجعة: الفاتحة 1 ← 7',
     ],
     [
       'Absent — Sick',
@@ -94,7 +116,7 @@ describe('DailyReportRow (SCR-14 list row)', () => {
         memo_range: null,
         rev_range: null,
       },
-      'غياب — مرض',
+      'غياب — مريض',
     ],
     [
       'Absent — Other',
@@ -107,10 +129,12 @@ describe('DailyReportRow (SCR-14 list row)', () => {
       'غياب — سبب آخر',
     ],
   ])('summarises %s from the row alone', (_label, overrides, expected) => {
-    expect(describeDailyReport({ ...base, ...overrides })).toBe(expected);
+    expect(describeDailyReport({ ...base, ...overrides }, surahIndex)).toBe(
+      expected,
+    );
   });
 
-  it('shows the Absent and Revision type labels with their badges', () => {
+  it('badges an excused absence as "غياب بعذر" and an Other absence as "يوم فائت" (BR-24/BR-25)', () => {
     render(
       <DailyReportRow
         report={{
@@ -119,10 +143,19 @@ describe('DailyReportRow (SCR-14 list row)', () => {
           type: 'Absent',
           absence_reason: 'Studying',
         }}
+        surahIndex={surahIndex}
       />,
     );
     expect(screen.getByTestId('daily-report-row-a-type')).toBeTruthy();
-    expect(screen.getByText('غياب')).toBeTruthy();
+    expect(screen.getByText('غياب بعذر')).toBeTruthy();
     expect(screen.getByText('غياب — دراسة')).toBeTruthy();
+
+    expect(
+      dailyReportBadge({ ...base, type: 'Absent', absence_reason: 'Other' }),
+    ).toEqual({ label: 'يوم فائت', variant: 'error' });
+    expect(dailyReportBadge({ ...base, type: 'Revision' })).toEqual({
+      label: 'مراجعة',
+      variant: 'info',
+    });
   });
 });

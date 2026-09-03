@@ -47,7 +47,7 @@ function renderSection() {
   );
 }
 
-describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
+describe('ProgressSection (SCR-13 — تقدّم الحفظ card, F-PRG-02, Figma 30:603)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(quranApi, 'listSurahs').mockResolvedValue(mockSurahs);
@@ -77,7 +77,11 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
 
     expect(await screen.findByTestId('progress-section')).toBeTruthy();
     expect(progressApi.getMyProgress).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('التقدم في الحفظ')).toBeTruthy();
+    expect(screen.getByText('تقدّم الحفظ')).toBeTruthy();
+    expect(screen.getByText('الأحزاب المكتملة')).toBeTruthy();
+    expect(screen.getByTestId('progress-section-count').props.children).toBe(
+      '23 من 60',
+    );
 
     const ring = screen.getByTestId('progress-section-ring');
     expect(ring.props.accessibilityRole).toBe('progressbar');
@@ -97,18 +101,13 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
 
     expect(await screen.findByTestId('progress-section-pointer')).toBeTruthy();
     await waitFor(() =>
-      expect(
-        screen.getByText('آخر موضع تم العمل عليه: سورة البقرة · الآية 142'),
-      ).toBeTruthy(),
+      expect(screen.getByText('آخر موضع: البقرة 142')).toBeTruthy(),
     );
+    // Figma: an info glyph carries the DEC-D02 disclaimer for assistive tech.
     expect(
-      screen.getByTestId('progress-section-pointer-disclaimer'),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        'يشير هذا الموضع إلى آخر نشاط حفظ فقط، ولا يعبّر عن نسبة التقدم.',
-      ),
-    ).toBeTruthy();
+      screen.getByTestId('progress-section-pointer-disclaimer').props
+        .accessibilityLabel,
+    ).toBe('يشير هذا الموضع إلى آخر نشاط حفظ فقط، ولا يعبّر عن نسبة التقدم.');
 
     // Exactly one progressbar exists (the ahzab ring); the pointer carries none.
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
@@ -155,11 +154,7 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
 
     renderSection();
 
-    expect(
-      await screen.findByText(
-        'آخر موضع تم العمل عليه: السورة رقم 2 · الآية 142',
-      ),
-    ).toBeTruthy();
+    expect(await screen.findByText('آخر موضع: سورة 2 142')).toBeTruthy();
   });
 
   it('renders a factual statement when no position has been recorded yet (UF §23)', async () => {
@@ -181,8 +176,8 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     expect(screen.getByText('لم يُسجَّل أي موضع حفظ بعد')).toBeTruthy();
     expect(screen.queryByTestId('progress-section-pointer-text')).toBeNull();
     expect(
-      screen.getByTestId('progress-section-pointer-disclaimer'),
-    ).toBeTruthy();
+      screen.queryByTestId('progress-section-pointer-disclaimer'),
+    ).toBeNull();
   });
 
   it.each([500, 503])(
@@ -201,7 +196,6 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
       renderSection();
 
       expect(await screen.findByTestId('progress-section-error')).toBeTruthy();
-      expect(screen.getByText('خطأ في تحميل البيانات')).toBeTruthy();
       expect(
         screen.getByTestId('progress-section-error-message').props.children,
       ).toBe(GENERIC_SERVER_MESSAGE);
@@ -225,8 +219,8 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     const banner = await screen.findByTestId('progress-section-error');
     expect(banner.props.accessibilityRole).toBe('alert');
     const icon = screen.getByTestId('progress-section-error-icon');
-    expect(icon.props.children).toBe('⚠️');
     expect(icon.props.accessibilityLabel).toBe('تنبيه');
+    expect(icon.props.accessibilityRole).toBe('image');
     expect(screen.getByLabelText('تنبيه')).toBeTruthy();
   });
 
@@ -245,7 +239,7 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     renderSection();
 
     await screen.findByTestId('progress-section-error');
-    fireEvent.press(screen.getByTestId('progress-section-retry-button'));
+    fireEvent.press(screen.getByTestId('progress-section-error-retry-button'));
 
     expect(await screen.findByTestId('progress-section')).toBeTruthy();
     expect(spy).toHaveBeenCalledTimes(2);

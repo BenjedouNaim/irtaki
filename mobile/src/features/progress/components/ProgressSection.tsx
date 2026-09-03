@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { Banner } from '@/shared/components/Banner';
 import {
   CompletionRing,
   METRIC_MAX_FONT_SIZE_MULTIPLIER,
+  TOTAL_AHZAB,
 } from '@/shared/components/CompletionRing';
+import { Icon } from '@/shared/components/Icon';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
-import { Button } from '@/shared/components/Button';
 import { ApiError } from '@/shared/api/types';
 import { AyahPositionDto } from '@/shared/api/progress.client';
 import { useMyProgress } from '@/features/progress/hooks/useMyProgress';
 import { useSurahs } from '@/features/progress/hooks/useSurahs';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
 
 export interface ProgressSectionProps {
   testID?: string;
@@ -23,6 +27,10 @@ const NETWORK_ERROR_MESSAGE =
 
 /** Server error 5xx (UF §24 / TS §29) — generic, never the server's own message. */
 const SERVER_ERROR_MESSAGE = 'حدث خطأ أثناء تحميل بيانات التقدم';
+
+/** DEC-D02: the pointer is an activity marker, never a share of progress. */
+const POINTER_DISCLAIMER =
+  'يشير هذا الموضع إلى آخر نشاط حفظ فقط، ولا يعبّر عن نسبة التقدم.';
 
 /**
  * Maps a query error to the user-facing Arabic message per UF §24's table.
@@ -43,27 +51,22 @@ function describeError(error: unknown): string {
   return NETWORK_ERROR_MESSAGE;
 }
 
+/** Figma "آخر موضع: البقرة 101" — surah number while the reference data is unavailable. */
 function describePosition(
   position: AyahPositionDto,
   surahName: string | undefined,
 ): string {
-  const surahLabel = surahName
-    ? `سورة ${surahName}`
-    : `السورة رقم ${position.surah}`;
-  return `${surahLabel} · الآية ${position.ayah}`;
+  return `${surahName ?? `سورة ${position.surah}`} ${position.ayah}`;
 }
 
 /**
- * Standalone "Memorization Progress" section of SCR-13 (F-PRG-02, UF §17).
- *
- * Renders the ahzab-completed completion ring (a real count) and the last-worked-on
- * position as PLAIN TEXT. `last_memorized_position` is an activity pointer under
- * non-linear memorization (DEC-D02) and is NEVER rendered as a progress bar. The
- * payload's `is_activity_pointer_only` is always `true` (APIS §10.10) and is not used
- * as a rendering switch — the position is plain text whenever it is non-null.
- *
- * The full SCR-13 (score, day-breakdown donut, quality, attendance) belongs to EPIC-06,
- * which assembles the screen around this component.
+ * "تقدّم الحفظ" card of SCR-13 (F-PRG-02, UF §17; Figma 30:603): title,
+ * then a row with the text column on the reading side — "الأحزاب المكتملة",
+ * "23 من 60" and the last-worked-on position as PLAIN TEXT with an info
+ * glyph — and the CompletionRing on the far side. `last_memorized_position`
+ * is an activity pointer under non-linear memorization (DEC-D02) and is
+ * NEVER rendered as a progress bar. The payload's `is_activity_pointer_only`
+ * is always `true` (APIS §10.10) and is not used as a rendering switch.
  */
 export function ProgressSection({
   testID = 'progress-section',
@@ -78,7 +81,7 @@ export function ProgressSection({
       <View
         key="skeleton"
         testID={`${testID}-skeleton`}
-        className={`w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 ${
+        className={`w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark ${
           className ?? ''
         }`}
         style={[{ borderCurve: 'continuous' }, style]}
@@ -89,43 +92,16 @@ export function ProgressSection({
   }
 
   if (isError || !data) {
-    const message = describeError(error);
-
     return (
-      <View
+      <Banner
         key="error"
+        tone="error"
+        message={describeError(error)}
+        onRetry={() => void refetch()}
         testID={`${testID}-error`}
-        accessibilityRole="alert"
-        className={`w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3 ${
-          className ?? ''
-        }`}
-        style={[{ borderCurve: 'continuous' }, style]}
-      >
-        <View className="flex-row items-center justify-center gap-2">
-          <Text
-            testID={`${testID}-error-icon`}
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-          <Text className="text-destructive-800 dark:text-destructive-200 text-base font-semibold text-center">
-            خطأ في تحميل البيانات
-          </Text>
-        </View>
-        <Text
-          className="text-destructive-700 dark:text-destructive-300 text-sm text-center leading-relaxed"
-          testID={`${testID}-error-message`}
-        >
-          {message}
-        </Text>
-        <Button
-          label="إعادة المحاولة"
-          variant="outline"
-          onPress={() => void refetch()}
-          testID={`${testID}-retry-button`}
-        />
-      </View>
+        className={className}
+        style={style}
+      />
     );
   }
 
@@ -139,54 +115,73 @@ export function ProgressSection({
       key="data"
       testID={testID}
       accessibilityRole="summary"
-      className={`w-full p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm gap-5 ${
+      className={`w-full p-5 gap-4 rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark ${itemsStart} ${
         className ?? ''
       }`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
       <Text
-        className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right"
+        className={`w-full ${typography.headingSm} text-right text-fg dark:text-fg-dark`}
+        accessibilityRole="header"
         testID={`${testID}-title`}
       >
-        التقدم في الحفظ
+        تقدّم الحفظ
       </Text>
 
-      <View className="items-center">
+      <View className={`w-full ${rowStart} items-center justify-between gap-4`}>
+        <View className={`flex-1 gap-1.5 ${itemsStart}`}>
+          <Text
+            className={`w-full ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+          >
+            الأحزاب المكتملة
+          </Text>
+          <Text
+            className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+            testID={`${testID}-count`}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
+          >
+            {`${data.ahzab_completed} من ${TOTAL_AHZAB}`}
+          </Text>
+          <View
+            className={`${rowStart} items-center gap-1.5 w-full`}
+            testID={`${testID}-pointer`}
+          >
+            {position ? (
+              <>
+                <Text
+                  className={`flex-shrink ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                  testID={`${testID}-pointer-text`}
+                  maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
+                >
+                  {`آخر موضع: ${describePosition(position, surahName)}`}
+                </Text>
+                <Icon
+                  name="info"
+                  size={14}
+                  tone="tertiary"
+                  accessibilityLabel={POINTER_DISCLAIMER}
+                  testID={`${testID}-pointer-disclaimer`}
+                />
+              </>
+            ) : (
+              <Text
+                className={`flex-1 ${typography.bodySm} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+                testID={`${testID}-pointer-empty`}
+                maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
+              >
+                لم يُسجَّل أي موضع حفظ بعد
+              </Text>
+            )}
+          </View>
+        </View>
+
         <CompletionRing
           completed={data.ahzab_completed}
           label="حزباً مكتملاً"
           testID={`${testID}-ring`}
         />
-      </View>
-
-      <View className="gap-2" testID={`${testID}-pointer`}>
-        {position ? (
-          <Text
-            className="text-base text-gray-900 dark:text-gray-100 text-right"
-            testID={`${testID}-pointer-text`}
-            maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
-          >
-            آخر موضع تم العمل عليه: {describePosition(position, surahName)}
-          </Text>
-        ) : (
-          <Text
-            className="text-base text-gray-600 dark:text-gray-400 text-right"
-            testID={`${testID}-pointer-empty`}
-            maxFontSizeMultiplier={METRIC_MAX_FONT_SIZE_MULTIPLIER}
-          >
-            لم يُسجَّل أي موضع حفظ بعد
-          </Text>
-        )}
-
-        <View
-          className="bg-info-50 dark:bg-info-950 border border-info-200 dark:border-info-800 rounded-lg px-3 py-2"
-          style={{ borderCurve: 'continuous' }}
-          testID={`${testID}-pointer-disclaimer`}
-        >
-          <Text className="text-xs text-info-700 dark:text-info-300 text-right leading-relaxed">
-            يشير هذا الموضع إلى آخر نشاط حفظ فقط، ولا يعبّر عن نسبة التقدم.
-          </Text>
-        </View>
       </View>
     </View>
   );

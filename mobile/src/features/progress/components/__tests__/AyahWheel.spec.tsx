@@ -17,7 +17,7 @@ describe('AyahWheel Component', () => {
     jest.clearAllMocks();
   });
 
-  it('renders exactly 1..ayah_count items and displays surah title', () => {
+  it('renders exactly 1..ayah_count items inside the Figma WheelCard with the "الآية" label', () => {
     render(
       <AyahWheel
         surah={mockSurahs[0]} // Al-Fatiha, 7 ayahs
@@ -28,8 +28,10 @@ describe('AyahWheel Component', () => {
       />,
     );
 
-    expect(screen.getByText('سورة الفاتحة')).toBeTruthy();
-    expect(screen.getByText('عدد الآيات: 7')).toBeTruthy();
+    expect(screen.getByText('الآية')).toBeTruthy();
+    expect(screen.getByTestId('ayah-wheel').props.accessibilityLabel).toBe(
+      'سورة الفاتحة، عدد الآيات 7',
+    );
 
     for (let i = 1; i <= 7; i++) {
       expect(screen.getByTestId(`ayah-wheel-picker-item-${i}`)).toBeTruthy();

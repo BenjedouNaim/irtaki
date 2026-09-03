@@ -6,7 +6,7 @@ import { ApiError } from '@/shared/api/types';
 
 jest.mock('@/shared/api/groups.client');
 
-describe('GroupLifecyclePanel Component', () => {
+describe('GroupLifecyclePanel (Figma SCR-29 Lifecycle card + Archive confirm)', () => {
   const mockGroupId = '11111111-1111-1111-1111-111111111111';
 
   const mockGroup: groupsApi.GroupListItemFull = {
@@ -30,7 +30,7 @@ describe('GroupLifecyclePanel Component', () => {
     jest.clearAllMocks();
   });
 
-  it('renders archive action button when group is Active', () => {
+  it('renders the archive row when the group is Active', () => {
     render(
       <GroupLifecyclePanel
         groupId={mockGroupId}
@@ -40,10 +40,17 @@ describe('GroupLifecyclePanel Component', () => {
     );
 
     expect(screen.getByTestId('group-lifecycle-panel')).toBeTruthy();
-    expect(screen.getByText('أرشفة الحلقة')).toBeTruthy();
+    expect(screen.getByText('دورة الحياة')).toBeTruthy();
+    expect(screen.getByText('أرشفة المجموعة')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'ترفض الطلبات المعلّقة، توقف التقارير والدفع. قابلة للعكس.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('أرشفة')).toBeTruthy();
   });
 
-  it('renders un-archive action button when group is Archived', () => {
+  it('renders the un-archive row when the group is Archived', () => {
     render(
       <GroupLifecyclePanel
         groupId={mockGroupId}
@@ -52,11 +59,11 @@ describe('GroupLifecyclePanel Component', () => {
       />,
     );
 
-    expect(screen.getByTestId('group-lifecycle-panel')).toBeTruthy();
-    expect(screen.getByText('إلغاء الأرشفة وتفعيل الحلقة')).toBeTruthy();
+    expect(screen.getByText('المجموعة مؤرشفة')).toBeTruthy();
+    expect(screen.getByText('إلغاء الأرشفة')).toBeTruthy();
   });
 
-  it('opens confirmation modal and archives group on confirm', async () => {
+  it('opens the standard confirmation naming the group and archives on confirm', async () => {
     const onChangedMock = jest.fn();
     const updatedGroup: groupsApi.GroupListItemFull = {
       ...mockGroup,
@@ -73,17 +80,21 @@ describe('GroupLifecyclePanel Component', () => {
       <GroupLifecyclePanel
         groupId={mockGroupId}
         lifecycleState="Active"
+        groupName="حلقة قالون"
         onChanged={onChangedMock}
       />,
     );
 
-    // Press archive button to open modal
     fireEvent.press(screen.getByTestId('toggle-lifecycle-button'));
 
     expect(screen.getByTestId('lifecycle-confirm-dialog')).toBeTruthy();
-    expect(screen.getByText('تأكيد أرشفة الحلقة')).toBeTruthy();
+    expect(screen.getByText('أرشفة حلقة قالون؟')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'تُرفض الطلبات المعلّقة تلقائيًا، وتتوقف التقارير والدفع. يمكن إلغاء الأرشفة لاحقًا، لكن الطلبات المرفوضة لا تعود.',
+      ),
+    ).toBeTruthy();
 
-    // Confirm archival
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('lifecycle-confirm-dialog-confirm-button'),
@@ -115,13 +126,11 @@ describe('GroupLifecyclePanel Component', () => {
       />,
     );
 
-    // Press un-archive button to open modal
     fireEvent.press(screen.getByTestId('toggle-lifecycle-button'));
 
     expect(screen.getByTestId('lifecycle-confirm-dialog')).toBeTruthy();
-    expect(screen.getByText('تأكيد تفعيل الحلقة')).toBeTruthy();
+    expect(screen.getByText('إلغاء أرشفة المجموعة؟')).toBeTruthy();
 
-    // Confirm un-archival
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('lifecycle-confirm-dialog-confirm-button'),
@@ -132,7 +141,7 @@ describe('GroupLifecyclePanel Component', () => {
     expect(onChangedMock).toHaveBeenCalledWith(updatedGroup);
   });
 
-  it('displays error banner when setGroupLifecycle API fails', async () => {
+  it('displays the error banner when setGroupLifecycle fails', async () => {
     jest.spyOn(groupsApi, 'setGroupLifecycle').mockRejectedValueOnce(
       new ApiError({
         statusCode: 500,
@@ -149,10 +158,8 @@ describe('GroupLifecyclePanel Component', () => {
       />,
     );
 
-    // Press archive button to open modal
     fireEvent.press(screen.getByTestId('toggle-lifecycle-button'));
 
-    // Confirm
     await act(async () => {
       fireEvent.press(
         screen.getByTestId('lifecycle-confirm-dialog-confirm-button'),

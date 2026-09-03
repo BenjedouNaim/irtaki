@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
+import { MetricRow } from '@/shared/components/MetricRow';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { TopBar } from '@/shared/components/TopBar';
 import { ApiError } from '@/shared/api/types';
 import { YesNoToggle } from '@/features/dailyReports/components/YesNoToggle';
+import { formatArabicWeekRange } from '@/features/dailyReports/utils/arabicDate';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
 import { useCurrentWeeklyReport } from '../hooks/useCurrentWeeklyReport';
 import { useConfirmWeeklyReport } from '../hooks/useConfirmWeeklyReport';
-import { WeeklyReportMetrics } from '../components/WeeklyReportMetrics';
+import {
+  STATE_BADGE,
+  WeeklyReportMetrics,
+} from '../components/WeeklyReportMetrics';
 
 /** Network unavailable (UF §24) — same copy as every other screen. */
 const NETWORK_ERROR_MESSAGE =
@@ -23,13 +33,20 @@ const CONFIRM_SERVER_ERROR_MESSAGE = 'حدث خطأ أثناء تأكيد الت
  */
 const NOT_RECITATION_DAY_MESSAGE =
   'تعذر تأكيد التقرير الأسبوعي؛ انتهى يوم التسميع.';
+/** Figma SCR-12 heading line — "6 أيام متوقّعة. ملخّص صادق — لا يُخفَّف." */
+const HONEST_SUMMARY = 'ملخّص صادق — لا يُخفَّف.';
+const LIVE_NOTE =
+  'هذه أرقام الأسبوع الجاري وتتحدث مع كل تقرير يومي. يُتاح تأكيد التقرير في يوم التسميع فقط.';
+const FINALISED_NOTE = 'تم اعتماد هذا التقرير ولا يمكن تعديله.';
+const ALREADY_FINALISED_NOTE =
+  'اعتُمد هذا الأسبوع تلقائياً عند منتصف الليل قبل تأكيدك.';
 
 /**
  * A non-field outcome of a confirmation (UF §16 state table): `retry`
  * keeps the screen and the answer (UF §24 "form data always preserved");
  * `home` sends the student back for Home to re-evaluate fresh.
  */
-interface Banner {
+interface ConfirmBanner {
   message: string;
   action: 'retry' | 'home';
 }
@@ -50,9 +67,11 @@ function describeError(error: unknown): string {
 }
 
 /**
- * SCR-12 Weekly Report (F-WR-01, UF §16 / §28): "Vertical stack: header,
- * metrics, checkbox, CTA". Reached from the SCR-08 CTA on the recitation
- * day (UF §26) and from the SCR-10 `422 RECITATION_DAY` path (UF §15).
+ * SCR-12 Weekly Report (F-WR-01, UF §16 / §28; Figma 27:633): TopBar
+ * "التقرير الأسبوعي", heading (week range + expected days line), the
+ * Metrics card, the attendance card and the Confirm CTA. Reached from the
+ * SCR-08 CTA on the recitation day (UF §26) and from the SCR-10
+ * `422 RECITATION_DAY` path (UF §15).
  *
  * Everything shown comes from API-033; the screen infers nothing:
  *  - `can_confirm=true` (recitation day, `Open`): metrics + the attendance
@@ -77,7 +96,7 @@ export function WeeklyReportScreen() {
   const { data, isLoading, isError, error, refetch } = useCurrentWeeklyReport();
   const confirmation = useConfirmWeeklyReport();
   const [attended, setAttended] = useState<boolean | null>(null);
-  const [banner, setBanner] = useState<Banner | null>(null);
+  const [banner, setBanner] = useState<ConfirmBanner | null>(null);
   const [alreadyFinalised, setAlreadyFinalised] = useState(false);
   const confirming = confirmation.isPending;
 
@@ -132,128 +151,105 @@ export function WeeklyReportScreen() {
     }
   };
 
-  const header = (
-    <View className="flex-row-reverse items-center justify-between">
-      <View className="flex-1 gap-1">
-        <Text
-          className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right"
-          accessibilityRole="header"
-          testID="weekly-report-title"
-        >
-          التقرير الأسبوعي
-        </Text>
-        {data ? (
-          <Text
-            className="text-sm text-gray-500 dark:text-gray-400 text-right"
-            testID="weekly-report-week-range"
-          >
-            {`من ${data.week_start} إلى ${data.week_end}`}
-          </Text>
-        ) : null}
-      </View>
-      <Pressable
-        testID="weekly-report-back-button"
-        accessibilityRole="button"
-        accessibilityLabel="العودة"
-        onPress={goBack}
-        className="min-h-[48px] min-w-[48px] items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-gray-800"
-      >
-        <Text className="text-xl font-bold text-gray-800 dark:text-gray-200">
-          →
-        </Text>
-      </Pressable>
-    </View>
-  );
-
   let body: React.ReactElement;
 
   if (isLoading && !data) {
-    // UF §22: skeleton matching the eventual layout — six metric rows.
+    // UF §22: skeleton matching the eventual layout — the five metric rows.
     body = (
-      <View testID="weekly-report-skeleton">
+      <View
+        testID="weekly-report-skeleton"
+        className="w-full px-4 py-3 rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark"
+        style={{ borderCurve: 'continuous' }}
+      >
         <SkeletonLoader
           variant="metricRow"
-          count={6}
+          count={5}
           testID="weekly-report-skeleton-loader"
         />
       </View>
     );
   } else if (isError || !data) {
     body = (
-      <View
+      <Banner
+        tone="error"
+        message={describeError(error)}
+        onRetry={() => void refetch()}
         testID="weekly-report-error"
-        accessibilityRole="alert"
-        className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3"
-        style={{ borderCurve: 'continuous' }}
-      >
-        <View className="flex-row-reverse items-center gap-2">
-          <Text
-            testID="weekly-report-error-icon"
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-          <Text
-            className="flex-1 text-destructive-800 dark:text-destructive-200 text-sm text-right leading-relaxed"
-            testID="weekly-report-error-message"
-          >
-            {describeError(error)}
-          </Text>
-        </View>
-        <Button
-          label="إعادة المحاولة"
-          variant="outline"
-          onPress={() => void refetch()}
-          testID="weekly-report-retry-button"
-        />
-      </View>
+      />
     );
   } else {
     const canConfirm = data.can_confirm && data.id !== null;
     const reportId = data.id;
+    const finalised = data.state === 'Finalised';
 
     body = (
-      <View className="w-full gap-4" testID="weekly-report-content">
-        <WeeklyReportMetrics report={data} />
+      <View className="w-full gap-5" testID="weekly-report-content">
+        <View className={`w-full gap-1 ${itemsStart}`}>
+          <View
+            className={`w-full ${rowStart} items-center justify-between gap-3`}
+          >
+            <Text
+              className={`flex-1 ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+              accessibilityRole="header"
+              testID="weekly-report-week-range"
+            >
+              {formatArabicWeekRange(data.week_start, data.week_end)}
+            </Text>
+            {finalised ? (
+              <StatusBadge
+                status={STATE_BADGE.Finalised.label}
+                variant={STATE_BADGE.Finalised.variant}
+                testID="weekly-report-state-badge"
+              />
+            ) : null}
+          </View>
+          <Text
+            className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+            testID="weekly-report-expected-days"
+          >
+            {`${data.expected_days} أيام متوقّعة. ${HONEST_SUMMARY}`}
+          </Text>
+        </View>
+
+        <WeeklyReportMetrics report={data}>
+          {finalised ? (
+            <MetricRow
+              label="حضور مجلس التسميع"
+              value={data.attended_recitation_call ? 'نعم' : 'لا'}
+              testID="weekly-report-attended-line"
+            />
+          ) : null}
+        </WeeklyReportMetrics>
 
         {canConfirm && reportId !== null ? (
-          <View className="w-full gap-2" testID="weekly-report-confirm-section">
-            <YesNoToggle
-              question="هل حضرت جلسة التسميع؟"
-              value={attended}
-              onChange={setAttended}
-              disabled={confirming}
-              testID="attended-toggle"
-            />
+          <View className="w-full gap-4" testID="weekly-report-confirm-section">
+            <View
+              className={`w-full px-4 py-5 gap-2.5 rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark ${itemsStart}`}
+              style={{ borderCurve: 'continuous' }}
+            >
+              <YesNoToggle
+                question="هل حضرت مجلس التسميع؟"
+                value={attended}
+                onChange={setAttended}
+                disabled={confirming}
+                testID="attended-toggle"
+              />
+            </View>
             {banner ? (
-              <View
-                testID="weekly-report-confirm-banner"
-                accessibilityRole="alert"
-                className="w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-4 gap-3"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View className="flex-row-reverse items-center gap-2">
-                  <Text
-                    testID="weekly-report-confirm-banner-icon"
-                    accessibilityLabel="تنبيه"
-                    className="text-base"
-                  >
-                    ⚠️
-                  </Text>
-                  <Text
-                    className="flex-1 text-destructive-800 dark:text-destructive-200 text-sm text-right leading-relaxed"
-                    testID="weekly-report-confirm-banner-message"
-                  >
-                    {banner.message}
-                  </Text>
-                </View>
+              <View className="w-full gap-3">
+                <Banner
+                  tone="error"
+                  icon={banner.action === 'home' ? 'alert' : undefined}
+                  message={banner.message}
+                  testID="weekly-report-confirm-banner"
+                />
                 {banner.action === 'home' ? (
                   <Button
                     label="العودة إلى الرئيسية"
                     variant="outline"
                     onPress={goHome}
                     testID="weekly-report-confirm-banner-home-button"
+                    className="w-full"
                   />
                 ) : null}
               </View>
@@ -272,59 +268,50 @@ export function WeeklyReportScreen() {
               className="w-full"
             />
           </View>
-        ) : data.state === 'Finalised' ? (
-          <View
-            className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-1"
-            style={{ borderCurve: 'continuous' }}
-            testID="weekly-report-finalised-note"
-          >
-            <Text className="text-sm font-semibold text-gray-800 dark:text-gray-200 text-right">
-              تم اعتماد هذا التقرير ولا يمكن تعديله.
-            </Text>
-            <Text
-              className="text-sm text-gray-600 dark:text-gray-400 text-right"
-              testID="weekly-report-attended-line"
-            >
-              {`حضور جلسة التسميع: ${
-                data.attended_recitation_call ? 'نعم' : 'لا'
-              }`}
-            </Text>
+        ) : finalised ? (
+          <View className="w-full gap-3">
+            <Banner
+              tone="info"
+              message={FINALISED_NOTE}
+              testID="weekly-report-finalised-note"
+            />
             {alreadyFinalised ? (
-              <Text
-                className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed"
+              <Banner
+                tone="info"
+                message={ALREADY_FINALISED_NOTE}
                 testID="weekly-report-already-finalised-note"
-              >
-                اعتُمد هذا الأسبوع تلقائياً عند منتصف الليل قبل تأكيدك.
-              </Text>
+              />
             ) : null}
           </View>
         ) : (
-          <View
-            className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
-            style={{ borderCurve: 'continuous' }}
+          <Banner
+            tone="info"
+            message={LIVE_NOTE}
             testID="weekly-report-live-note"
-          >
-            <Text className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed">
-              هذه أرقام الأسبوع الجاري وتتحدث مع كل تقرير يومي. يُتاح تأكيد
-              التقرير في يوم التسميع فقط.
-            </Text>
-          </View>
+          />
         )}
       </View>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-white dark:bg-gray-950"
-      contentContainerStyle={{ flexGrow: 1, padding: 20 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="weekly-report-screen"
     >
-      <View className="w-full max-w-md self-center gap-5">
-        {header}
+      <TopBar title="التقرير الأسبوعي" onBack={goBack} testID="weekly-report" />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 24,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         {body}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

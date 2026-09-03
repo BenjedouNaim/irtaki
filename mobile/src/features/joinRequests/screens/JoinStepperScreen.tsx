@@ -4,18 +4,30 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Modal,
   TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Checkbox } from '@/shared/components/Checkbox';
+import { EmptyState } from '@/shared/components/EmptyState';
+import { FormField, getInputClassName } from '@/shared/components/FormField';
+import { Icon } from '@/shared/components/Icon';
+import { ListRow } from '@/shared/components/ListRow';
+import { SegmentedControl } from '@/shared/components/SegmentedControl';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
-import { FormField } from '@/shared/components/FormField';
+import { StepIndicator } from '@/shared/components/StepIndicator';
+import { Toast } from '@/shared/components/Toast';
+import { TopBar } from '@/shared/components/TopBar';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import { AhzabChipGrid } from '../components/AhzabChipGrid';
+import { GroupDetailSheet } from '../components/GroupDetailSheet';
 import {
   listAvailableGroups,
   GroupListItemLimited,
@@ -42,12 +54,153 @@ export function getRecitationDayName(day: number): string {
 
 export type TajweedLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 
+type Gender = 'Male' | 'Female';
+type YesNo = 'yes' | 'no';
+type GoalOption = 'memorization' | 'revision';
+
+/** Network / 5xx while listing groups (UF §24, Figma 54:4561). */
+const GROUPS_ERROR_MESSAGE =
+  'تعذّر تحميل المجموعات. جنسك محفوظ — أعد المحاولة.';
+/** EC-09 / VR-34 — group closed at final submit (Figma 54:4748). */
+const GROUP_UNAVAILABLE_TOAST = 'المجموعة لم تعد متاحة — حُدِّثت القائمة';
+/** BR-36 — Revision-only applications are blocked client-side. */
+const REVISION_BLOCK_MESSAGE =
+  'عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.';
+/** Fee agreement (VR-06) — 30 TND per 3-month cycle (SRS business value). */
+const FEE_AGREEMENT_LABEL =
+  'أوافق على دفع رسوم المركز (30 دينارًا لكل دورة من 3 أشهر) في مواعيدها.';
+
+const TAJWEED_OPTIONS: { label: string; value: TajweedLevel }[] = [
+  { label: 'مبتدئ', value: 'Beginner' },
+  { label: 'متوسط', value: 'Intermediate' },
+  { label: 'متقدم', value: 'Advanced' },
+];
+const YES_NO_OPTIONS: { label: string; value: YesNo }[] = [
+  { label: 'نعم', value: 'yes' },
+  { label: 'لا', value: 'no' },
+];
+const GOAL_OPTIONS: { label: string; value: GoalOption }[] = [
+  { label: 'حفظ', value: 'memorization' },
+  { label: 'مراجعة فقط', value: 'revision' },
+];
+
+function toYesNo(value: boolean | null): YesNo | null {
+  if (value === null) return null;
+  return value ? 'yes' : 'no';
+}
+
+function GenderOption({
+  label,
+  selected,
+  onPress,
+  testID,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  testID: string;
+}) {
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      className={`flex-1 items-center justify-center gap-2.5 py-6 rounded-lg active:opacity-80 ${
+        selected
+          ? 'bg-primary-subtle dark:bg-primary-subtle-dark border-[1.5px] border-line-brand dark:border-line-brand-dark'
+          : 'bg-surface dark:bg-surface-dark border border-line dark:border-line-dark'
+      }`}
+      style={{ borderCurve: 'continuous' }}
+    >
+      <View
+        className={`w-12 h-12 rounded-full items-center justify-center ${
+          selected
+            ? 'bg-primary dark:bg-primary-dark'
+            : 'bg-subtle dark:bg-subtle-dark'
+        }`}
+      >
+        <Icon
+          name="user"
+          size={21}
+          tone={selected ? 'on-primary' : 'secondary'}
+        />
+      </View>
+      <Text
+        className={`${typography.headingSm} text-center ${
+          selected
+            ? 'text-brand dark:text-brand-dark'
+            : 'text-fg dark:text-fg-dark'
+        }`}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <View className={`w-full gap-1 ${itemsStart}`}>
+      <Text
+        className={`w-full ${typography.headingLg} text-right text-fg dark:text-fg-dark`}
+        accessibilityRole="header"
+      >
+        {title}
+      </Text>
+      <Text
+        className={`w-full ${typography.bodyMd} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      >
+        {subtitle}
+      </Text>
+    </View>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <Text
+      className={`w-full mb-4 ${typography.overline} text-right text-fg-secondary dark:text-fg-secondary-dark`}
+      accessibilityRole="header"
+    >
+      {children}
+    </Text>
+  );
+}
+
+function InlineError({
+  message,
+  testID,
+}: {
+  message: string;
+  testID?: string;
+}) {
+  return (
+    <View
+      className={`${rowStart} items-center gap-1 w-full mt-2`}
+      testID={testID}
+      accessibilityRole="alert"
+    >
+      <Icon name="alert" size={16} tone="error" accessibilityLabel="تنبيه" />
+      <Text className={`flex-1 ${typography.bodySm} text-right text-fg-error`}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * SCR-06 Join Stepper (Figma 22:139 · 22:201 · 22:290 · 54:4561 · 54:4735 ·
+ * 23:258) with the SCR-07 group sheet (23:230 · 54:4622). Gender → eligible
+ * groups → profile (UF §11, §13); the top-bar back control steps backwards.
+ */
 export function JoinStepperScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedGender, setSelectedGender] = useState<
-    'Male' | 'Female' | null
-  >(null);
+  const [selectedGender, setSelectedGender] = useState<Gender | null>(null);
 
   const [groups, setGroups] = useState<GroupListItemLimited[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +209,7 @@ export function JoinStepperScreen() {
     string | null
   >(null);
 
-  // Group Detail Modal (SCR-07) state
+  // Group Detail sheet (SCR-07) state
   const [selectedGroup, setSelectedGroup] =
     useState<GroupListItemLimited | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -77,6 +230,7 @@ export function JoinStepperScreen() {
     'Memorization',
   );
   const [feeAgreement, setFeeAgreement] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Submission & Form Errors State
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -97,24 +251,33 @@ export function JoinStepperScreen() {
     }
   };
 
-  const fetchGroups = useCallback(async (gender: 'Male' | 'Female') => {
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const fetchGroups = useCallback(async (gender: Gender) => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
       const response = await listAvailableGroups(gender);
       setGroups(response.data as GroupListItemLimited[]);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setErrorMessage(err.message || 'تعذر تحميل الحلقات المتاحة');
+      if (err instanceof ApiError && err.statusCode < 500) {
+        setErrorMessage(err.message || GROUPS_ERROR_MESSAGE);
       } else {
-        setErrorMessage('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+        setErrorMessage(GROUPS_ERROR_MESSAGE);
       }
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const handleGenderSelect = (gender: 'Male' | 'Female') => {
+  const handleGenderSelect = (gender: Gender) => {
     triggerHaptic('selection');
     setSelectedGender(gender);
   };
@@ -138,6 +301,18 @@ export function JoinStepperScreen() {
     setShowDetailModal(true);
   };
 
+  const handleCloseGroupDetail = () => {
+    setShowDetailModal(false);
+    // UF §11 — a group that closed since listing refreshes the list on close.
+    if (
+      selectedGroup &&
+      selectedGroup.enrollment_status !== 'Open' &&
+      selectedGender
+    ) {
+      fetchGroups(selectedGender);
+    }
+  };
+
   const handleProceedToStep3 = () => {
     setShowDetailModal(false);
     setFieldErrors({});
@@ -149,6 +324,16 @@ export function JoinStepperScreen() {
   const handleBackToStep2 = () => {
     setStep(2);
     setSubmitError(null);
+  };
+
+  const handleTopBarBack = () => {
+    if (step === 1) {
+      router.back();
+    } else if (step === 2) {
+      handleBackToStep1();
+    } else {
+      handleBackToStep2();
+    }
   };
 
   // Client-side validation for form readiness
@@ -209,13 +394,13 @@ export function JoinStepperScreen() {
         ) {
           // Group became unavailable -> return to Step 2 and refresh (EC-09)
           setStep(2);
-          setGroupUnavailableNotice(
-            'هذه الحلقة لم تعد متاحة للتسجيل. يرجى اختيار حلقة أخرى.',
-          );
+          setGroupUnavailableNotice(GROUP_UNAVAILABLE_TOAST);
           fetchGroups(selectedGender);
         } else if (err.statusCode === 409) {
           // Duplicate submit race -> silent success per UF.md §13
           router.replace('/(app)/user');
+        } else if (err.statusCode >= 500) {
+          setSubmitError('حدث خطأ أثناء إرسال الطلب. أعد المحاولة.');
         } else {
           setSubmitError(err.message || 'حدث خطأ أثناء إرسال الطلب');
         }
@@ -229,902 +414,426 @@ export function JoinStepperScreen() {
     }
   };
 
+  const inputClass = (field: string) =>
+    getInputClassName({
+      error: Boolean(fieldErrors[field]),
+      focused: focusedField === field,
+    });
+
+  const genderLabel = selectedGender === 'Female' ? 'للإناث' : 'للذكور';
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
     >
+      <TopBar
+        title="طلب الانضمام"
+        onBack={handleTopBarBack}
+        testID="join-stepper-top-bar"
+      />
+
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 60 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: 8,
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+          gap: 24,
+        }}
         contentInsetAdjustmentBehavior="automatic"
         testID="join-stepper-screen"
         keyboardShouldPersistTaps="handled"
       >
-        {/* Stepper Header / Progress Indicator */}
-        <View
-          className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800"
-          style={{ borderCurve: 'continuous' }}
-        >
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-sm font-semibold text-primary dark:text-primary-400">
-              {step === 1
-                ? 'الخطوة 1 من 3: تحديد الجنس'
-                : step === 2
-                  ? 'الخطوة 2 من 3: اختيار الحلقة'
-                  : 'الخطوة 3 من 3: بيانات التقديم'}
-            </Text>
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
-              {step === 1 ? '1/3' : step === 2 ? '2/3' : '3/3'}
-            </Text>
-          </View>
+        <StepIndicator step={step} testID="step-indicator" />
 
-          {/* Progress bar */}
-          <View className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <View
-              className={`h-full bg-primary ${
-                step === 1 ? 'w-1/3' : step === 2 ? 'w-2/3' : 'w-full'
-              } rounded-full`}
-            />
-          </View>
-        </View>
-
-        {/* Step 1: Gender Selection */}
+        {/* Step 1: Gender (Figma 22:139) */}
         {step === 1 && (
-          <View className="gap-4">
-            <View>
-              <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 text-right">
-                تحديد الجنس
-              </Text>
-              <Text className="text-sm text-gray-600 dark:text-gray-400 text-right">
-                يرجى تحديد الجنس لعرض الحلقات القرآنية المتاحة المناسبة لك
-              </Text>
-            </View>
-
-            <View className="gap-3">
-              <Pressable
-                testID="gender-male-option"
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selectedGender === 'Male' }}
-                accessibilityLabel="ذكور"
+          <View className="flex-1 gap-6" testID="step1-gender">
+            <StepHeading
+              title="ما جنسك؟"
+              subtitle="تُعرض عليك مجموعات الجنس نفسه فقط. يُسجَّل هذا مرة واحدة."
+            />
+            <View
+              className={`${rowStart} items-start gap-3 w-full`}
+              accessibilityRole="radiogroup"
+            >
+              <GenderOption
+                label="ذكر"
+                selected={selectedGender === 'Male'}
                 onPress={() => handleGenderSelect('Male')}
-                className={`p-4 rounded-xl border-2 flex-row items-center justify-between ${
-                  selectedGender === 'Male'
-                    ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                }`}
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View
-                  className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                    selectedGender === 'Male'
-                      ? 'border-primary bg-primary'
-                      : 'border-gray-400'
-                  }`}
-                >
-                  {selectedGender === 'Male' && (
-                    <View className="w-2.5 h-2.5 rounded-full bg-white" />
-                  )}
-                </View>
-                <View className="items-end">
-                  <Text className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    ذكور (رجال)
-                  </Text>
-                  <Text className="text-xs text-gray-500 dark:text-gray-400">
-                    عرض حلقات الذكور المفتوحة
-                  </Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                testID="gender-female-option"
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selectedGender === 'Female' }}
-                accessibilityLabel="إناث"
+                testID="gender-male-option"
+              />
+              <GenderOption
+                label="أنثى"
+                selected={selectedGender === 'Female'}
                 onPress={() => handleGenderSelect('Female')}
-                className={`p-4 rounded-xl border-2 flex-row items-center justify-between ${
-                  selectedGender === 'Female'
-                    ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                }`}
-                style={{ borderCurve: 'continuous' }}
-              >
-                <View
-                  className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                    selectedGender === 'Female'
-                      ? 'border-primary bg-primary'
-                      : 'border-gray-400'
-                  }`}
-                >
-                  {selectedGender === 'Female' && (
-                    <View className="w-2.5 h-2.5 rounded-full bg-white" />
-                  )}
-                </View>
-                <View className="items-end">
-                  <Text className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    إناث (نساء)
-                  </Text>
-                  <Text className="text-xs text-gray-500 dark:text-gray-400">
-                    عرض حلقات الإناث المفتوحة
-                  </Text>
-                </View>
-              </Pressable>
+                testID="gender-female-option"
+              />
             </View>
-
+            <View className="flex-1" />
             <Button
-              label="التالي: عرض الحلقات المتاحة"
+              label="متابعة"
               onPress={handleProceedToStep2}
               disabled={!selectedGender}
               testID="step1-submit-button"
-              className="mt-2"
-            />
-
-            <Button
-              label="إلغاء والعودة للرئيسية"
-              variant="outline"
-              onPress={() => router.back()}
-              testID="cancel-button"
+              className="w-full"
             />
           </View>
         )}
 
-        {/* Step 2: Available Groups List */}
+        {/* Step 2: Eligible groups (Figma 22:201 · 22:290 · 54:4561) */}
         {step === 2 && (
-          <View className="gap-4">
-            <View className="flex-row items-center justify-between">
-              <Pressable
-                testID="change-gender-button"
-                onPress={handleBackToStep1}
-                className="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800 active:opacity-70"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <Text className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  تغيير الجنس
-                </Text>
-              </Pressable>
-              <View className="items-end">
-                <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 text-right">
-                  الحلقات المتاحة
-                </Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                  الفئة: {selectedGender === 'Male' ? 'ذكور' : 'إناث'}
-                </Text>
-              </View>
-            </View>
+          <View className="gap-6" testID="step2-groups">
+            <StepHeading
+              title="المجموعات المتاحة"
+              subtitle="الاسم ويوم التسميع فقط — اضغط على مجموعة للاطلاع والتقديم."
+            />
 
-            {/* Unavailable Group Notice (EC-09) */}
-            {groupUnavailableNotice && (
-              <View
-                className="p-4 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-800"
-                style={{ borderCurve: 'continuous' }}
-                testID="group-unavailable-notice"
-              >
-                <Text className="text-sm font-semibold text-amber-800 dark:text-amber-200 text-right">
-                  {groupUnavailableNotice}
-                </Text>
-              </View>
-            )}
-
-            {/* Loading state */}
             {isLoading && (
-              <View className="gap-3" testID="groups-loading">
-                <SkeletonLoader count={3} />
-              </View>
+              <SkeletonLoader variant="row" count={3} testID="groups-loading" />
             )}
 
-            {/* Error state */}
             {!isLoading && errorMessage && (
-              <View
-                className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
-                style={{ borderCurve: 'continuous' }}
+              <Banner
+                message={errorMessage}
+                tone="error"
+                onRetry={() => selectedGender && fetchGroups(selectedGender)}
                 testID="groups-error-banner"
-              >
-                <Text className="text-sm font-semibold text-destructive dark:text-destructive-300 text-right">
-                  {errorMessage}
-                </Text>
-                <Button
-                  label="إعادة المحاولة"
-                  variant="outline"
-                  onPress={() => selectedGender && fetchGroups(selectedGender)}
-                  testID="retry-fetch-button"
-                />
-              </View>
+              />
             )}
 
-            {/* Empty state */}
             {!isLoading && !errorMessage && groups.length === 0 && (
-              <View
+              <EmptyState
+                message={`لا توجد مجموعات متاحة ${genderLabel} حاليًا`}
+                icon="layers"
                 testID="empty-groups-state"
-                className="p-6 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 items-center text-center gap-3 mt-4"
-                style={{ borderCurve: 'continuous' }}
-              >
-                <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-center">
-                  لا توجد حلقات متاحة لـ{' '}
-                  {selectedGender === 'Male' ? 'الذكور' : 'الإناث'} حالياً
-                </Text>
-                <Text className="text-sm text-gray-500 dark:text-gray-400 text-center leading-5">
-                  لا توجد حلقات مفتوحة ونشطة تناسب خيارك في الوقت الحالي. يمكنك
-                  تغيير الجنس أو المحاولة لاحقاً عند فتح حلقات جديدة.
-                </Text>
-                <Button
-                  label="تغيير الجنس"
-                  variant="outline"
-                  onPress={handleBackToStep1}
-                  testID="empty-back-button"
-                  className="mt-2"
-                />
-              </View>
+              />
             )}
 
-            {/* List of groups */}
             {!isLoading && !errorMessage && groups.length > 0 && (
-              <View className="gap-3" testID="available-groups-list">
+              <View className="w-full gap-2.5" testID="available-groups-list">
                 {groups.map((group) => (
-                  <Pressable
+                  <ListRow
                     key={group.id}
-                    testID={`group-card-${group.id}`}
+                    title={group.name}
+                    subtitle={`يوم التسميع: ${getRecitationDayName(group.recitation_day)}`}
+                    leadingIcon="layers"
+                    trailing="chevron"
                     onPress={() => handleOpenGroupDetail(group)}
-                    className="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 active:border-primary dark:active:border-primary-500 gap-2"
-                    style={{ borderCurve: 'continuous' }}
-                  >
-                    <View className="flex-row items-center justify-between">
-                      <StatusBadge
-                        status="مفتوح للتسجيل"
-                        variant="success"
-                        testID={`status-badge-${group.id}`}
-                      />
-                      <Text
-                        selectable
-                        className="text-base font-bold text-gray-900 dark:text-gray-100 text-right"
-                      >
-                        {group.name}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center justify-end gap-1">
-                      <Text className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                        {getRecitationDayName(group.recitation_day)}
-                      </Text>
-                      <Text className="text-xs text-gray-500 dark:text-gray-400">
-                        يوم التسميع الأسبوعي:
-                      </Text>
-                    </View>
-                  </Pressable>
+                    testID={`group-card-${group.id}`}
+                  />
                 ))}
               </View>
             )}
-
-            {/* Back button */}
-            <Button
-              label="الرجوع لتحديد الجنس"
-              variant="outline"
-              onPress={handleBackToStep1}
-              testID="step2-back-button"
-              className="mt-4"
-            />
           </View>
         )}
 
-        {/* Step 3: Application Profile Form (SCR-06 / UF.md §13) */}
+        {/* Step 3: Profile (Figma 23:258 · UF §13) */}
         {step === 3 && (
-          <View className="gap-4" testID="step3-profile-form">
-            {/* Selected Group Header Card */}
-            <View
-              className="p-4 rounded-xl bg-primary-50/50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900 flex-row items-center justify-between"
-              style={{ borderCurve: 'continuous' }}
-            >
-              <View className="items-start">
-                <Text className="text-xs text-primary-700 dark:text-primary-300 font-semibold">
-                  يوم التسميع:{' '}
-                  {selectedGroup
-                    ? getRecitationDayName(selectedGroup.recitation_day)
-                    : ''}
-                </Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400">
-                  الفئة: {selectedGender === 'Male' ? 'ذكور' : 'إناث'}
-                </Text>
-              </View>
-              <View className="items-end">
-                <Text className="text-xs text-gray-500 dark:text-gray-400">
-                  الحلقة المحددة
-                </Text>
-                <Text className="text-base font-bold text-gray-900 dark:text-gray-100">
-                  {selectedGroup?.name}
-                </Text>
-              </View>
-            </View>
+          <View className="gap-6" testID="step3-profile-form">
+            <StepHeading
+              title="ملفك الشخصي"
+              subtitle="تُملأ هذه البيانات مع كل طلب. تُعرض على مساعد المجموعة فقط."
+            />
 
-            {/* Submit Error Banner */}
             {submitError && (
-              <View
-                className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800"
-                style={{ borderCurve: 'continuous' }}
+              <Banner
+                message={submitError}
+                tone="error"
                 testID="form-error-banner"
-              >
-                <Text className="text-sm font-semibold text-destructive dark:text-destructive-300 text-right">
-                  {submitError}
-                </Text>
-              </View>
+              />
             )}
 
-            {/* Full Name */}
-            <FormField
-              label="الاسم الكامل"
-              required
-              error={fieldErrors['full_name']}
-              helpText="الاسم واللقب كما هو في الهوية (3–80 حرفاً)"
-              testID="field-full-name"
-            >
-              <TextInput
-                value={fullName}
-                onChangeText={(text) => {
-                  setFullName(text);
-                  if (fieldErrors['full_name']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      full_name: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                placeholder="مثال: أحمد بن محمد التونسي"
-                placeholderTextColor="#9ca3af"
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-right text-base"
-                style={{ borderCurve: 'continuous' }}
-                testID="input-full-name"
-              />
-            </FormField>
+            <View className="w-full">
+              <SectionLabel>البيانات الأساسية</SectionLabel>
 
-            {/* Age */}
-            <FormField
-              label="العمر"
-              required
-              error={fieldErrors['age']}
-              helpText="العمر بالسنوات"
-              testID="field-age"
-            >
-              <TextInput
-                value={age}
-                onChangeText={(text) => {
-                  setAge(text.replace(/[^0-9]/g, ''));
-                  if (fieldErrors['age']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      age: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                placeholder="مثال: 25"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-right text-base"
-                style={{ borderCurve: 'continuous' }}
-                testID="input-age"
-              />
-            </FormField>
-
-            {/* Phone Number */}
-            <FormField
-              label="رقم الهاتف"
-              required
-              error={fieldErrors['phone_number']}
-              helpText="رقم تونسي صالح (8 أرقام، اختياري: +216)"
-              testID="field-phone-number"
-            >
-              <TextInput
-                value={phoneNumber}
-                onChangeText={(text) => {
-                  setPhoneNumber(text);
-                  if (fieldErrors['phone_number']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      phone_number: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                placeholder="مثال: 98123456 أو +21698123456"
-                placeholderTextColor="#9ca3af"
-                keyboardType="phone-pad"
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-right text-base"
-                style={{ borderCurve: 'continuous' }}
-                testID="input-phone-number"
-              />
-            </FormField>
-
-            {/* Occupation */}
-            <FormField
-              label="المهنة / الصفة"
-              required
-              error={fieldErrors['occupation']}
-              testID="field-occupation"
-            >
-              <TextInput
-                value={occupation}
-                onChangeText={(text) => {
-                  setOccupation(text);
-                  if (fieldErrors['occupation']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      occupation: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                placeholder="مثال: مهندس برمجيات / طالب جامعي"
-                placeholderTextColor="#9ca3af"
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-right text-base"
-                style={{ borderCurve: 'continuous' }}
-                testID="input-occupation"
-              />
-            </FormField>
-
-            {/* City */}
-            <FormField
-              label="المدينة / الولاية"
-              required
-              error={fieldErrors['city']}
-              testID="field-city"
-            >
-              <TextInput
-                value={city}
-                onChangeText={(text) => {
-                  setCity(text);
-                  if (fieldErrors['city']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      city: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                placeholder="مثال: تونس / صفاقس / سوسة"
-                placeholderTextColor="#9ca3af"
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-right text-base"
-                style={{ borderCurve: 'continuous' }}
-                testID="input-city"
-              />
-            </FormField>
-
-            {/* Memorized Ahzab Chip Grid */}
-            <FormField
-              label="الأحزاب المحفوظة سابقاً"
-              required
-              error={fieldErrors['memorized_ahzab']}
-              helpText="يرجى تحديد جميع الأحزاب التي تحفظها حالياً (5 أحزاب على الأقل)"
-              testID="field-memorized-ahzab"
-            >
-              <AhzabChipGrid
-                selectedAhzab={memorizedAhzab}
-                onChange={(selected) => {
-                  setMemorizedAhzab(selected);
-                  if (fieldErrors['memorized_ahzab']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      memorized_ahzab: undefined as unknown as string,
-                    }));
-                  }
-                }}
-              />
-            </FormField>
-
-            {/* Tajweed Level */}
-            <FormField
-              label="مستوى التجويد"
-              required
-              error={fieldErrors['tajweed_level']}
-              testID="field-tajweed-level"
-            >
-              <View className="gap-2">
-                {[
-                  {
-                    key: 'Beginner',
-                    label: 'مبتدئ (معرفة أساسية بمخارج الحروف)',
-                  },
-                  {
-                    key: 'Intermediate',
-                    label: 'متوسط (تطبيق أحكام النون والميم والمدود)',
-                  },
-                  {
-                    key: 'Advanced',
-                    label: 'متقدم (إتقان تام للأحكام والصفات)',
-                  },
-                ].map((item) => {
-                  const isSelected = tajweedLevel === item.key;
-                  return (
-                    <Pressable
-                      key={item.key}
-                      testID={`tajweed-option-${item.key}`}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected }}
-                      onPress={() => {
-                        triggerHaptic('selection');
-                        setTajweedLevel(item.key as TajweedLevel);
-                        if (fieldErrors['tajweed_level']) {
-                          setFieldErrors((prev) => ({
-                            ...prev,
-                            tajweed_level: undefined as unknown as string,
-                          }));
-                        }
-                      }}
-                      className={`p-3.5 rounded-xl border flex-row items-center justify-between ${
-                        isSelected
-                          ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                          : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                      }`}
-                      style={{ borderCurve: 'continuous' }}
-                    >
-                      <View
-                        className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
-                          isSelected
-                            ? 'border-primary bg-primary'
-                            : 'border-gray-400'
-                        }`}
-                      >
-                        {isSelected && (
-                          <View className="w-2 h-2 rounded-full bg-white" />
-                        )}
-                      </View>
-                      <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right">
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </FormField>
-
-            {/* Studied Tajweed Theory */}
-            <FormField
-              label="هل درست قواعد التجويد النظرية سابقاً؟"
-              required
-              error={fieldErrors['studied_tajweed_theory']}
-              testID="field-tajweed-theory"
-            >
-              <View className="flex-row gap-3">
-                <Pressable
-                  testID="theory-yes"
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    selected: studiedTajweedTheory === true,
-                  }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setStudiedTajweedTheory(true);
-                  }}
-                  className={`flex-1 p-3 rounded-xl border items-center ${
-                    studiedTajweedTheory === true
-                      ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text
-                    className={`font-bold ${
-                      studiedTajweedTheory === true
-                        ? 'text-primary dark:text-primary-400'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    نعم
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  testID="theory-no"
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    selected: studiedTajweedTheory === false,
-                  }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setStudiedTajweedTheory(false);
-                  }}
-                  className={`flex-1 p-3 rounded-xl border items-center ${
-                    studiedTajweedTheory === false
-                      ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text
-                    className={`font-bold ${
-                      studiedTajweedTheory === false
-                        ? 'text-primary dark:text-primary-400'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    لا
-                  </Text>
-                </Pressable>
-              </View>
-            </FormField>
-
-            {/* Studied Qalun */}
-            <FormField
-              label="هل قرأت أو درست برواية قالون عن نافع سابقاً؟"
-              required
-              error={fieldErrors['studied_qalun']}
-              testID="field-studied-qalun"
-            >
-              <View className="flex-row gap-3">
-                <Pressable
-                  testID="qalun-yes"
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: studiedQalun === true }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setStudiedQalun(true);
-                  }}
-                  className={`flex-1 p-3 rounded-xl border items-center ${
-                    studiedQalun === true
-                      ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text
-                    className={`font-bold ${
-                      studiedQalun === true
-                        ? 'text-primary dark:text-primary-400'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    نعم
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  testID="qalun-no"
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: studiedQalun === false }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setStudiedQalun(false);
-                  }}
-                  className={`flex-1 p-3 rounded-xl border items-center ${
-                    studiedQalun === false
-                      ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text
-                    className={`font-bold ${
-                      studiedQalun === false
-                        ? 'text-primary dark:text-primary-400'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    لا
-                  </Text>
-                </Pressable>
-              </View>
-            </FormField>
-
-            {/* Program Goal */}
-            <FormField
-              label="هدف البرنامج المطلوب"
-              required
-              error={fieldErrors['program_goal']}
-              testID="field-program-goal"
-            >
-              <View className="gap-2">
-                <Pressable
-                  testID="goal-memorization"
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    selected: programGoal === 'Memorization',
-                  }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setProgramGoal('Memorization');
-                  }}
-                  className={`p-3.5 rounded-xl border flex-row items-center justify-between ${
-                    programGoal === 'Memorization'
-                      ? 'border-primary bg-primary-50/40 dark:bg-primary-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <View
-                    className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
-                      programGoal === 'Memorization'
-                        ? 'border-primary bg-primary'
-                        : 'border-gray-400'
-                    }`}
-                  >
-                    {programGoal === 'Memorization' && (
-                      <View className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </View>
-                  <View className="items-end">
-                    <Text className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                      حفظ جديد ومتابعة يومية
-                    </Text>
-                    <Text className="text-xs text-gray-500 dark:text-gray-400">
-                      البرنامج الأساسي للجمعية
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  testID="goal-revision"
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: programGoal === 'Revision' }}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setProgramGoal('Revision');
-                  }}
-                  className={`p-3.5 rounded-xl border flex-row items-center justify-between ${
-                    programGoal === 'Revision'
-                      ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-950/40'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                  }`}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <View
-                    className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
-                      programGoal === 'Revision'
-                        ? 'border-amber-500 bg-amber-500'
-                        : 'border-gray-400'
-                    }`}
-                  >
-                    {programGoal === 'Revision' && (
-                      <View className="w-2 h-2 rounded-full bg-white" />
-                    )}
-                  </View>
-                  <View className="items-end">
-                    <Text className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                      مراجعة وتثبيت فقط
-                    </Text>
-                    <Text className="text-xs text-gray-500 dark:text-gray-400">
-                      برنامج غير متاح حالياً
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-
-              {/* BR-36 inline block explanation */}
-              {programGoal === 'Revision' && (
-                <View
-                  className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-800"
-                  style={{ borderCurve: 'continuous' }}
-                  testID="revision-block-notice"
-                >
-                  <Text className="text-xs text-amber-800 dark:text-amber-200 text-right leading-5 font-semibold">
-                    عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة
-                    اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.
-                  </Text>
-                </View>
-              )}
-            </FormField>
-
-            {/* Fee Agreement */}
-            <FormField
-              label="الرسوم والالتزام المالي"
-              required
-              error={fieldErrors['fee_agreement']}
-              testID="field-fee-agreement"
-            >
-              <Pressable
-                testID="fee-agreement-checkbox"
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: feeAgreement }}
-                onPress={() => {
-                  triggerHaptic('selection');
-                  setFeeAgreement(!feeAgreement);
-                  if (fieldErrors['fee_agreement']) {
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      fee_agreement: undefined as unknown as string,
-                    }));
-                  }
-                }}
-                className={`p-4 rounded-xl border flex-row items-center justify-between ${
-                  feeAgreement
-                    ? 'border-primary bg-primary-50/30 dark:bg-primary-950/30'
-                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-                }`}
-                style={{ borderCurve: 'continuous' }}
+              <FormField
+                label="الاسم الكامل"
+                required
+                error={fieldErrors['full_name']}
+                testID="field-full-name"
               >
-                <View
-                  className={`w-6 h-6 rounded-md border-2 items-center justify-center ${
-                    feeAgreement
-                      ? 'border-primary bg-primary'
-                      : 'border-gray-400 bg-transparent'
-                  }`}
-                >
-                  {feeAgreement && (
-                    <Text className="text-white text-xs font-bold">✓</Text>
-                  )}
-                </View>
+                <TextInput
+                  value={fullName}
+                  onChangeText={(text) => {
+                    setFullName(text);
+                    clearFieldError('full_name');
+                  }}
+                  onFocus={() => setFocusedField('full_name')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholderTextColor={colors.textTertiary}
+                  textAlign="right"
+                  className={inputClass('full_name')}
+                  style={{ borderCurve: 'continuous' }}
+                  testID="input-full-name"
+                />
+              </FormField>
 
-                <View className="flex-1 mr-3 items-end">
-                  <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100 text-right leading-5">
-                    أوافق وأتعهد بالالتزام بالرسوم الفصلية (30 دينار تونسي لكل
-                    دورة مدتها 3 أشهر).
-                  </Text>
+              <View className={`${rowStart} items-start gap-3 w-full`}>
+                <View className="flex-1">
+                  <FormField
+                    label="العمر"
+                    required
+                    error={fieldErrors['age']}
+                    testID="field-age"
+                  >
+                    <TextInput
+                      value={age}
+                      onChangeText={(text) => {
+                        setAge(text.replace(/[^0-9]/g, ''));
+                        clearFieldError('age');
+                      }}
+                      onFocus={() => setFocusedField('age')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="numeric"
+                      textAlign="right"
+                      className={inputClass('age')}
+                      style={{ borderCurve: 'continuous' }}
+                      testID="input-age"
+                    />
+                  </FormField>
                 </View>
-              </Pressable>
-            </FormField>
+                <View className="flex-1">
+                  <FormField
+                    label="رقم الهاتف"
+                    required
+                    error={fieldErrors['phone_number']}
+                    testID="field-phone-number"
+                  >
+                    <TextInput
+                      value={phoneNumber}
+                      onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        clearFieldError('phone_number');
+                      }}
+                      onFocus={() => setFocusedField('phone_number')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="phone-pad"
+                      textAlign="right"
+                      className={inputClass('phone_number')}
+                      style={{ borderCurve: 'continuous' }}
+                      testID="input-phone-number"
+                    />
+                  </FormField>
+                </View>
+              </View>
 
-            {/* Submit CTA */}
+              <FormField
+                label="المهنة"
+                required
+                error={fieldErrors['occupation']}
+                testID="field-occupation"
+              >
+                <TextInput
+                  value={occupation}
+                  onChangeText={(text) => {
+                    setOccupation(text);
+                    clearFieldError('occupation');
+                  }}
+                  onFocus={() => setFocusedField('occupation')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholderTextColor={colors.textTertiary}
+                  textAlign="right"
+                  className={inputClass('occupation')}
+                  style={{ borderCurve: 'continuous' }}
+                  testID="input-occupation"
+                />
+              </FormField>
+
+              <FormField
+                label="المدينة"
+                required
+                error={fieldErrors['city']}
+                testID="field-city"
+              >
+                <TextInput
+                  value={city}
+                  onChangeText={(text) => {
+                    setCity(text);
+                    clearFieldError('city');
+                  }}
+                  onFocus={() => setFocusedField('city')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholderTextColor={colors.textTertiary}
+                  textAlign="right"
+                  className={inputClass('city')}
+                  style={{ borderCurve: 'continuous' }}
+                  testID="input-city"
+                />
+              </FormField>
+            </View>
+
+            <View className="w-full">
+              <SectionLabel>الحفظ والتجويد</SectionLabel>
+
+              <View className="w-full mb-4" testID="field-memorized-ahzab">
+                <AhzabChipGrid
+                  label="الأحزاب المحفوظة"
+                  required
+                  selectedAhzab={memorizedAhzab}
+                  onChange={(selected) => {
+                    setMemorizedAhzab(selected);
+                    clearFieldError('memorized_ahzab');
+                  }}
+                  error={fieldErrors['memorized_ahzab']}
+                />
+              </View>
+
+              <FormField
+                label="مستوى التجويد"
+                required
+                error={fieldErrors['tajweed_level']}
+                testID="field-tajweed-level"
+              >
+                <SegmentedControl<TajweedLevel>
+                  options={TAJWEED_OPTIONS}
+                  value={tajweedLevel}
+                  onChange={(value) => {
+                    triggerHaptic('selection');
+                    setTajweedLevel(value);
+                    clearFieldError('tajweed_level');
+                  }}
+                  accessibilityLabel="مستوى التجويد"
+                  testID="tajweed-option"
+                />
+              </FormField>
+
+              <FormField
+                label="هل درست أحكام التجويد نظريًا؟"
+                required
+                error={fieldErrors['studied_tajweed_theory']}
+                testID="field-tajweed-theory"
+              >
+                <SegmentedControl<YesNo>
+                  options={YES_NO_OPTIONS}
+                  value={toYesNo(studiedTajweedTheory)}
+                  onChange={(value) => {
+                    triggerHaptic('selection');
+                    setStudiedTajweedTheory(value === 'yes');
+                    clearFieldError('studied_tajweed_theory');
+                  }}
+                  accessibilityLabel="درست أحكام التجويد نظريًا:"
+                  testID="theory"
+                />
+              </FormField>
+
+              <FormField
+                label="هل درست رواية قالون؟"
+                required
+                error={fieldErrors['studied_qalun']}
+                testID="field-studied-qalun"
+              >
+                <SegmentedControl<YesNo>
+                  options={YES_NO_OPTIONS}
+                  value={toYesNo(studiedQalun)}
+                  onChange={(value) => {
+                    triggerHaptic('selection');
+                    setStudiedQalun(value === 'yes');
+                    clearFieldError('studied_qalun');
+                  }}
+                  accessibilityLabel="درست رواية قالون:"
+                  testID="qalun"
+                />
+              </FormField>
+
+              <FormField
+                label="هدفك من البرنامج"
+                required
+                error={fieldErrors['program_goal']}
+                testID="field-program-goal"
+              >
+                <SegmentedControl<GoalOption>
+                  options={GOAL_OPTIONS}
+                  value={
+                    programGoal === 'Revision' ? 'revision' : 'memorization'
+                  }
+                  onChange={(value) => {
+                    triggerHaptic('selection');
+                    setProgramGoal(
+                      value === 'revision' ? 'Revision' : 'Memorization',
+                    );
+                    clearFieldError('program_goal');
+                  }}
+                  accessibilityLabel="هدفك من البرنامج"
+                  testID="goal"
+                />
+                {programGoal === 'Revision' && (
+                  <Banner
+                    tone="warning"
+                    message={REVISION_BLOCK_MESSAGE}
+                    testID="revision-block-notice"
+                    className="mt-2"
+                  />
+                )}
+              </FormField>
+            </View>
+
+            <View className="w-full">
+              <SectionLabel>الالتزام</SectionLabel>
+              <Checkbox
+                checked={feeAgreement}
+                onChange={(checked) => {
+                  triggerHaptic('selection');
+                  setFeeAgreement(checked);
+                  clearFieldError('fee_agreement');
+                }}
+                label={FEE_AGREEMENT_LABEL}
+                accessibilityLabel={FEE_AGREEMENT_LABEL}
+                testID="fee-agreement-checkbox"
+                className="w-full"
+              />
+              {fieldErrors['fee_agreement'] ? (
+                <InlineError
+                  message={fieldErrors['fee_agreement']}
+                  testID="fee-agreement-error"
+                />
+              ) : null}
+            </View>
+
             <Button
-              label={
-                isSubmitting ? 'جاري إرسال الطلب...' : 'إرسال طلب الانضمام'
-              }
+              label="إرسال الطلب"
               onPress={handleSubmit}
-              disabled={!isFormValid || isSubmitting}
+              disabled={!isFormValid}
+              loading={isSubmitting}
               testID="submit-application-button"
-              className="mt-4"
-            />
-
-            {/* Back CTA */}
-            <Button
-              label="الرجوع لاختيار الحلقة"
-              variant="outline"
-              disabled={isSubmitting}
-              onPress={handleBackToStep2}
-              testID="step3-back-button"
+              className="w-full"
             />
           </View>
         )}
-
-        {/* SCR-07 Group Detail Sheet Modal */}
-        <Modal
-          visible={showDetailModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowDetailModal(false)}
-          testID="group-detail-modal"
-        >
-          <View className="flex-1 justify-end bg-black/50">
-            <View
-              className="bg-white dark:bg-gray-900 p-6 rounded-t-3xl border-t border-gray-200 dark:border-gray-800 gap-4"
-              style={{ borderCurve: 'continuous' }}
-            >
-              <View className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full self-center mb-1" />
-
-              <View className="flex-row items-center justify-between">
-                <StatusBadge status="مفتوح للتسجيل" variant="success" />
-                <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 text-right">
-                  {selectedGroup?.name}
-                </Text>
-              </View>
-
-              <View className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl gap-2">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {selectedGroup
-                      ? getRecitationDayName(selectedGroup.recitation_day)
-                      : ''}
-                  </Text>
-                  <Text className="text-sm text-gray-500 dark:text-gray-400">
-                    يوم التسميع:
-                  </Text>
-                </View>
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    قالون عن نافع
-                  </Text>
-                  <Text className="text-sm text-gray-500 dark:text-gray-400">
-                    الرواية:
-                  </Text>
-                </View>
-              </View>
-
-              <Button
-                label="التقديم على هذه الحلقة"
-                onPress={handleProceedToStep3}
-                testID="apply-group-button"
-              />
-
-              <Button
-                label="إغلاق"
-                variant="outline"
-                onPress={() => setShowDetailModal(false)}
-                testID="close-detail-button"
-              />
-            </View>
-          </View>
-        </Modal>
       </ScrollView>
+
+      {groupUnavailableNotice ? (
+        <View
+          className="absolute left-4 right-4"
+          style={{ bottom: insets.bottom + 16 }}
+          pointerEvents="box-none"
+        >
+          <Toast
+            message={groupUnavailableNotice}
+            icon="alert"
+            onDismiss={() => setGroupUnavailableNotice(null)}
+            testID="group-unavailable-notice"
+          />
+        </View>
+      ) : null}
+
+      {/* SCR-07 Group Detail sheet */}
+      <GroupDetailSheet
+        visible={showDetailModal}
+        group={selectedGroup}
+        recitationDayName={
+          selectedGroup
+            ? getRecitationDayName(selectedGroup.recitation_day)
+            : ''
+        }
+        onApply={handleProceedToStep3}
+        onClose={handleCloseGroupDetail}
+        testID="group-detail-modal"
+      />
     </KeyboardAvoidingView>
   );
 }

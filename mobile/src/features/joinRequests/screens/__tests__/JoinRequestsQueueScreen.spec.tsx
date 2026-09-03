@@ -18,6 +18,10 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
   const mockQueueItems: joinRequestsApi.JoinRequestQueueItem[] = [
     {
@@ -62,14 +66,33 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
         },
       });
 
-    const { getByTestId, findByText, queryByTestId } = render(
+    const { getByTestId, getByText, findByText, queryByTestId } = render(
       <JoinRequestsQueueScreen />,
     );
 
     // Screen title and elements
     expect(getByTestId('join-requests-queue-screen')).toBeTruthy();
-    expect(await findByText('طلبات الانضمام')).toBeTruthy();
+    expect(await findByText('أحمد التونسي')).toBeTruthy();
+    expect(getByTestId('join-requests-top-bar-title')).toHaveTextContent(
+      'طلبات الانضمام',
+    );
     expect(queryByTestId('join-requests-skeleton')).toBeNull();
+
+    // Head: fixed score order, count with Arabic agreement (Figma 34:143)
+    expect(getByTestId('join-requests-count')).toHaveTextContent(
+      'طلبان معلّقان',
+    );
+    expect(getByText('ترتيب ثابت: الأعلى نقاطًا أولًا')).toBeTruthy();
+
+    // Assistant tab bar: queue active, payments inert (not built)
+    expect(
+      getByTestId('assistant-tab-bar-join-requests').props.accessibilityState
+        .selected,
+    ).toBe(true);
+    expect(
+      getByTestId('assistant-tab-bar-payments').props.accessibilityState
+        .disabled,
+    ).toBe(true);
 
     // Item 1
     expect(getByTestId('join-request-row-jr-1111-1111-1111-1111')).toBeTruthy();
@@ -81,7 +104,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     ).toHaveTextContent('95.5');
     expect(
       getByTestId('join-request-created-at-jr-1111-1111-1111-1111'),
-    ).toHaveTextContent('2026-08-20');
+    ).toHaveTextContent('قُدِّم في 2026-08-20');
 
     // Item 2
     expect(getByTestId('join-request-row-jr-2222-2222-2222-2222')).toBeTruthy();
@@ -93,7 +116,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     ).toHaveTextContent('80');
     expect(
       getByTestId('join-request-created-at-jr-2222-2222-2222-2222'),
-    ).toHaveTextContent('2026-08-21');
+    ).toHaveTextContent('قُدِّم في 2026-08-21');
   });
 
   it('renders empty state when listPendingJoinRequests returns empty array', async () => {
@@ -111,7 +134,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
       <JoinRequestsQueueScreen />,
     );
 
-    expect(await findByText('لا توجد طلبات معلقة')).toBeTruthy();
+    expect(await findByText('لا توجد طلبات معلّقة')).toBeTruthy();
     expect(getByTestId('join-requests-empty')).toBeTruthy();
     expect(queryByTestId('join-requests-content')).toBeNull();
     expect(queryByTestId('join-requests-skeleton')).toBeNull();
@@ -145,7 +168,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
 
     // Tap retry
     await act(async () => {
-      fireEvent.press(getByTestId('retry-button'));
+      fireEvent.press(getByTestId('join-requests-error-retry-button'));
     });
 
     expect(await findByText('أحمد التونسي')).toBeTruthy();
@@ -239,5 +262,27 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     expect(getByTestId('join-request-row-jr-page1')).toBeTruthy();
     expect(getByTestId('join-request-row-jr-page2')).toBeTruthy();
     expect(queryByTestId('load-more-button')).toBeNull();
+  });
+
+  it('returns to Assistant Home from the tab bar', async () => {
+    jest
+      .spyOn(joinRequestsApi, 'listPendingJoinRequests')
+      .mockResolvedValueOnce({
+        data: mockQueueItems,
+        pagination: {
+          next_cursor: null,
+          has_more: false,
+        },
+      });
+
+    const { getByTestId, findByText } = render(<JoinRequestsQueueScreen />);
+    expect(await findByText('أحمد التونسي')).toBeTruthy();
+
+    fireEvent.press(getByTestId('assistant-tab-bar-home'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/assistant');
+
+    // The inert Payments tab never navigates
+    fireEvent.press(getByTestId('assistant-tab-bar-payments'));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

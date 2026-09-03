@@ -8,8 +8,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
+import { TopBar } from '@/shared/components/TopBar';
+import { typography } from '@/shared/theme/typography';
+import { useThemeColors } from '@/shared/theme/colors';
+import { rowStart } from '@/shared/theme/rtl';
+import { AssistantTabBar } from '@/navigation/AssistantTabBar';
 import {
   listPendingJoinRequests,
   JoinRequestQueueItem,
@@ -17,8 +24,22 @@ import {
 import { ApiError } from '@/shared/api/types';
 import { JoinRequestQueueRow } from '../components/JoinRequestQueueRow';
 
+/** "N pending requests" with Arabic number agreement (Figma 34:145). */
+export function pendingCountLabel(count: number): string {
+  if (count === 1) return 'طلب واحد معلّق';
+  if (count === 2) return 'طلبان معلّقان';
+  if (count <= 10) return `${count} طلبات معلّقة`;
+  return `${count} طلبًا معلّقًا`;
+}
+
+/**
+ * SCR-18 Join Requests Queue (Figma 34:115 / 34:222): score-sorted list,
+ * fixed order (UF §13), one row per pending request in the assistant's
+ * assigned groups; cursor pagination (APIS §9).
+ */
 export function JoinRequestsQueueScreen() {
   const router = useRouter();
+  const colors = useThemeColors();
   const [requests, setRequests] = useState<JoinRequestQueueItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -110,96 +131,106 @@ export function JoinRequestsQueueScreen() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-gray-50 dark:bg-gray-950"
-      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
-      contentInsetAdjustmentBehavior="automatic"
+    <View
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="join-requests-queue-screen"
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-      }
     >
-      {/* Screen Header */}
-      <View className="flex-row-reverse items-center justify-between">
-        <View className="gap-1">
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-right">
-            طلبات الانضمام
-          </Text>
-          <Text className="text-xs text-gray-500 dark:text-gray-400 text-right">
-            مراجعة وتقييم طلبات المتقدمين للحلقات
-          </Text>
-        </View>
-      </View>
+      <TopBar
+        title="طلبات الانضمام"
+        back={false}
+        testID="join-requests-top-bar"
+      />
 
-      {/* State rendering */}
-      {isLoading ? (
-        <View testID="join-requests-skeleton" className="gap-3">
-          <SkeletonLoader variant="row" count={4} />
-        </View>
-      ) : errorMessage ? (
-        <View
-          className="p-4 rounded-xl bg-destructive-50 border border-destructive-200 dark:bg-destructive-950 dark:border-destructive-800 gap-3"
-          style={{ borderCurve: 'continuous' }}
-          testID="join-requests-error"
-        >
-          <Text
-            selectable
-            className="text-sm font-medium text-destructive-700 dark:text-destructive-300 text-right leading-5"
-          >
-            {errorMessage}
-          </Text>
-          <Button
-            label="إعادة المحاولة"
-            variant="outline"
-            onPress={fetchInitialRequests}
-            testID="retry-button"
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingTop: 4,
+          paddingHorizontal: 16,
+          paddingBottom: 24,
+          gap: 16,
+        }}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.textBrand}
+            colors={[colors.textBrand]}
           />
-        </View>
-      ) : requests.length === 0 ? (
-        <View
-          testID="join-requests-empty"
-          className="p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 items-center text-center gap-3 mt-4"
-          style={{ borderCurve: 'continuous' }}
-        >
-          <Text className="text-lg font-bold text-gray-900 dark:text-gray-100 text-center">
-            لا توجد طلبات معلقة
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center leading-5">
-            لا توجد حالياً أي طلبات انضمام جديدة بحاجة إلى المراجعة للحلقات
-            المسندة إليك.
-          </Text>
-        </View>
-      ) : (
-        <View className="gap-3" testID="join-requests-content">
-          {requests.map((item) => (
-            <JoinRequestQueueRow
-              key={item.id}
-              item={item}
-              onPress={handleRequestPress}
-            />
-          ))}
-
-          {/* Pagination loading / Load more */}
-          {isLoadingMore && (
+        }
+      >
+        {isLoading ? (
+          <SkeletonLoader
+            variant="row"
+            count={4}
+            testID="join-requests-skeleton"
+          />
+        ) : errorMessage ? (
+          <Banner
+            message={errorMessage}
+            tone="error"
+            onRetry={fetchInitialRequests}
+            testID="join-requests-error"
+          />
+        ) : requests.length === 0 ? (
+          <EmptyState
+            message="لا توجد طلبات معلّقة"
+            icon="inbox"
+            testID="join-requests-empty"
+          />
+        ) : (
+          <>
             <View
-              testID="pagination-loading"
-              className="py-4 items-center justify-center"
+              className={`${rowStart} items-center justify-between gap-3 w-full`}
+              testID="join-requests-head"
             >
-              <ActivityIndicator size="small" />
+              <Text
+                className={`${typography.headingSm} text-right text-fg dark:text-fg-dark`}
+                testID="join-requests-count"
+                accessibilityRole="header"
+              >
+                {hasMore ? 'طلبات معلّقة' : pendingCountLabel(requests.length)}
+              </Text>
+              <Text
+                className={`${typography.caption} text-left text-fg-tertiary dark:text-fg-tertiary-dark`}
+              >
+                ترتيب ثابت: الأعلى نقاطًا أولًا
+              </Text>
             </View>
-          )}
 
-          {hasMore && !isLoadingMore && (
-            <Button
-              label="تحميل المزيد"
-              variant="outline"
-              onPress={handleLoadMore}
-              testID="load-more-button"
-              className="mt-2"
-            />
-          )}
-        </View>
-      )}
-    </ScrollView>
+            <View className="w-full gap-2.5" testID="join-requests-content">
+              {requests.map((item) => (
+                <JoinRequestQueueRow
+                  key={item.id}
+                  item={item}
+                  onPress={handleRequestPress}
+                />
+              ))}
+
+              {isLoadingMore && (
+                <View
+                  testID="pagination-loading"
+                  className="py-4 items-center justify-center"
+                >
+                  <ActivityIndicator size="small" color={colors.textBrand} />
+                </View>
+              )}
+
+              {hasMore && !isLoadingMore && (
+                <Button
+                  label="تحميل المزيد"
+                  variant="secondary"
+                  onPress={handleLoadMore}
+                  testID="load-more-button"
+                  className="mt-1 w-full"
+                />
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      <AssistantTabBar activeKey="join-requests" />
+    </View>
   );
 }

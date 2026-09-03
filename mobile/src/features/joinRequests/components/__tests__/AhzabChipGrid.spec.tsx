@@ -2,18 +2,44 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { AhzabChipGrid } from '../AhzabChipGrid';
 
-describe('AhzabChipGrid', () => {
-  it('renders all 60 chips and displays initial counter', () => {
+describe('AhzabChipGrid (UF §19, Figma 23:363 / 35:261)', () => {
+  it('renders all 60 chips with the live counter below the minimum', () => {
     const { getByTestId, getByText } = render(
-      <AhzabChipGrid selectedAhzab={[1, 2, 3]} onChange={jest.fn()} />,
+      <AhzabChipGrid
+        label="الأحزاب المحفوظة"
+        required
+        selectedAhzab={[1, 2, 3]}
+        onChange={jest.fn()}
+      />,
     );
 
-    expect(getByTestId('ahzab-counter')).toHaveTextContent('3 / 60 حزباً');
-    expect(getByText('(الحد الأدنى 5)')).toBeTruthy();
+    expect(getByText('الأحزاب المحفوظة')).toBeTruthy();
+    expect(getByTestId('ahzab-counter')).toHaveTextContent(
+      '3 محددة · الحد الأدنى 5',
+    );
 
     for (let i = 1; i <= 60; i++) {
       expect(getByTestId(`ahzab-chip-${i}`)).toBeTruthy();
     }
+    expect(getByTestId('ahzab-chip-2').props.accessibilityState.checked).toBe(
+      true,
+    );
+    expect(getByTestId('ahzab-chip-4').props.accessibilityState.checked).toBe(
+      false,
+    );
+  });
+
+  it('reports the counter once the minimum is met', () => {
+    const { getByTestId } = render(
+      <AhzabChipGrid
+        selectedAhzab={[1, 2, 3, 4, 5, 6, 7]}
+        onChange={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('ahzab-counter')).toHaveTextContent(
+      '7 محددة · الحد الأدنى 5',
+    );
   });
 
   it('calls onChange when a chip is toggled on and off', () => {
@@ -31,24 +57,20 @@ describe('AhzabChipGrid', () => {
     expect(handleChange).toHaveBeenCalledWith([2]);
   });
 
-  it('handles "Select All" and "Clear All" buttons', () => {
-    const handleChange = jest.fn();
-    const { getByTestId } = render(
-      <AhzabChipGrid selectedAhzab={[1, 2]} onChange={handleChange} />,
+  it('renders an icon + text error line under the grid (UF §32)', () => {
+    const { getByTestId, getByText } = render(
+      <AhzabChipGrid
+        selectedAhzab={[]}
+        onChange={jest.fn()}
+        error="يجب اختيار 5 أحزاب على الأقل"
+      />,
     );
 
-    // Press Select All
-    fireEvent.press(getByTestId('ahzab-select-all'));
-    expect(handleChange).toHaveBeenCalledWith(
-      Array.from({ length: 60 }, (_, i) => i + 1),
-    );
-
-    // Press Clear
-    fireEvent.press(getByTestId('ahzab-clear-all'));
-    expect(handleChange).toHaveBeenCalledWith([]);
+    expect(getByTestId('ahzab-chip-grid-error')).toBeTruthy();
+    expect(getByText('يجب اختيار 5 أحزاب على الأقل')).toBeTruthy();
   });
 
-  it('hides quick actions and disables toggles when readOnly is true', () => {
+  it('is read-only on Applicant Detail: no counter, filled/empty cells, no toggling', () => {
     const handleChange = jest.fn();
     const { queryByTestId, getByTestId } = render(
       <AhzabChipGrid
@@ -58,8 +80,13 @@ describe('AhzabChipGrid', () => {
       />,
     );
 
-    expect(queryByTestId('ahzab-select-all')).toBeNull();
-    expect(queryByTestId('ahzab-clear-all')).toBeNull();
+    expect(queryByTestId('ahzab-counter')).toBeNull();
+    expect(getByTestId('ahzab-chip-1').props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(getByTestId('ahzab-chip-5').props.accessibilityState.selected).toBe(
+      false,
+    );
 
     fireEvent.press(getByTestId('ahzab-chip-5'));
     expect(handleChange).not.toHaveBeenCalled();

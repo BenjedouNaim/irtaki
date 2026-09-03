@@ -1,17 +1,19 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
-import {
-  StatusBadge,
-  StatusBadgeVariant,
-} from '@/shared/components/StatusBadge';
+import { Banner } from '@/shared/components/Banner';
+import { Button, ButtonVariant } from '@/shared/components/Button';
+import { Icon, IconName, IconTone } from '@/shared/components/Icon';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
-import { Button } from '@/shared/components/Button';
 import { ApiError } from '@/shared/api/types';
 import {
   DailyReportBlockReason,
   DailyReportDto,
 } from '@/shared/api/dailyReports.client';
 import { useTodayReportStatus } from '@/features/dailyReports/hooks/useTodayReportStatus';
+import { typography } from '@/shared/theme/typography';
+import { itemsStart, rowStart } from '@/shared/theme/rtl';
+import { formatArabicDate } from '../utils/arabicDate';
+import { localTodayIsoDate } from '../utils/dailyReportForm';
 
 export interface ReportStatusCardProps {
   /** `block_reason` absent → "Submit Today's Report" → opens SCR-09. */
@@ -51,58 +53,123 @@ function describeError(error: unknown): string {
   return NETWORK_ERROR_MESSAGE;
 }
 
-interface CtaState {
-  badge: { label: string; variant: StatusBadgeVariant };
+/** Figma DailyCTA hero tones: primary (memorisation day), accent (recitation day), success (submitted). */
+type HeroTone = 'primary' | 'accent' | 'success';
+
+interface HeroState {
+  kind: 'hero';
+  tone: HeroTone;
+  icon: IconName;
   title: string;
   description: string;
-  cta: { label: string; testID: string } | null;
+  cta: { label: string; testID: string; variant: ButtonVariant };
+}
+
+interface BannerState {
+  kind: 'banner';
+  message: string;
 }
 
 /**
  * UF §10 "Daily Report CTA state machine". The server states the reason
  * (API-029); this table only renders it — nothing is inferred client-side.
  */
-const CTA_STATES: Record<DailyReportBlockReason | 'none', CtaState> = {
+const CTA_STATES: Record<
+  DailyReportBlockReason | 'none',
+  HeroState | BannerState
+> = {
   none: {
-    badge: { label: 'يوم حفظ', variant: 'info' },
-    title: 'لم يُرسل تقرير اليوم بعد',
-    description: 'يُغلق باب الإرسال عند منتصف الليل، ولا يمكن إرساله لاحقاً.',
-    cta: { label: 'إرسال تقرير اليوم', testID: 'submit-report-button' },
+    kind: 'hero',
+    tone: 'primary',
+    icon: 'pen',
+    title: 'اليوم يوم حفظ',
+    description: 'لم تُرسل تقرير اليوم بعد. يستغرق أقل من دقيقة.',
+    cta: {
+      label: 'إرسال تقرير اليوم',
+      testID: 'submit-report-button',
+      variant: 'secondary',
+    },
   },
   already_submitted: {
-    badge: { label: 'تم الإرسال', variant: 'success' },
+    kind: 'hero',
+    tone: 'success',
+    icon: 'circle-check',
     title: 'تم إرسال تقرير اليوم',
     description: 'لا يمكن تعديل التقرير أو حذفه بعد إرساله.',
-    cta: { label: 'عرض تقرير اليوم', testID: 'view-report-button' },
+    cta: {
+      label: 'عرض تقرير اليوم',
+      testID: 'view-report-button',
+      variant: 'primary',
+    },
   },
   recitation_day: {
-    badge: { label: 'يوم التسميع', variant: 'info' },
-    title: 'اليوم هو يوم التسميع',
-    description: 'لا يُرسل تقرير يومي في يوم التسميع؛ أكمل التقرير الأسبوعي.',
-    cta: { label: 'إكمال التقرير الأسبوعي', testID: 'weekly-report-button' },
+    kind: 'hero',
+    tone: 'accent',
+    icon: 'book',
+    title: 'اليوم يوم التسميع',
+    description: 'راجع ملخّص أسبوعك وأكّد حضورك لمجلس التسميع.',
+    cta: {
+      label: 'إكمال التقرير الأسبوعي',
+      testID: 'weekly-report-button',
+      variant: 'primary',
+    },
   },
   group_archived: {
-    badge: { label: 'الحلقة مؤرشفة', variant: 'neutral' },
-    title: 'حلقتك لم تعد نشطة',
-    description: 'أُرشفت الحلقة؛ لا يمكن إرسال تقارير جديدة.',
-    cta: null,
+    kind: 'banner',
+    message: 'مجموعتك لم تعد نشطة. لا يمكن إرسال التقارير حاليًا.',
   },
   membership_inactive: {
-    badge: { label: 'العضوية غير نشطة', variant: 'neutral' },
-    title: 'عضويتك في الحلقة غير نشطة',
-    description: 'لا يمكن إرسال تقارير دون عضوية نشطة.',
-    cta: null,
+    kind: 'banner',
+    message: 'عضويتك في الحلقة غير نشطة. لا يمكن إرسال التقارير حاليًا.',
+  },
+};
+
+const HERO_TONES: Record<
+  HeroTone,
+  {
+    container: string;
+    pill: string;
+    pillText: string;
+    iconTone: IconTone;
+    title: string;
+    description: string;
+  }
+> = {
+  primary: {
+    container: 'bg-primary dark:bg-primary-dark',
+    pill: 'bg-fg-on-primary/20',
+    pillText: 'text-fg-on-primary',
+    iconTone: 'on-primary',
+    title: 'text-fg-on-primary',
+    description: 'text-fg-on-primary opacity-80',
+  },
+  accent: {
+    container:
+      'bg-accent-subtle dark:bg-accent-subtle-dark border border-line-warning dark:border-line-warning-dark',
+    pill: 'bg-surface dark:bg-surface-dark border border-line-warning dark:border-line-warning-dark',
+    pillText: 'text-fg-accent dark:text-fg-accent-dark',
+    iconTone: 'accent',
+    title: 'text-fg dark:text-fg-dark',
+    description: 'text-fg-secondary dark:text-fg-secondary-dark',
+  },
+  success: {
+    container:
+      'bg-success-subtle dark:bg-primary-subtle-dark border border-line-success',
+    pill: 'bg-surface dark:bg-surface-dark border border-line-success',
+    pillText: 'text-fg-success',
+    iconTone: 'success',
+    title: 'text-fg dark:text-fg-dark',
+    description: 'text-fg-secondary dark:text-fg-secondary-dark',
   },
 };
 
 /**
- * Standalone Daily Report status / CTA card of SCR-08 (F-DR-01, UF §10).
- *
- * Renders exactly the UF §10 state table from API-029's `block_reason`:
- * a CTA for the reachable states (submit / view / weekly) and a no-CTA
- * banner for `group_archived` and `membership_inactive`. The full SCR-08
- * (weekly strip, score, payment chip) is assembled by EPIC-10 around this
- * component. A CTA whose destination is not wired yet renders disabled.
+ * SCR-08 DailyCTA hero (Figma 24:27 / 24:170) of Student Home (F-DR-01,
+ * UF §10). Renders exactly the UF §10 state table from API-029's
+ * `block_reason`: a day pill + glyph, a title, one line and a CTA for the
+ * reachable states (submit / view / weekly), a warning Banner for
+ * `group_archived` and `membership_inactive`. A CTA whose destination is
+ * not wired yet renders disabled.
  */
 export function ReportStatusCard({
   onSubmitReport,
@@ -119,7 +186,7 @@ export function ReportStatusCard({
       <View
         key="skeleton"
         testID={`${testID}-skeleton`}
-        className={`w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 ${
+        className={`w-full rounded-xl bg-subtle dark:bg-subtle-dark ${
           className ?? ''
         }`}
         style={[{ borderCurve: 'continuous' }, style]}
@@ -130,43 +197,16 @@ export function ReportStatusCard({
   }
 
   if (isError || !data) {
-    const message = describeError(error);
-
     return (
-      <View
+      <Banner
         key="error"
+        tone="error"
+        message={describeError(error)}
+        onRetry={() => void refetch()}
         testID={`${testID}-error`}
-        accessibilityRole="alert"
-        className={`w-full bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-xl p-5 gap-3 ${
-          className ?? ''
-        }`}
-        style={[{ borderCurve: 'continuous' }, style]}
-      >
-        <View className="flex-row items-center justify-center gap-2">
-          <Text
-            testID={`${testID}-error-icon`}
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-          <Text className="text-destructive-800 dark:text-destructive-200 text-base font-semibold text-center">
-            خطأ في تحميل البيانات
-          </Text>
-        </View>
-        <Text
-          className="text-destructive-700 dark:text-destructive-300 text-sm text-center leading-relaxed"
-          testID={`${testID}-error-message`}
-        >
-          {message}
-        </Text>
-        <Button
-          label="إعادة المحاولة"
-          variant="outline"
-          onPress={() => void refetch()}
-          testID={`${testID}-retry-button`}
-        />
-      </View>
+        className={className}
+        style={style}
+      />
     );
   }
 
@@ -174,6 +214,21 @@ export function ReportStatusCard({
     ? 'none'
     : (data.block_reason ?? 'membership_inactive');
   const state = CTA_STATES[reason];
+
+  if (state.kind === 'banner') {
+    // UF §10: "No CTA — banner". Icon + text, never colour-only (UF §32).
+    return (
+      <Banner
+        key="banner"
+        tone="warning"
+        icon="archive"
+        message={state.message}
+        testID={`${testID}-banner`}
+        className={className}
+        style={style}
+      />
+    );
+  }
 
   const existingReport = data.existing_report;
   const handlers: Record<
@@ -190,71 +245,47 @@ export function ReportStatusCard({
     membership_inactive: undefined,
   };
   const onPress = handlers[reason];
-
-  if (!state.cta) {
-    // UF §10: "No CTA — banner". Icon + text, never colour-only (UF §32).
-    return (
-      <View
-        testID={`${testID}-banner`}
-        accessibilityRole="alert"
-        className={`w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-2 ${
-          className ?? ''
-        }`}
-        style={[{ borderCurve: 'continuous' }, style]}
-      >
-        <View className="flex-row items-center justify-end gap-2">
-          <Text
-            className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right"
-            testID={`${testID}-title`}
-          >
-            {state.title}
-          </Text>
-          <Text
-            testID={`${testID}-banner-icon`}
-            accessibilityLabel="تنبيه"
-            className="text-base"
-          >
-            ⚠️
-          </Text>
-        </View>
-        <Text
-          className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed"
-          testID={`${testID}-description`}
-        >
-          {state.description}
-        </Text>
-      </View>
-    );
-  }
+  const tone = HERO_TONES[state.tone];
+  const dayLabel = formatArabicDate(
+    existingReport?.report_date ?? localTodayIsoDate(),
+  );
 
   return (
     <View
       key="data"
       testID={testID}
       accessibilityRole="summary"
-      accessibilityLabel={`تقرير اليوم: ${state.badge.label}. ${state.title}`}
-      className={`w-full p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm gap-3 ${
+      accessibilityLabel={`تقرير اليوم: ${dayLabel}. ${state.title}`}
+      className={`w-full p-5 rounded-xl gap-3.5 ${itemsStart} ${tone.container} ${
         className ?? ''
       }`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
-      <View className="flex-row items-center justify-between">
-        <StatusBadge
-          status={state.badge.label}
-          variant={state.badge.variant}
-          testID={`${testID}-badge`}
-        />
+      <View className={`w-full ${rowStart} items-center justify-between`}>
+        <View
+          testID={`${testID}-day-pill`}
+          className={`rounded-full px-2.5 py-1 ${tone.pill}`}
+          style={{ borderCurve: 'continuous' }}
+        >
+          <Text
+            className={`${typography.labelSm} text-right ${tone.pillText}`}
+            maxFontSizeMultiplier={1.4}
+          >
+            {dayLabel}
+          </Text>
+        </View>
+        <Icon name={state.icon} size={26} tone={tone.iconTone} />
       </View>
 
       <Text
-        className="text-lg font-bold text-gray-900 dark:text-gray-100 text-right"
+        className={`w-full ${typography.headingLg} text-right ${tone.title}`}
         testID={`${testID}-title`}
       >
         {state.title}
       </Text>
 
       <Text
-        className="text-sm text-gray-600 dark:text-gray-400 text-right leading-relaxed"
+        className={`w-full ${typography.bodyMd} text-right ${tone.description}`}
         testID={`${testID}-description`}
       >
         {state.description}
@@ -262,11 +293,11 @@ export function ReportStatusCard({
 
       <Button
         label={state.cta.label}
-        variant="primary"
+        variant={state.cta.variant}
         onPress={() => onPress?.()}
         disabled={!onPress}
         testID={state.cta.testID}
-        className="w-full mt-1"
+        className="w-full"
       />
     </View>
   );

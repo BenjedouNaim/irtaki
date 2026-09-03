@@ -13,6 +13,7 @@ export default function ForgotPasswordConfirmPage() {
       onNavigateToRequest={() =>
         router.replace('/(auth)/forgot-password-request')
       }
+      onBack={() => router.replace('/(auth)/login')}
     />
   );
 }

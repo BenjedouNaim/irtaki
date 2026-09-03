@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  KeyboardAvoidingView,
-  ScrollView,
-} from 'react-native';
+import { View, KeyboardAvoidingView, ScrollView } from 'react-native';
 import { z } from 'zod';
 import { FormField } from '@/shared/components/FormField';
 import { Button } from '@/shared/components/Button';
+import { Banner } from '@/shared/components/Banner';
+import { TopBar } from '@/shared/components/TopBar';
+import { itemsStart } from '@/shared/theme/rtl';
+import { TextInputField } from '@/features/auth/components/TextInputField';
+import { AuthIntro } from '@/features/auth/components/AuthIntro';
+import { OutcomeState } from '@/features/auth/components/OutcomeState';
 import { requestPasswordReset } from '@/shared/api/auth.client';
 import { ApiError } from '@/shared/api/types';
 
@@ -29,6 +28,7 @@ export interface ForgotPasswordRequestScreenProps {
   onNavigateToLogin?: () => void;
 }
 
+/** SCR-03 Forgot Password — Figma 21:134 (request) · 21:182 (sent, neutral). */
 export function ForgotPasswordRequestScreen({
   onNavigateToLogin,
 }: ForgotPasswordRequestScreenProps) {
@@ -84,86 +84,78 @@ export function ForgotPasswordRequestScreen({
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-white dark:bg-gray-950"
+      className="flex-1 bg-canvas dark:bg-canvas-dark"
       testID="forgot-password-request-screen"
     >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          paddingVertical: 32,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="items-center mb-8">
-          <Text className="text-3xl font-extrabold text-primary dark:text-primary-400 mb-2 font-arabic-bold">
-            إرتقِ
-          </Text>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1.5 text-center">
-            استعادة كلمة المرور
-          </Text>
-          <Text className="text-sm text-gray-500 dark:text-gray-400 text-center">
-            أدخل بريدك الإلكتروني لإرسال رابط إعادة تعيين كلمة المرور
-          </Text>
-        </View>
+      <TopBar
+        title="استعادة كلمة المرور"
+        onBack={onNavigateToLogin}
+        testID="forgot-password-top-bar"
+      />
 
-        {generalError ? (
-          <View
-            className="bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800 rounded-lg p-3 mb-4"
-            style={{ borderCurve: 'continuous' }}
-            testID="forgot-password-general-error"
-          >
-            <Text className="text-destructive-700 dark:text-destructive-300 text-sm text-center font-medium">
-              {generalError}
-            </Text>
-          </View>
-        ) : null}
+      {isSubmitted ? (
+        <OutcomeState
+          icon="mail"
+          tone="brand"
+          title="تحقّق من بريدك"
+          body="إن كان هذا البريد مسجّلًا لدينا، فستصلك رسالة تحتوي رابط إعادة التعيين خلال دقائق."
+          testID="forgot-password-success-banner"
+        >
+          {onNavigateToLogin ? (
+            <Button
+              label="العودة لتسجيل الدخول"
+              variant="ghost"
+              onPress={onNavigateToLogin}
+              className="w-full"
+              testID="forgot-password-back-to-login-button"
+            />
+          ) : null}
+        </OutcomeState>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 16,
+            paddingBottom: 32,
+            gap: 32,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <AuthIntro
+            title="أدخل بريدك الإلكتروني"
+            subtitle="سنرسل رابط إعادة التعيين إن كان الحساب موجودًا."
+          />
 
-        {isSubmitted ? (
-          <View
-            className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5 mb-6"
-            style={{ borderCurve: 'continuous' }}
-            testID="forgot-password-success-banner"
-          >
-            <Text className="text-emerald-800 dark:text-emerald-200 text-base font-semibold text-center mb-2">
-              تم إرسال التعليمات
-            </Text>
-            <Text className="text-emerald-700 dark:text-emerald-300 text-sm text-center leading-relaxed mb-4">
-              إذا كان البريد الإلكتروني مسجلاً في النظام، فقد تم إرسال رابط
-              إعادة تعيين كلمة المرور إليه. يرجى التحقق من صندوق الوارد.
-            </Text>
-            {onNavigateToLogin ? (
-              <Button
-                label="العودة لتسجيل الدخول"
-                variant="outline"
-                onPress={onNavigateToLogin}
-                testID="forgot-password-back-to-login-button"
-              />
-            ) : null}
-          </View>
-        ) : (
-          <View className="w-full">
+          {generalError ? (
+            <Banner
+              message={generalError}
+              tone="error"
+              testID="forgot-password-general-error"
+            />
+          ) : null}
+
+          <View className={`w-full ${itemsStart}`}>
             <FormField
               label="البريد الإلكتروني"
               required
               error={errors.email}
+              disabled={isSubmitting}
               testID="forgot-password-email-field"
+              style={{ marginBottom: 0 }}
             >
-              <TextInput
+              <TextInputField
                 testID="forgot-password-email-input"
-                className={`w-full h-12 border rounded-lg px-3.5 text-base text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 text-right ${
-                  errors.email
-                    ? 'border-destructive bg-white dark:bg-gray-950'
-                    : 'border-gray-300 dark:border-gray-700'
-                }`}
-                style={{ borderCurve: 'continuous' }}
-                placeholder="example@domain.com"
-                placeholderTextColor="#9ca3af"
+                ltr
+                placeholder="name@example.com"
                 keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!isSubmitting}
+                returnKeyType="send"
+                onSubmitEditing={handleSubmit}
+                error={Boolean(errors.email)}
+                disabled={isSubmitting}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -171,35 +163,19 @@ export function ForgotPasswordRequestScreen({
                     setErrors((prev) => ({ ...prev, email: undefined }));
                   }
                 }}
-                textAlign="right"
               />
             </FormField>
-
-            <Button
-              label="إرسال رابط إعادة التعيين"
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              testID="forgot-password-submit-button"
-              className="mt-2"
-            />
           </View>
-        )}
 
-        {onNavigateToLogin && !isSubmitted ? (
-          <View className="flex-row-reverse justify-center items-center mt-6">
-            <Pressable
-              onPress={onNavigateToLogin}
-              disabled={isSubmitting}
-              testID="forgot-password-back-link"
-            >
-              <Text className="text-sm font-bold text-primary dark:text-primary-400">
-                العودة إلى تسجيل الدخول
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </ScrollView>
+          <Button
+            label="إرسال الرابط"
+            onPress={handleSubmit}
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            testID="forgot-password-submit-button"
+          />
+        </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }

@@ -12,7 +12,7 @@ const mockSurahs: SurahDto[] = [
   { number: 3, name_ar: 'آل عمران', ayah_count: 200, ordinal_offset: 293 },
 ];
 
-describe('QuranRangePickerSheet (SCR-11)', () => {
+describe('QuranRangePickerSheet (SCR-11, Figma 27:457 / 27:571)', () => {
   const onConfirmMock = jest.fn();
   const onCancelMock = jest.fn();
   const refetchMock = jest.fn();
@@ -84,7 +84,7 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     expect(screen.getByText('حدث خطأ أثناء تحميل بيانات السور')).toBeTruthy();
 
     const retryBtn = screen.getByTestId(
-      'quran-range-picker-sheet-retry-button',
+      'quran-range-picker-sheet-error-retry-button',
     );
     fireEvent.press(retryBtn);
 
@@ -101,16 +101,24 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       />,
     );
 
-    // Header title
-    expect(screen.getByText('نطاق الحفظ')).toBeTruthy();
+    // Header: step title + the range type in the context line
+    expect(screen.getByText('من — اختر السورة')).toBeTruthy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-step-subtitle').props
+        .children,
+    ).toBe('نطاق الحفظ · ترتيب المصحف · اكتب للبحث');
 
-    // Stage 1: from-surah
-    expect(screen.getByText('من: اختر السورة (1/4)')).toBeTruthy();
+    // Stage 1: from-surah — the "من" step pill is active
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-step-from').props
+        .accessibilityState.selected,
+    ).toBe(true);
     const fromSurah1 = screen.getByTestId('surah-row-1'); // Al-Fatiha
     fireEvent.press(fromSurah1);
 
-    // Stage 2: from-ayah
-    expect(screen.getByText('من: سورة الفاتحة (2/4)')).toBeTruthy();
+    // Stage 2: from-ayah — the surah and its count move to the context line
+    expect(screen.getByText('من — اختر الآية')).toBeTruthy();
+    expect(screen.getByText('الفاتحة · 7 آية')).toBeTruthy();
     const ayah3 = screen.getByTestId(
       'quran-range-picker-sheet-from-ayah-wheel-picker-item-3',
     );
@@ -119,13 +127,22 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     const nextBtn = screen.getByTestId('quran-range-picker-sheet-next-button');
     fireEvent.press(nextBtn);
 
-    // Stage 3: to-surah
-    expect(screen.getByText('إلى: اختر السورة (3/4)')).toBeTruthy();
+    // Stage 3: to-surah — the "من" pill now carries the chosen start
+    expect(screen.getByText('إلى — اختر السورة')).toBeTruthy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-summary-from').props
+        .children,
+    ).toBe('من · الفاتحة 3');
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-step-to').props
+        .accessibilityState.selected,
+    ).toBe(true);
     const toSurah2 = screen.getByTestId('surah-row-2'); // Al-Baqara
     fireEvent.press(toSurah2);
 
-    // Stage 4: to-ayah
-    expect(screen.getByText('إلى: سورة البقرة (4/4)')).toBeTruthy();
+    // Stage 4: to-ayah — running range summary "Surah ayah ← Surah ayah"
+    expect(screen.getByText('إلى — اختر الآية')).toBeTruthy();
+    expect(screen.getByText('البقرة · 286 آية')).toBeTruthy();
     const toAyah20 = screen.getByTestId(
       'quran-range-picker-sheet-to-ayah-wheel-picker-item-20',
     );
@@ -135,6 +152,10 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       'quran-range-picker-sheet-confirm-button',
     );
     expect(confirmBtn.props.accessibilityState?.disabled).toBeFalsy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-summary-value').props
+        .children,
+    ).toBe('الفاتحة 3 ← البقرة 20');
     fireEvent.press(confirmBtn);
 
     expect(onConfirmMock).toHaveBeenCalledWith({
@@ -153,7 +174,10 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       />,
     );
 
-    expect(screen.getByText('نطاق المراجعة')).toBeTruthy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-step-subtitle').props
+        .children,
+    ).toBe('نطاق المراجعة · ترتيب المصحف · اكتب للبحث');
 
     // Stage 1 -> Back calls onCancel
     const backBtn = screen.getByTestId('quran-range-picker-sheet-back-button');
@@ -163,29 +187,31 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     // Move to stage 2
     const fromSurah2 = screen.getByTestId('surah-row-2');
     fireEvent.press(fromSurah2);
-    expect(screen.getByText('من: سورة البقرة (2/4)')).toBeTruthy();
+    expect(screen.getByText('من — اختر الآية')).toBeTruthy();
+    expect(screen.getByText('البقرة · 286 آية')).toBeTruthy();
 
     // Stage 2 -> Back returns to stage 1
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-back-button'));
-    expect(screen.getByText('من: اختر السورة (1/4)')).toBeTruthy();
+    expect(screen.getByText('من — اختر السورة')).toBeTruthy();
 
     // Move to stage 3
     fireEvent.press(screen.getByTestId('surah-row-2'));
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-next-button'));
-    expect(screen.getByText('إلى: اختر السورة (3/4)')).toBeTruthy();
+    expect(screen.getByText('إلى — اختر السورة')).toBeTruthy();
 
     // Stage 3 -> Back returns to stage 2
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-back-button'));
-    expect(screen.getByText('من: سورة البقرة (2/4)')).toBeTruthy();
+    expect(screen.getByText('من — اختر الآية')).toBeTruthy();
 
     // Move to stage 4
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-next-button'));
     fireEvent.press(screen.getByTestId('surah-row-3')); // Aal Imran
-    expect(screen.getByText('إلى: سورة آل عمران (4/4)')).toBeTruthy();
+    expect(screen.getByText('إلى — اختر الآية')).toBeTruthy();
+    expect(screen.getByText('آل عمران · 200 آية')).toBeTruthy();
 
     // Stage 4 -> Back returns to stage 3
     fireEvent.press(screen.getByTestId('quran-range-picker-sheet-back-button'));
-    expect(screen.getByText('إلى: اختر السورة (3/4)')).toBeTruthy();
+    expect(screen.getByText('إلى — اختر السورة')).toBeTruthy();
   });
 
   it('calls onCancel when close button (✕) is pressed', () => {
@@ -228,10 +254,15 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
     // TO: Surah 1 (Al-Fatiha) -> before Surah 2
     fireEvent.press(screen.getByTestId('surah-row-1'));
 
-    // In stage 4: warning text shown and confirm button disabled
+    // In stage 4: icon + text warning shown and confirm button disabled
     expect(
       screen.getByText('يجب أن تكون نهاية النطاق بعد بدايته في ترتيب المصحف'),
     ).toBeTruthy();
+    expect(
+      screen.getByTestId('quran-range-picker-sheet-vr14a-warning').props
+        .accessibilityRole,
+    ).toBe('alert');
+    expect(screen.getByLabelText('تنبيه')).toBeTruthy();
 
     const confirmBtn = screen.getByTestId(
       'quran-range-picker-sheet-confirm-button',
@@ -256,8 +287,13 @@ describe('QuranRangePickerSheet (SCR-11)', () => {
       />,
     );
 
+    // The seeded FROM surah is pre-selected in the list; picking it again
+    // restarts its ayah at 1 (the wheel is then re-seeded by the user).
     expect(
-      screen.getByTestId('quran-range-picker-sheet-summary-from'),
-    ).toHaveTextContent('سورة البقرة (آية 15)');
+      screen.getByTestId('surah-row-2').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('surah-row-3').props.accessibilityState.selected,
+    ).toBe(false);
   });
 });

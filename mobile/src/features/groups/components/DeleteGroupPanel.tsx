@@ -1,20 +1,38 @@
 import React, { useState } from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Button } from '@/shared/components/Button';
-import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { Button, Banner, Icon, ConfirmationDialog } from '@/shared/components';
+import { typography } from '@/shared/theme/typography';
+import { rowStart, itemsStart } from '@/shared/theme/rtl';
 import { deleteGroup } from '@/shared/api/groups.client';
 import { ApiError } from '@/shared/api/types';
 
 export interface DeleteGroupPanelProps {
   groupId: string;
+  /** Names the group in the confirmation title ("حذف حلقة الرحمة نهائيًا؟"). */
+  groupName?: string;
   onDeleted?: () => void;
   className?: string;
   style?: StyleProp<ViewStyle>;
 }
 
+/** Figma 52:1067 — the group has never had a member: deletion is possible. */
+const AVAILABLE_COPY =
+  'الحذف نهائي ولا يمكن التراجع عنه — ممكن فقط لمجموعة لم ينضم إليها أحد قط.';
+/** Figma 41:309 — the server reported membership history (409). */
+const UNAVAILABLE_COPY =
+  'غير متاح — للمجموعة سجل عضويات. الحذف ممكن فقط لمجموعة لم ينضم إليها أحد قط.';
+const HAS_HISTORY_MESSAGE = 'لا يمكن حذف مجموعة سبق أن انضم إليها طلاب';
+
+/**
+ * Figma SCR-29 Danger card (41:303) + Delete confirm (52:1139, strong
+ * dialog). The API alone knows whether the group ever had a member
+ * (API-018, 409 GROUP_HAS_HISTORY); after that answer the action renders
+ * unavailable (40% opacity, inert) exactly as the frame shows.
+ */
 export function DeleteGroupPanel({
   groupId,
+  groupName,
   onDeleted,
   className,
   style,
@@ -22,6 +40,9 @@ export function DeleteGroupPanel({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasHistory, setHasHistory] = useState(false);
+
+  const subject = groupName ?? 'المجموعة';
 
   const triggerHaptic = () => {
     if (process.env.EXPO_OS === 'ios' || process.env.EXPO_OS === 'android') {
@@ -59,13 +80,15 @@ export function DeleteGroupPanel({
       setShowConfirmModal(false);
       onDeleted?.();
     } catch (err) {
+      setShowConfirmModal(false);
       if (err instanceof ApiError) {
         if (
           err.statusCode === 409 ||
           err.errorCode === 'GROUP_HAS_HISTORY' ||
           err.message?.includes('سبق أن انضم')
         ) {
-          setErrorMessage('لا يمكن حذف حلقة سبق أن انضم إليها طلاب');
+          setHasHistory(true);
+          setErrorMessage(HAS_HISTORY_MESSAGE);
         } else if (
           err.statusCode === 422 &&
           err.details &&
@@ -73,7 +96,7 @@ export function DeleteGroupPanel({
         ) {
           setErrorMessage(err.details[0].message);
         } else {
-          setErrorMessage(err.message || 'حدث خطأ أثناء حذف الحلقة');
+          setErrorMessage(err.message || 'حدث خطأ أثناء حذف المجموعة');
         }
       } else {
         setErrorMessage('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
@@ -86,54 +109,59 @@ export function DeleteGroupPanel({
   return (
     <View
       testID="delete-group-panel"
-      className={`p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 gap-4 ${
+      className={`w-full rounded-lg bg-error-subtle border border-line-error px-[18px] py-4 gap-2.5 ${itemsStart} ${
         className ?? ''
       }`}
       style={[{ borderCurve: 'continuous' }, style]}
     >
-      <View className="gap-1">
-        <Text className="text-base font-bold text-gray-900 dark:text-gray-100 text-right">
-          حذف الحلقة
-        </Text>
-        <Text className="text-xs text-gray-500 dark:text-gray-400 text-right leading-5">
-          حذف هذه الحلقة نهائياً من النظام. هذا الإجراء متاح فقط للحلقات التي لم
-          ينضم إليها أي طالب سابقاً أو حالياً.
-        </Text>
-      </View>
-
-      {/* Error Message Banner */}
       {errorMessage ? (
-        <View
-          className="p-3 rounded-lg bg-destructive-50 dark:bg-destructive-950 border border-destructive-200 dark:border-destructive-800"
-          style={{ borderCurve: 'continuous' }}
+        <Banner
+          tone="error"
+          icon="alert"
+          message={errorMessage}
           testID="delete-group-error"
-        >
-          <Text
-            selectable
-            className="text-xs text-destructive-700 dark:text-destructive-300 text-right font-medium"
-          >
-            {errorMessage}
-          </Text>
-        </View>
+        />
       ) : null}
 
-      {/* Action Button */}
-      <Button
-        label="حذف الحلقة"
-        variant="destructive"
-        onPress={handleOpenConfirm}
-        disabled={isSubmitting}
-        testID="delete-group-button"
-      />
+      <View className={`${rowStart} items-center gap-3 w-full`}>
+        <Icon name="trash" size={20} tone="error" />
+        <View className={`flex-1 ${itemsStart}`}>
+          <Text
+            className={`w-full ${typography.bodyMdMedium} text-right text-fg-error`}
+          >
+            حذف المجموعة نهائيًا
+          </Text>
+          <Text
+            className={`w-full ${typography.caption} text-right text-fg-error`}
+            testID="delete-group-description"
+          >
+            {hasHistory ? UNAVAILABLE_COPY : AVAILABLE_COPY}
+          </Text>
+        </View>
+        <View
+          className={hasHistory ? 'opacity-40' : undefined}
+          pointerEvents={hasHistory ? 'none' : 'auto'}
+          accessibilityState={{ disabled: hasHistory }}
+        >
+          <Button
+            label="حذف"
+            variant="destructive"
+            size="small"
+            onPress={handleOpenConfirm}
+            disabled={isSubmitting}
+            testID="delete-group-button"
+            className="min-w-[96px]"
+          />
+        </View>
+      </View>
 
-      {/* Confirmation Dialog (Strongest Copy per UF.md §25) */}
       <ConfirmationDialog
         visible={showConfirmModal}
-        title="تأكيد حذف الحلقة"
-        message="هل أنت متأكد من رغبتك في حذف هذه الحلقة نهائياً؟ هذا الإجراء لا يمكن التراجع عنه وسيتم حذف بيانات الحلقة بالكامل."
-        confirmLabel="حذف نهائي"
-        cancelLabel="تراجع"
-        confirmVariant="destructive"
+        title={`حذف ${subject} نهائيًا؟`}
+        message="لا يمكن التراجع عن هذا الإجراء. تُحذف المجموعة من القاعدة بالكامل."
+        confirmLabel="حذف نهائيًا"
+        cancelLabel="إلغاء"
+        weight="strong"
         loading={isSubmitting}
         onConfirm={handleConfirmDelete}
         onCancel={() => {
