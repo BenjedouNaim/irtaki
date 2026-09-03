@@ -70,7 +70,7 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     expect(screen.queryByTestId('progress-section-error')).toBeNull();
   });
 
-  it('fetches via getMyProgress and renders the completion ring as a real count "23 / 60"', async () => {
+  it('fetches via getMyProgress and renders the completion ring as a real count "23" over "من 60 حزبًا"', async () => {
     jest.spyOn(progressApi, 'getMyProgress').mockResolvedValue(mockProgress);
 
     renderSection();
@@ -84,8 +84,10 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     expect(ring.props.accessibilityValue).toEqual({ min: 0, max: 60, now: 23 });
     expect(
       screen.getByTestId('progress-section-ring-value').props.children,
-    ).toBe('23 / 60');
-    expect(screen.getByText('حزباً مكتملاً')).toBeTruthy();
+    ).toBe('23');
+    expect(
+      screen.getByTestId('progress-section-ring').props.accessibilityLabel,
+    ).toBe('حزباً مكتملاً: 23 من 60');
   });
 
   it('renders last_memorized_position as plain text with the surah name and an info disclaimer — never as a progress bar (DEC-D02)', async () => {
@@ -175,7 +177,7 @@ describe('ProgressSection (SCR-13 — Memorization Progress, F-PRG-02)', () => {
     ).toBeTruthy();
     expect(
       screen.getByTestId('progress-section-ring-value').props.children,
-    ).toBe('0 / 60');
+    ).toBe('0');
     expect(screen.getByText('لم يُسجَّل أي موضع حفظ بعد')).toBeTruthy();
     expect(screen.queryByTestId('progress-section-pointer-text')).toBeNull();
     expect(
