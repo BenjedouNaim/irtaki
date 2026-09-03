@@ -72,6 +72,23 @@ export interface DayBreakdown {
 }
 
 /**
+ * The DMS §8 `AbsenceReason` tally over the SAME `ExpectedDays(m, w)` the
+ * `DayBreakdown` is built from — the "absence-reason breakdown" UC-07 step 4
+ * names and API-038 returns as `absence_breakdown` (UF §17 "Absence reasons
+ * — Group-level donut").
+ *
+ * Derived here rather than in the Performance module so the reason split
+ * and the VO-09 classification can never disagree (TS §22): by construction
+ * `sick + studying = dayBreakdown.absentExcused` (BR-24) and
+ * `other = dayBreakdown.absentOther` (BR-25).
+ */
+export interface AbsenceBreakdown {
+  sick: number;
+  studying: number;
+  other: number;
+}
+
+/**
  * The six E-06 metrics (SAS §18.2) plus the three §18.1 denominators
  * (`|ExpectedDays|`, `|EffectiveDays|`, `|MemorizationExpectedDays|`) and the
  * "days on which memorisation actually occurred" count that §18.2 names as
@@ -94,6 +111,8 @@ export interface WeeklyMetrics {
   memorizationDays: number;
   /** The VO-09 tally over `ExpectedDays(m, w)` (APIS §10.9 `day_breakdown`). */
   dayBreakdown: DayBreakdown;
+  /** The AbsenceReason tally over the same days (APIS §10.9 `absence_breakdown`). */
+  absenceBreakdown: AbsenceBreakdown;
 }
 
 /**
@@ -128,6 +147,16 @@ function countOf(
   classification: DayClassification,
 ): number {
   return days.filter((d) => d.classification === classification).length;
+}
+
+/** Count of the expected days filed `Absent` with one AbsenceReason (VR-19). */
+function countAbsencesFor(
+  days: readonly ClassifiedDay[],
+  reason: 'Sick' | 'Studying' | 'Other',
+): number {
+  return days.filter(
+    (d) => d.report?.type === 'Absent' && d.report.absenceReason === reason,
+  ).length;
 }
 
 /**
@@ -211,6 +240,14 @@ export function computeWeeklyMetrics(input: WeeklyMetricsInput): WeeklyMetrics {
       absentExcused: countOf(days, 'ABSENT_EXCUSED'),
       absentOther: countOf(days, 'ABSENT_OTHER'),
       noReport: countOf(days, 'NO_REPORT'),
+    },
+    // The same days split by VR-19's reason (UC-07 step 4's "absence-reason
+    // breakdown"): Sick + Studying is exactly ABSENT_EXCUSED (BR-24) and
+    // Other is exactly ABSENT_OTHER (BR-25).
+    absenceBreakdown: {
+      sick: countAbsencesFor(days, 'Sick'),
+      studying: countAbsencesFor(days, 'Studying'),
+      other: countAbsencesFor(days, 'Other'),
     },
   };
 }

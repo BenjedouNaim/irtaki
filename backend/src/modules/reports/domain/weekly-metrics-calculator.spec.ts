@@ -97,6 +97,7 @@ const zeroMetrics: Omit<WeeklyMetrics, 'expectedDays'> = {
     absentOther: 0,
     noReport: 0,
   },
+  absenceBreakdown: { sick: 0, studying: 0, other: 0 },
 };
 
 describe('computeEffectiveWindow (SAS §18.1 EffectiveWindow)', () => {
@@ -225,6 +226,10 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
             absentOther: 0,
             noReport: 0,
           },
+          absenceBreakdown:
+            reason === 'Sick'
+              ? { sick: 1, studying: 0, other: 0 }
+              : { sick: 0, studying: 1, other: 0 },
         });
       }
     });
@@ -326,6 +331,7 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
           absentOther: 0,
           noReport: 0,
         },
+        absenceBreakdown: { sick: 3, studying: 3, other: 0 },
       });
     });
 
@@ -347,6 +353,7 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
           absentOther: 0,
           noReport: 6,
         },
+        absenceBreakdown: { sick: 0, studying: 0, other: 0 },
       });
     });
   });
@@ -388,6 +395,48 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
         normalFull(WEEK.weekEnd),
       ]);
       expect(result.dayBreakdown.normal).toBe(6);
+    });
+  });
+
+  describe('absence breakdown (UC-07 step 4, API-038 `absence_breakdown`)', () => {
+    it('splits the excused and unexcused absences by VR-19 reason', () => {
+      const result = compute([
+        absent(DAY[0], 'Sick'),
+        absent(DAY[1], 'Sick'),
+        absent(DAY[2], 'Studying'),
+        absent(DAY[3], 'Other'),
+        normalFull(DAY[4]),
+      ]);
+
+      expect(result.absenceBreakdown).toEqual({
+        sick: 2,
+        studying: 1,
+        other: 1,
+      });
+    });
+
+    it('always agrees with the VO-09 tally it is drawn from (TS §22)', () => {
+      const result = compute([
+        absent(DAY[0], 'Sick'),
+        absent(DAY[1], 'Studying'),
+        absent(DAY[2], 'Other'),
+        revision(DAY[3]),
+      ]);
+      const { sick, studying, other } = result.absenceBreakdown;
+
+      // BR-24: Sick + Studying IS the excused set. BR-25: Other IS the rest.
+      expect(sick + studying).toBe(result.dayBreakdown.absentExcused);
+      expect(other).toBe(result.dayBreakdown.absentOther);
+    });
+
+    it('never counts an absence outside the week’s expected days (BR-45)', () => {
+      const result = compute([absent(WEEK.weekEnd, 'Sick')]);
+
+      expect(result.absenceBreakdown).toEqual({
+        sick: 0,
+        studying: 0,
+        other: 0,
+      });
     });
   });
 

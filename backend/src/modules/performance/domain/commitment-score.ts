@@ -1,4 +1,5 @@
 import type {
+  AbsenceBreakdown,
   DayBreakdown,
   WeeklyMetrics,
 } from '../../reports/domain/weekly-metrics-calculator';
@@ -161,6 +162,21 @@ export class CommitmentScoreCalculator {
       absentExcused: sum(weeks, (w) => w.dayBreakdown.absentExcused),
       absentOther: sum(weeks, (w) => w.dayBreakdown.absentOther),
       noReport: sum(weeks, (w) => w.dayBreakdown.noReport),
+    };
+  }
+
+  /**
+   * The AbsenceReason tally over the same expected days — API-038's
+   * `absence_breakdown` for ONE member, summed across the group by the use
+   * case (UC-07 step 4). `sick + studying` always equals
+   * `dayBreakdown().absentExcused` and `other` equals `absentOther`, since
+   * both come from the same `WeeklyMetricsCalculator` pass (TS §22).
+   */
+  static absenceBreakdown(weeks: readonly WeeklyMetrics[]): AbsenceBreakdown {
+    return {
+      sick: sum(weeks, (w) => w.absenceBreakdown.sick),
+      studying: sum(weeks, (w) => w.absenceBreakdown.studying),
+      other: sum(weeks, (w) => w.absenceBreakdown.other),
     };
   }
 }

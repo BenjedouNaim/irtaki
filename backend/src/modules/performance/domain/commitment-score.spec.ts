@@ -23,6 +23,7 @@ function week(overrides: Partial<WeeklyMetrics> = {}): WeeklyMetrics {
       absentOther: 0,
       noReport: 0,
     },
+    absenceBreakdown: { sick: 0, studying: 0, other: 0 },
     ...overrides,
   };
 }
