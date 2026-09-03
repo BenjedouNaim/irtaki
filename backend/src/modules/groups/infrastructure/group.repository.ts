@@ -54,6 +54,20 @@ export class GroupRepository implements IGroupRepository {
     return rows.map((r) => this.mapRawToGroupListRow(r));
   }
 
+  /**
+   * API-009's Admin `group_count`. Archived groups are counted: `GET /groups`
+   * returns them too (APIS §10.4 declares no lifecycle filter), and SCR-27 —
+   * the list this tile taps into (UF §10) — shows them with a lifecycle
+   * badge, so a tile that excluded them would contradict the screen it opens.
+   */
+  async countAll(): Promise<number> {
+    const rows = await this.groupRepo.query<Array<{ count: number }>>(
+      'SELECT COUNT(*)::int AS count FROM groups',
+    );
+
+    return rows[0]?.count ?? 0;
+  }
+
   async findByStaffIdForList(staffId: string): Promise<GroupListRow[]> {
     const rows = await this.groupRepo
       .createQueryBuilder('g')

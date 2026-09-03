@@ -1,5 +1,5 @@
 export * from './RootNavigator';
-export * from './stacks/AuthStack';
+export * from './roleHome';
 export * from './stacks/UserStack';
 export * from './stacks/StudentTabs';
 export * from './stacks/AssistantTabs';

@@ -1,31 +1,21 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
+import { homeRouteForRole } from '@/navigation/roleHome';
+import type { Role } from '@/shared/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const { resetSuccess } = useLocalSearchParams<{ resetSuccess?: string }>();
 
+  /**
+   * "Every role lands on its correct Home screen immediately post-login"
+   * (F-DASH-02) — resolved from the role the session was just opened with,
+   * through the same map the entry route uses. `replace`, not `push`: the
+   * login screen must not stay on the back stack behind a Home (UF §8).
+   */
   const handleLoginSuccess = (role: string) => {
-    switch (role) {
-      case 'User':
-        router.replace('/(app)/user');
-        break;
-      case 'Student':
-        router.replace('/(app)/student');
-        break;
-      case 'Assistant':
-        router.replace('/(app)/assistant');
-        break;
-      case 'Teacher':
-        router.replace('/(app)/teacher');
-        break;
-      case 'Admin':
-        router.replace('/(app)/admin');
-        break;
-      default:
-        router.replace('/(app)/user');
-    }
+    router.replace(homeRouteForRole(role as Role));
   };
 
   return (

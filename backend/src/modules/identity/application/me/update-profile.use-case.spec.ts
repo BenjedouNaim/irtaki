@@ -14,6 +14,7 @@ describe('UpdateProfileUseCase', () => {
       findByEmail: jest.fn(),
       findById: jest.fn(),
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
       save: jest.fn().mockImplementation((u) => Promise.resolve(u)),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),

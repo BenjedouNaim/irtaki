@@ -75,5 +75,15 @@ import { PerformanceController } from './presentation/performance.controller';
     // service (TS §9, §24), holds no state and needs no provider.
     GetAtRiskListUseCase,
   ],
+  // API-009's cross-module orchestrator (TS §12) composes the Student's
+  // `commitment_score` and the Teacher's per-group figures from these three
+  // reads rather than re-deriving them, so DS-03/DS-04 keep exactly one
+  // implementation. `GetMembershipPerformanceUseCase` is NOT exported: no
+  // dashboard payload names a caller-supplied membership.
+  exports: [
+    GetOwnPerformanceUseCase,
+    GetGroupPerformanceUseCase,
+    GetAtRiskListUseCase,
+  ],
 })
 export class PerformanceModule {}

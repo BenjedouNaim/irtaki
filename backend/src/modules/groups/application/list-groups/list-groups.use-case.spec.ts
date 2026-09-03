@@ -33,6 +33,7 @@ describe('ListGroupsUseCase', () => {
   beforeEach(async () => {
     const mockRepo: Partial<jest.Mocked<IGroupRepository>> = {
       findAllForList: jest.fn(),
+      countAll: jest.fn(),
       findByStaffIdForList: jest.fn(),
       findByActiveMemberForList: jest.fn(),
     };

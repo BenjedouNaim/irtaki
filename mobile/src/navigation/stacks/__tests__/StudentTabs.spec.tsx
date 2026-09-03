@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StudentTabs } from '../StudentTabs';
 import * as dailyReportsApi from '@/shared/api/dailyReports.client';
+import * as dashboardApi from '@/shared/api/dashboard.client';
 import * as weeklyReportsApi from '@/shared/api/weeklyReports.client';
 import * as meApi from '@/shared/api/me.client';
 import * as membershipsApi from '@/shared/api/memberships.client';
@@ -19,6 +20,7 @@ import {
 } from '@/features/dailyReports/utils/arabicDate';
 
 jest.mock('@/shared/api/dailyReports.client');
+jest.mock('@/shared/api/dashboard.client');
 jest.mock('@/shared/api/weeklyReports.client');
 jest.mock('@/shared/api/me.client');
 jest.mock('@/shared/api/memberships.client');
@@ -41,6 +43,17 @@ const NEVER = () => new Promise<never>(() => {});
 const today = localTodayIsoDate();
 const weekStart = toIsoDate(addDays(parseIsoDate(today)!, -3));
 const weekEnd = toIsoDate(addDays(parseIsoDate(today)!, 3));
+
+/** API-009's Student arm — the CTA state, the score and the payment chip. */
+const studentDashboard: dashboardApi.StudentDashboardDto = {
+  can_submit_today: true,
+  commitment_score: 86,
+  payment: {
+    status: 'Due Soon',
+    next_due_date: '2026-09-30',
+    arrears_count: 0,
+  },
+};
 
 const liveWeek: weeklyReportsApi.WeeklyReportLiveDto = {
   id: null,
@@ -130,6 +143,9 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
       },
       days_since_last_report: 1,
     });
+    jest
+      .spyOn(dashboardApi, 'getMyDashboard')
+      .mockResolvedValue(studentDashboard);
   });
 
   afterEach(() => {
@@ -137,10 +153,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('greets the student by first name with the avatar initial and the group + recitation day line', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
-
     renderTabs();
 
     expect(screen.getByTestId('student-tabs')).toBeTruthy();
@@ -155,9 +167,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
 
   it('shows the header skeleton while the profile loads (Figma 50:1072)', () => {
     jest.spyOn(meApi, 'getMe').mockImplementation(NEVER);
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
 
     renderTabs();
 
@@ -181,9 +190,11 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
         message: 'لا توجد عضوية نشطة',
       }),
     );
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: false, block_reason: 'group_archived' });
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      can_submit_today: false,
+      block_reason: 'group_archived',
+    });
 
     renderTabs();
 
@@ -198,10 +209,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('renders the report status card and routes "Submit Today\'s Report" to SCR-09 (UF §26)', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
-
     renderTabs();
 
     fireEvent.press(await screen.findByTestId('submit-report-button'));
@@ -211,9 +218,11 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('keeps the profile entry point on the avatar', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: false, block_reason: 'group_archived' });
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      can_submit_today: false,
+      block_reason: 'group_archived',
+    });
 
     renderTabs();
 
@@ -223,10 +232,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('drives the week card from API-033: 7 day cells, recitation day rightmost-last, today outlined, others empty', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
-
     renderTabs();
 
     expect(await screen.findByTestId('week-card')).toBeTruthy();
@@ -248,9 +253,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('shows two skeleton rows while the week loads and a retry banner on failure', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
     const spy = jest
       .spyOn(weeklyReportsApi, 'getCurrentWeeklyReport')
       .mockRejectedValueOnce(
@@ -278,10 +280,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('switches to the Progress tab: the memorization card and the History link to SCR-14 (UF §26)', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
-
     renderTabs();
     await screen.findByTestId('submit-report-button');
 
@@ -315,10 +313,6 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('switches to the Payment tab: SCR-16 with its own TopBar (F-PAY-01)', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
-
     renderTabs();
     await screen.findByTestId('submit-report-button');
 
@@ -342,6 +336,13 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('routes "View Today\'s Report" to SCR-15 by the id of the report already fetched (F-DR-07)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      can_submit_today: false,
+      block_reason: 'already_submitted',
+    });
+    // Only `already_submitted` needs API-029 — the dashboard deliberately
+    // carries no `existing_report` (APIS §10.3), and the CTA must open one.
     jest.spyOn(dailyReportsApi, 'getTodayReportStatus').mockResolvedValue({
       can_submit: false,
       block_reason: 'already_submitted',
@@ -375,9 +376,11 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
   });
 
   it('routes "Complete Weekly Report" to SCR-12 on the recitation day (UF §10, F-WR-01)', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: false, block_reason: 'recitation_day' });
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      can_submit_today: false,
+      block_reason: 'recitation_day',
+    });
 
     renderTabs();
 
@@ -386,11 +389,84 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
     expect(screen.queryByTestId('submit-report-button')).toBeNull();
   });
 
-  it('keeps the logout entry point', async () => {
-    jest
-      .spyOn(dailyReportsApi, 'getTodayReportStatus')
-      .mockResolvedValue({ can_submit: true });
+  it('renders the score and payment tiles from the dashboard (Figma 24:105)', async () => {
+    renderTabs();
 
+    await screen.findByTestId('student-summary-tiles');
+    expect(
+      screen.getByTestId('student-summary-tiles-score-value').props.children,
+    ).toBe('86%');
+    expect(
+      screen.getByTestId('student-summary-tiles-score-caption').props.children,
+    ).toBe('الأسبوع الحالي');
+    expect(
+      screen.getByTestId('student-summary-tiles-payment-badge'),
+    ).toHaveTextContent('يستحق قريبًا');
+    expect(
+      screen.getByTestId('student-summary-tiles-payment-caption').props
+        .children,
+    ).toBe('الاستحقاق 30 سبتمبر');
+
+    fireEvent.press(screen.getByTestId('student-summary-tiles-payment'));
+    expect(screen.getByTestId('payment-screen')).toBeTruthy();
+  });
+
+  it('renders a null commitment score as the null state, never 0% (DEC-B04)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      commitment_score: null,
+    });
+
+    renderTabs();
+
+    await screen.findByTestId('student-summary-tiles');
+    expect(
+      screen.getByTestId('student-summary-tiles-score-value').props.children,
+    ).toBe('—');
+    expect(
+      screen.getByTestId('student-summary-tiles-score-caption').props.children,
+    ).toBe('بيانات غير كافية');
+  });
+
+  it('shows the arrears count on the chip when there are any (UF §10/§18)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue({
+      ...studentDashboard,
+      payment: {
+        status: 'Unpaid',
+        next_due_date: '2026-06-30',
+        arrears_count: 3,
+      },
+    });
+
+    renderTabs();
+
+    await screen.findByTestId('student-summary-tiles');
+    expect(
+      screen.getByTestId('student-summary-tiles-payment-badge'),
+    ).toHaveTextContent('غير مدفوع');
+    expect(
+      screen.getByTestId('student-summary-tiles-payment-caption').props
+        .children,
+    ).toBe('3 دورات متأخرة');
+  });
+
+  /**
+   * F-DASH-03's last checkbox. Home's CTA state now comes from the ONE
+   * dashboard call, so API-029 must stay idle — except in the one state
+   * where the CTA needs a record the dashboard does not carry.
+   */
+  it('does not ask API-029 for a state the dashboard already answered', async () => {
+    renderTabs();
+
+    await screen.findByTestId('student-summary-tiles');
+    expect(dashboardApi.getMyDashboard).toHaveBeenCalledTimes(1);
+    expect(dailyReportsApi.getTodayReportStatus).not.toHaveBeenCalled();
+    // The weekly strip keeps its own call: API-009 carries no per-day state
+    // (UF §10's stated exception for Student Home).
+    expect(weeklyReportsApi.getCurrentWeeklyReport).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the logout entry point', async () => {
     renderTabs();
 
     expect(await screen.findByTestId('logout-button')).toBeTruthy();

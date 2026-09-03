@@ -120,6 +120,19 @@ export interface IMembershipRepository {
     options: { asOf?: string },
   ): Promise<RosterRow[]>;
   findByIdForRecovery(id: string): Promise<MembershipRecoveryData | null>;
+  /**
+   * API-009's Admin `pending_recovery_count` tile (APIS §10.3, UF §10).
+   *
+   * DOC GAP: neither APIS nor UF defines the figure beyond its name, and
+   * UF §10 marks the tile "informational only — no global recovery-list
+   * endpoint". The conservative doc-consistent reading is the population the
+   * one recovery route can be opened for: every `Terminated` membership,
+   * since termination is what soft-deletes the records
+   * `GET /memberships/{id}/recovery` dumps (APIS §10.6, DEC-B10) and no
+   * write path ever clears `deleted_at`, so a terminated membership stays
+   * recoverable forever. ONE parameterised `COUNT(*)`.
+   */
+  countByState(state: 'Active' | 'Terminated'): Promise<number>;
   findStateAndUserById(
     membershipId: string,
     manager: EntityManager,

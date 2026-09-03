@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { TopBar, Button, Icon, ListRow } from '@/shared/components';
+import {
+  TopBar,
+  Banner,
+  Button,
+  Icon,
+  ListRow,
+  SkeletonLoader,
+} from '@/shared/components';
 import { typography } from '@/shared/theme/typography';
 import { logoutUser } from '@/shared/api/auth.client';
+import type { AdminDashboardDto } from '@/shared/api/dashboard.client';
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard';
+import { describeDashboardError } from '@/features/dashboard/utils/dashboardCopy';
 import { AdminSummaryTiles } from '@/features/admin/components/AdminSummaryTiles';
 import {
   useAuthStore,
@@ -18,9 +28,15 @@ const ROLE_LINE = 'مدير · قراءة كاملة، وإعدادات هيكل
  * SCR-26 Admin Home (Figma 39:2, UF §10 / §28 "Menu hub"): the role line, the
  * four dashboard tiles and the three menu rows that are Admin's real
  * workflow — Groups (F-GRP-10), Staff & Users (F-ADM-02) and the Audit Log
- * (F-ADM-03). The tiles read `GET /me/dashboard` (API-009), which has no
- * client yet, so they render MetricTile's Null state (see AdminSummaryTiles);
- * the group and staff tiles still carry UF §10's tap targets.
+ * (F-ADM-03).
+ *
+ * The tiles are F-ADM-04's `AdminSummaryTiles` shell, unchanged: F-DASH-03
+ * only hands it the four counts from the ONE `GET /me/dashboard` call
+ * (API-009, F-DASH-01). Until the call resolves they keep rendering
+ * MetricTile's Null state rather than a placeholder zero (DEC-B04), and the
+ * group and staff tiles keep UF §10's tap targets. The menu rows never
+ * depend on the call, so a failed dashboard read never blocks Admin's actual
+ * workflow — the error Banner sits above a fully usable menu.
  *
  * Two frame slots have no counterpart in the app. The headline above the role
  * line is the centre's name, which no endpoint and no doc supplies, so the
@@ -32,6 +48,8 @@ const ROLE_LINE = 'مدير · قراءة كاملة، وإعدادات هيكل
 export function AdminStack() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { data, isLoading, isError, error, refetch } =
+    useDashboard<AdminDashboardDto>();
 
   const openGroups = () => router.push('/(app)/admin/groups' as any);
   const openUsers = () => router.push('/(app)/admin/users' as any);
@@ -88,10 +106,30 @@ export function AdminStack() {
           {ROLE_LINE}
         </Text>
 
-        <AdminSummaryTiles
-          onGroupsPress={openGroups}
-          onStaffPress={openUsers}
-        />
+        {isLoading && !data ? (
+          <View className="w-full" testID="admin-summary-loading">
+            <SkeletonLoader variant="dashboard" />
+          </View>
+        ) : (
+          <>
+            {isError ? (
+              <Banner
+                tone="error"
+                message={describeDashboardError(error)}
+                onRetry={() => void refetch()}
+                testID="admin-summary-error"
+              />
+            ) : null}
+            <AdminSummaryTiles
+              groupCount={data?.group_count ?? null}
+              staffCount={data?.staff_count ?? null}
+              studentCount={data?.student_count ?? null}
+              pendingRecoveryCount={data?.pending_recovery_count ?? null}
+              onGroupsPress={openGroups}
+              onStaffPress={openUsers}
+            />
+          </>
+        )}
 
         <View className="w-full gap-2.5 pt-1.5" testID="admin-menu">
           <ListRow

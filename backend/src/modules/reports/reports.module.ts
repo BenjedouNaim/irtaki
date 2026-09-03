@@ -92,6 +92,9 @@ import { MembershipWeeklyReportsScopeGuard } from './presentation/guards/members
     WeeklyReportFinalizationJob,
   ],
   exports: [
+    // API-029's read is also API-009's Student CTA state and its membership
+    // probe (TS §12's cross-module orchestrator).
+    GetTodayReportStatusUseCase,
     DAILY_REPORT_REPOSITORY,
     DailyReportRepository,
     WEEKLY_REPORT_REPOSITORY,

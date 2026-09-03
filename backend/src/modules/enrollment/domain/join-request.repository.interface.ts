@@ -65,6 +65,15 @@ export interface IJoinRequestRepository {
       sortKey: { score: number; createdAt: string };
     } | null;
   }): Promise<{ rows: JoinRequestQueueRow[]; hasMore: boolean }>;
+  /**
+   * API-009's `pending_request_count` — how many live `Pending` requests sit
+   * in the caller's review queue, over the SAME scope predicate
+   * `findPendingQueue` applies (`assistantId = null` = the Admin's whole
+   * queue). One parameterised `COUNT(*)` over DB-IDX-05, never the length of
+   * a fetched page: the queue is cursor-paginated and APIS §9.1 puts no
+   * total on it, so the dashboard tile cannot be derived from a page.
+   */
+  countPendingForAssistant(assistantId: string | null): Promise<number>;
   acceptConditionally(
     id: string,
     reviewerId: string,

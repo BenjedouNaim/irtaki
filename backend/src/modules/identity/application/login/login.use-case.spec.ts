@@ -21,6 +21,7 @@ describe('LoginUseCase', () => {
       findByEmail: jest.fn(),
       findById: jest.fn(),
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),

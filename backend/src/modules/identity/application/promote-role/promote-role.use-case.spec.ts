@@ -33,6 +33,7 @@ describe('PromoteRoleUseCase (UC-17, API-052)', () => {
       findByEmail: jest.fn(),
       findById: jest.fn(),
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),

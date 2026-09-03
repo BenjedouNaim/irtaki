@@ -297,6 +297,30 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     return { rows, hasMore };
   }
 
+  /**
+   * API-009's Assistant tile: the size of the live `Pending` queue, over the
+   * same scope predicate `findPendingQueue` uses — the Assistant's own
+   * assigned groups, or every group when `assistantId` is null (the Admin
+   * path). ONE literal parameterised statement over DB-IDX-05
+   * `join_requests(group_id, status, …)`; the `IS NULL` guard makes the
+   * `assistant_id` narrowing a parameter rather than appended SQL (TS §36).
+   */
+  async countPendingForAssistant(assistantId: string | null): Promise<number> {
+    const rows = await this.joinRequestRepo.query<Array<{ count: number }>>(
+      `SELECT COUNT(*)::int AS count
+         FROM join_requests jr
+        WHERE jr.status = 'Pending'
+          AND jr.deleted_at IS NULL
+          AND (
+            $1::uuid IS NULL
+            OR jr.group_id IN (SELECT g.id FROM groups g WHERE g.assistant_id = $1::uuid)
+          )`,
+      [assistantId],
+    );
+
+    return rows[0]?.count ?? 0;
+  }
+
   async acceptConditionally(
     id: string,
     reviewerId: string,

@@ -49,6 +49,7 @@ describe('GetJoinRequestDetailUseCase', () => {
       findByIdForDetail: jest.fn().mockResolvedValue(mockDetailRow),
       acceptConditionally: jest.fn(),
       rejectConditionally: jest.fn(),
+      countPendingForAssistant: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

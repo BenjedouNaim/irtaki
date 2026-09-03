@@ -1,22 +1,27 @@
 import React from 'react';
 import {
-  render,
+  render as rtlRender,
   screen,
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AssistantTabs } from '../AssistantTabs';
+import * as dashboardApi from '@/shared/api/dashboard.client';
 import * as groupsApi from '@/shared/api/groups.client';
 import * as meApi from '@/shared/api/me.client';
 import * as authApi from '@/shared/api/auth.client';
 import * as authStore from '@/shared/auth/authStore';
 import { ApiError } from '@/shared/api/types';
 
+jest.mock('@/shared/api/dashboard.client');
 jest.mock('@/shared/api/groups.client');
 jest.mock('@/shared/api/me.client');
 jest.mock('@/shared/api/auth.client');
 jest.mock('@/shared/auth/authStore', () => {
-  const original = jest.requireActual('@/shared/auth/authStore');
+  const original = jest.requireActual<typeof authStore>(
+    '@/shared/auth/authStore',
+  );
   return {
     ...original,
     getStoredRefreshToken: jest.fn(),
@@ -49,38 +54,39 @@ const me: meApi.MeResponse = {
   timezone: 'Africa/Tunis',
 };
 
-const groups: groupsApi.GroupListItemFull[] = [
-  {
-    id: 'g-1',
-    name: 'حلقة الفجر',
-    gender: 'Female',
-    recitation_day: 6,
-    enrollment_status: 'Open',
-    lifecycle_state: 'Active',
-    teacher: { id: 't-1', full_name: null },
-    assistant: { id: 'user-1', full_name: 'سارة بن علي' },
-  },
-  {
-    id: 'g-2',
-    name: 'حلقة النور',
-    gender: 'Female',
-    recitation_day: 2,
-    enrollment_status: 'Closed',
-    lifecycle_state: 'Active',
-    teacher: { id: 't-2', full_name: null },
-    assistant: { id: 'user-1', full_name: 'سارة بن علي' },
-  },
-];
+const dashboard: dashboardApi.AssistantDashboardDto = {
+  pending_request_count: 4,
+  groups: [
+    { id: 'g-1', name: 'حلقة الفجر', payment_followup_count: 4 },
+    { id: 'g-2', name: 'حلقة النور', payment_followup_count: 2 },
+  ],
+};
+
+let queryClient: QueryClient;
+
+function render(ui: React.ReactElement) {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
 
 describe('AssistantTabs (SCR-17 Assistant Home)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (meApi.getMe as jest.Mock).mockResolvedValue(me);
+    jest.spyOn(meApi, 'getMe').mockResolvedValue(me);
   });
 
-  it('renders the skeleton while loading', () => {
-    (groupsApi.listGroups as jest.Mock).mockReturnValue(new Promise(() => {}));
-    (meApi.getMe as jest.Mock).mockReturnValue(new Promise(() => {}));
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('renders the skeleton while the dashboard call is in flight', () => {
+    jest
+      .spyOn(dashboardApi, 'getMyDashboard')
+      .mockReturnValue(new Promise(() => {}));
 
     render(<AssistantTabs />);
 
@@ -88,19 +94,26 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     expect(
       screen.getByTestId('assistant-home-top-bar-title'),
     ).toHaveTextContent('الرئيسية');
-    expect(screen.getByTestId('assistant-home-greeting')).toHaveTextContent(
-      'مرحبًا',
-    );
   });
 
-  it('greets by first name and lists the assigned groups with their recitation day', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: groups });
+  it('renders the two summary tiles and the groups from ONE call', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue(dashboard);
 
     render(<AssistantTabs />);
 
     await waitFor(() => {
-      expect(screen.queryByTestId('assistant-home-loading')).toBeNull();
+      expect(screen.getByTestId('assistant-summary-tiles')).toBeTruthy();
     });
+
+    expect(
+      screen.getByTestId('assistant-summary-tiles-pending-value').props
+        .children,
+    ).toBe('4');
+    // 4 + 2 across the assigned groups.
+    expect(
+      screen.getByTestId('assistant-summary-tiles-follow-ups-value').props
+        .children,
+    ).toBe('6');
 
     expect(screen.getByTestId('assistant-home-greeting')).toHaveTextContent(
       'مرحبًا، سارة',
@@ -108,22 +121,55 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     expect(screen.getByTestId('assistant-home-subtitle')).toHaveTextContent(
       'مساعدة · مجموعتان مُسندتان',
     );
-    expect(screen.getByText('مجموعاتك')).toBeTruthy();
     expect(
       screen.getByTestId('assistant-group-row-g-1-title'),
     ).toHaveTextContent('حلقة الفجر');
     expect(
-      screen.getByTestId('assistant-group-row-g-1-subtitle'),
-    ).toHaveTextContent('يوم التسميع: السبت');
-    expect(
-      screen.getByTestId('assistant-group-row-g-2-title'),
-    ).toHaveTextContent('حلقة النور');
-    // No commitment / performance figure ever (DEC-B09, UF §10)
-    expect(screen.queryByText(/نسبة الالتزام/)).toBeNull();
+      screen.getByTestId('assistant-group-row-g-1-badge'),
+    ).toHaveTextContent('4 متابعات دفع');
+
+    expect(dashboardApi.getMyDashboard).toHaveBeenCalledTimes(1);
+    // F-DASH-03: the dashboard already names the assigned groups.
+    expect(groupsApi.listGroups).not.toHaveBeenCalled();
   });
 
-  it('renders the "no groups assigned" empty state (UF §23)', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: [] });
+  it('shows no performance figure anywhere, at any depth (DEC-B09, UF §10)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue(dashboard);
+
+    render(<AssistantTabs />);
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-summary-tiles')).toBeTruthy();
+    });
+
+    for (const forbidden of [
+      /نسبة الالتزام/,
+      /متوسط الالتزام/,
+      /نسبة الإرسال/,
+      /معرّضون للخطر/,
+    ]) {
+      expect(screen.queryByText(forbidden)).toBeNull();
+    }
+  });
+
+  it('routes the tiles to the Join Requests queue and the Payments ledger (UF §10)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue(dashboard);
+
+    render(<AssistantTabs />);
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-summary-tiles')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('assistant-summary-tiles-pending'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/join-requests');
+
+    fireEvent.press(screen.getByTestId('assistant-summary-tiles-follow-ups'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/payments');
+  });
+
+  it('renders the "no groups assigned" empty state, tiles included (UF §23)', async () => {
+    jest
+      .spyOn(dashboardApi, 'getMyDashboard')
+      .mockResolvedValue({ pending_request_count: 0, groups: [] });
 
     render(<AssistantTabs />);
 
@@ -136,12 +182,18 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     expect(screen.getByTestId('assistant-home-subtitle')).toHaveTextContent(
       'مساعدة · لا مجموعات مُسندة بعد',
     );
+    // A genuine count of zero is zero, not the null state.
+    expect(
+      screen.getByTestId('assistant-summary-tiles-follow-ups-value').props
+        .children,
+    ).toBe('0');
   });
 
   it('shows the generic retry banner on a network failure and retries', async () => {
-    (groupsApi.listGroups as jest.Mock)
+    const spy = jest
+      .spyOn(dashboardApi, 'getMyDashboard')
       .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({ data: groups });
+      .mockResolvedValueOnce(dashboard);
 
     render(<AssistantTabs />);
 
@@ -154,12 +206,12 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     fireEvent.press(screen.getByTestId('assistant-home-error-retry-button'));
 
     expect(await screen.findByText('حلقة الفجر')).toBeTruthy();
-    expect(groupsApi.listGroups).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it('never shows a 5xx server message, and falls back to a plain greeting when /me fails', async () => {
-    (meApi.getMe as jest.Mock).mockRejectedValue(new Error('boom'));
-    (groupsApi.listGroups as jest.Mock).mockRejectedValueOnce(
+    jest.spyOn(meApi, 'getMe').mockRejectedValue(new Error('boom'));
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockRejectedValue(
       new ApiError({
         statusCode: 500,
         error: 'Internal Server Error',
@@ -170,7 +222,7 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
     render(<AssistantTabs />);
 
     expect(
-      await screen.findByText('حدث خطأ أثناء تحميل المجموعات'),
+      await screen.findByText('حدث خطأ أثناء تحميل الصفحة الرئيسية'),
     ).toBeTruthy();
     expect(screen.queryByText('stack trace leaked')).toBeNull();
     expect(screen.getByTestId('assistant-home-greeting')).toHaveTextContent(
@@ -179,7 +231,7 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
   });
 
   it('exposes the Assistant tab bar: Home active, Join Requests and Payments push', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: groups });
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue(dashboard);
 
     render(<AssistantTabs />);
     await screen.findByText('حلقة الفجر');
@@ -188,21 +240,18 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
       screen.getByTestId('assistant-tab-bar-home').props.accessibilityState
         .selected,
     ).toBe(true);
-    expect(
-      screen.getByTestId('assistant-tab-bar-payments').props.accessibilityState
-        .disabled,
-    ).toBeUndefined();
 
     fireEvent.press(screen.getByTestId('assistant-tab-bar-join-requests'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/join-requests');
 
-    // SCR-20 is live since F-PAY-02 — the tab is no longer a placeholder.
     fireEvent.press(screen.getByTestId('assistant-tab-bar-payments'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/assistant/payments');
   });
 
   it('navigates to the profile from the trailing top-bar control', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: [] });
+    jest
+      .spyOn(dashboardApi, 'getMyDashboard')
+      .mockResolvedValue({ pending_request_count: 0, groups: [] });
 
     render(<AssistantTabs />);
     await screen.findByTestId('assistant-home-empty');
@@ -212,7 +261,9 @@ describe('AssistantTabs (SCR-17 Assistant Home)', () => {
   });
 
   it('logs out from the ghost action', async () => {
-    (groupsApi.listGroups as jest.Mock).mockResolvedValue({ data: [] });
+    jest
+      .spyOn(dashboardApi, 'getMyDashboard')
+      .mockResolvedValue({ pending_request_count: 0, groups: [] });
     (authStore.getStoredRefreshToken as jest.Mock).mockResolvedValue(
       'sample-refresh-token',
     );

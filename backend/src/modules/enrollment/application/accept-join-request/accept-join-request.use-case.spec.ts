@@ -59,6 +59,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findPendingQueue: jest.fn(),
       acceptConditionally: jest.fn(),
       rejectConditionally: jest.fn(),
+      countPendingForAssistant: jest.fn(),
     };
 
     mockMembershipRepo = {
@@ -66,6 +67,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findActiveByUserId: jest.fn(),
       findRosterByGroupId: jest.fn(),
       findByIdForRecovery: jest.fn(),
+      countByState: jest.fn(),
       findStateAndUserById: jest.fn(),
       terminateConditionally: jest.fn(),
       softDeleteMembershipRecords: jest.fn(),
@@ -75,6 +77,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       findByEmail: jest.fn(),
       findById: jest.fn(),
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),

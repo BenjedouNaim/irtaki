@@ -15,7 +15,33 @@ import { itemsStart, rowStart } from '@/shared/theme/rtl';
 import { formatArabicDate } from '../utils/arabicDate';
 import { localTodayIsoDate } from '../utils/dailyReportForm';
 
+/**
+ * The CTA's state as `GET /me/dashboard` reports it (API-009's
+ * `can_submit_today` / `block_reason`) — the subset of API-029 the CTA
+ * actually renders.
+ */
+export interface ReportStatusCardState {
+  can_submit: boolean;
+  block_reason?: DailyReportBlockReason;
+}
+
 export interface ReportStatusCardProps {
+  /**
+   * Controlled mode (F-DASH-03). When SCR-08 already holds the CTA state
+   * from its one `GET /me/dashboard` call, it passes it here and the card
+   * stops asking API-029 the same question — UF §10's "Every dashboard is
+   * one `GET /me/dashboard` call".
+   *
+   * The one exception is `already_submitted`: APIS §10.3's Student payload
+   * deliberately carries no `existing_report`, and "View Today's Report"
+   * needs the report it opens. In that ONE state the card re-enables its own
+   * API-029 read for that record — a datum the dashboard does not carry, not
+   * a duplicate of one it does.
+   *
+   * Omit the prop and the card fetches its own state, as SCR-09's gate and
+   * every other caller still expect.
+   */
+  status?: ReportStatusCardState;
   /** `block_reason` absent → "Submit Today's Report" → opens SCR-09. */
   onSubmitReport?: () => void;
   /**
@@ -172,6 +198,7 @@ const HERO_TONES: Record<
  * not wired yet renders disabled.
  */
 export function ReportStatusCard({
+  status,
   onSubmitReport,
   onViewReport,
   onCompleteWeeklyReport,
@@ -179,9 +206,16 @@ export function ReportStatusCard({
   className,
   style,
 }: ReportStatusCardProps) {
-  const { data, isLoading, isError, error, refetch } = useTodayReportStatus();
+  const isControlled = status !== undefined;
+  // Uncontrolled: the card owns the read. Controlled: it stays idle, except
+  // in `already_submitted`, where only API-029 knows WHICH report to open.
+  const query = useTodayReportStatus({
+    enabled: !isControlled || status.block_reason === 'already_submitted',
+  });
+  const { isLoading, isError, error, refetch } = query;
+  const data = isControlled ? status : query.data;
 
-  if (isLoading && !data) {
+  if (!isControlled && isLoading && !data) {
     return (
       <View
         key="skeleton"
@@ -196,7 +230,7 @@ export function ReportStatusCard({
     );
   }
 
-  if (isError || !data) {
+  if (!isControlled && (isError || !data)) {
     return (
       <Banner
         key="error"
@@ -208,6 +242,10 @@ export function ReportStatusCard({
         style={style}
       />
     );
+  }
+
+  if (!data) {
+    return null;
   }
 
   const reason: DailyReportBlockReason | 'none' = data.can_submit
@@ -230,7 +268,10 @@ export function ReportStatusCard({
     );
   }
 
-  const existingReport = data.existing_report;
+  // The report body always comes from API-029, controlled or not — the
+  // dashboard payload has no `existing_report` (APIS §10.3). In controlled
+  // mode the CTA is therefore inert only while that narrow read is in flight.
+  const existingReport = query.data?.existing_report;
   const handlers: Record<
     DailyReportBlockReason | 'none',
     (() => void) | undefined

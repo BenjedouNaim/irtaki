@@ -50,6 +50,7 @@ describe('RejectJoinRequestUseCase (Unit)', () => {
       findPendingQueue: jest.fn(),
       acceptConditionally: jest.fn(),
       rejectConditionally: jest.fn(),
+      countPendingForAssistant: jest.fn(),
     };
 
     mockEventEmitter = {
