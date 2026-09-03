@@ -49,6 +49,13 @@ export interface IGroupRepository {
     createdBy: string;
   }): Promise<GroupListRow>;
   updateName(id: string, name: string): Promise<GroupListRow | null>;
+  /**
+   * Conditional toggle (BR-42): flips `enrollment_status` only while the group
+   * still holds `lifecycle_state = 'Active'`. Returns null when the guard did
+   * not match, which the use case maps to the documented no-op — this is what
+   * keeps a concurrent archival from being overwritten without any row
+   * locking (TS §20).
+   */
   updateEnrollmentStatus(
     id: string,
     status: 'Open' | 'Closed',

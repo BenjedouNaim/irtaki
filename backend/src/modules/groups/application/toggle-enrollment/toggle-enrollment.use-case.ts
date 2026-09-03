@@ -34,21 +34,36 @@ export class ToggleEnrollmentUseCase {
       throw new ForbiddenException();
     }
 
-    // 3. BR-42 no-op: if archived, return current unchanged state with no DB write and no audit entry
+    // 3. BR-42 no-op fast path: if archived, return current unchanged state
+    //    with no DB write and no audit entry. This read is only the early
+    //    exit — the authoritative guard is the `lifecycle_state = 'Active'`
+    //    predicate on the UPDATE in step 4 (TS §20).
     if (existing.lifecycle_state === 'Archived') {
       return {
         data: this.mapToDto(existing),
       };
     }
 
-    // 4. Update enrollment status
+    // 4. Guarded update: writes only while the group is still Active.
     const updated = await this.groupRepository.updateEnrollmentStatus(
       groupId,
       dto.enrollment_status,
     );
 
+    // 4a. 0 rows means the group stopped being Active between the read above
+    //     and this write. That is the same BR-42 no-op as step 3, reached
+    //     through the TOCTOU window instead of the fast path: 200 with the
+    //     unchanged state (APIS §10.4), no audit entry. Re-read so the caller
+    //     sees the state that actually won, not the stale snapshot; a row that
+    //     has since disappeared stays masked as 403 like step 2.
     if (!updated) {
-      throw new ForbiddenException();
+      const current = await this.groupRepository.findByIdForDetail(groupId);
+      if (!current) {
+        throw new ForbiddenException();
+      }
+      return {
+        data: this.mapToDto(current),
+      };
     }
 
     // 5. Best-effort audit write

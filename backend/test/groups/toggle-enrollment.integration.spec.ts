@@ -18,6 +18,10 @@ import { LoginResponseDto } from '../../src/modules/identity/application/login/l
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { GroupListItemDto } from '../../src/modules/groups/application/list-groups/group-list-item.dto';
 import {
+  GROUP_REPOSITORY,
+  IGroupRepository,
+} from '../../src/modules/groups/domain/group.repository.interface';
+import {
   purgeNotificationLog,
   stopScheduledJobs,
 } from '../shared/scheduled-jobs';
@@ -406,7 +410,151 @@ describe('PATCH /groups/:id/enrollment (API-015 Integration)', () => {
     });
   });
 
-  // 5. Validation errors -> 422
+  // 5. Archival racing the toggle (BR-42, TS §20)
+  describe('Archival racing the toggle (BR-42 under concurrency)', () => {
+    it('holds the BR-42 no-op when the group is archived inside the check-then-write window', async () => {
+      const admin = await registerAndLogin(
+        'admin-toggle@test-toggle-enrollment.com',
+        UserRole.Admin,
+      );
+      const teacher = await registerAndLogin(
+        'teacher-toctou@test-toggle-enrollment.com',
+        UserRole.Teacher,
+      );
+      const assistant = await registerAndLogin(
+        'assistant-toctou@test-toggle-enrollment.com',
+        UserRole.Assistant,
+      );
+
+      const group = await createTestGroup(
+        admin.accessToken,
+        'حلقة فحص حالة التسجيل - سباق الأرشفة',
+        teacher.userId,
+        assistant.userId,
+      );
+
+      // A Promise.all race almost always takes the benign interleaving, so the
+      // window is opened deliberately: the archival commits between the use
+      // case's lifecycle read and its UPDATE, which is the exact ordering the
+      // fast-path check cannot see.
+      const groupRepository = app.get<IGroupRepository>(GROUP_REPOSITORY);
+
+      // The snapshot the use case is about to read, captured while the group
+      // is genuinely still Active.
+      const staleActiveRow = await groupRepository.findByIdForDetail(group.id);
+      expect(staleActiveRow?.lifecycle_state).toBe('Active');
+
+      const spy = jest
+        .spyOn(groupRepository, 'findByIdForDetail')
+        .mockImplementationOnce(async (id: string) => {
+          // The Admin's archival commits between the read and the write. Only
+          // this first call is intercepted; the no-op branch's re-read falls
+          // through to the real query.
+          await dataSource.query(
+            "UPDATE groups SET lifecycle_state = 'Archived', archived_at = NOW() WHERE id = $1",
+            [id],
+          );
+          return staleActiveRow;
+        });
+
+      try {
+        const res = await request(app.getHttpServer())
+          .patch(`/api/v1/groups/${group.id}/enrollment`)
+          .set('Authorization', `Bearer ${teacher.accessToken}`)
+          .send({ enrollment_status: 'Open' })
+          .expect(HttpStatus.OK);
+
+        // The documented loser response: 200 with the unchanged state, not an
+        // error (APIS §10.4).
+        const body = res.body as { data: GroupListItemDto };
+        expect(body.data.enrollment_status).toBe('Closed');
+        expect(body.data.lifecycle_state).toBe('Archived');
+      } finally {
+        spy.mockRestore();
+      }
+
+      // The write never landed on the archived group...
+      const rows: Array<{
+        enrollment_status: string;
+        lifecycle_state: string;
+      }> = await dataSource.query(
+        'SELECT enrollment_status, lifecycle_state FROM groups WHERE id = $1',
+        [group.id],
+      );
+      expect(rows[0].enrollment_status).toBe('Closed');
+      expect(rows[0].lifecycle_state).toBe('Archived');
+
+      // ...so no audit row claims a transition BR-42 forbids.
+      const auditRows: Array<{ id: string }> = await dataSource.query(
+        "SELECT id FROM audit_entries WHERE target_id = $1 AND action = 'ENROLLMENT_TOGGLED'",
+        [group.id],
+      );
+      expect(auditRows).toHaveLength(0);
+    });
+
+    it('keeps enrollment_status and the audit trail consistent when the toggle and the archival are fired together', async () => {
+      const admin = await registerAndLogin(
+        'admin-toggle@test-toggle-enrollment.com',
+        UserRole.Admin,
+      );
+      const teacher = await registerAndLogin(
+        'teacher-race@test-toggle-enrollment.com',
+        UserRole.Teacher,
+      );
+      const assistant = await registerAndLogin(
+        'assistant-race@test-toggle-enrollment.com',
+        UserRole.Assistant,
+      );
+
+      const group = await createTestGroup(
+        admin.accessToken,
+        'حلقة فحص حالة التسجيل - سباق متزامن',
+        teacher.userId,
+        assistant.userId,
+      );
+
+      const [toggleRes, archiveRes] = await Promise.all([
+        request(app.getHttpServer())
+          .patch(`/api/v1/groups/${group.id}/enrollment`)
+          .set('Authorization', `Bearer ${teacher.accessToken}`)
+          .send({ enrollment_status: 'Open' }),
+        request(app.getHttpServer())
+          .patch(`/api/v1/groups/${group.id}/lifecycle`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ lifecycle_state: 'Archived' }),
+      ]);
+
+      // Either interleaving is legal, and neither is an error: the archival
+      // always wins the lifecycle, and the toggle is either an ordinary
+      // success or the BR-42 no-op.
+      expect(toggleRes.status).toBe(HttpStatus.OK);
+      expect(archiveRes.status).toBe(HttpStatus.OK);
+
+      const rows: Array<{
+        enrollment_status: string;
+        lifecycle_state: string;
+      }> = await dataSource.query(
+        'SELECT enrollment_status, lifecycle_state FROM groups WHERE id = $1',
+        [group.id],
+      );
+      expect(rows[0].lifecycle_state).toBe('Archived');
+
+      const auditRows: Array<{ id: string }> = await dataSource.query(
+        "SELECT id FROM audit_entries WHERE target_id = $1 AND action = 'ENROLLMENT_TOGGLED'",
+        [group.id],
+      );
+
+      // The invariant that must hold in every interleaving: an audit row exists
+      // if and only if the toggle actually landed while the group was Active.
+      // A stale 'Open' with no audit row — or an audit row with the toggle
+      // never applied — is the BR-42 violation this guards.
+      expect(auditRows).toHaveLength(
+        rows[0].enrollment_status === 'Open' ? 1 : 0,
+      );
+    });
+  });
+
+  // 6. Validation errors -> 422
   describe('Validation', () => {
     it('returns 422 when enrollment_status is invalid value', async () => {
       const teacher = await registerAndLogin(
@@ -437,7 +585,7 @@ describe('PATCH /groups/:id/enrollment (API-015 Integration)', () => {
     });
   });
 
-  // 6. Role-based authorization tests (parameterized per TS.md)
+  // 7. Role-based authorization tests (parameterized per TS.md)
   describe('Role-based authorization', () => {
     it('returns 401 Unauthorized when unauthenticated', async () => {
       const randomId = uuidv7();

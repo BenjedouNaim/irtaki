@@ -204,13 +204,33 @@ describe('ToggleEnrollmentUseCase', () => {
     expect(result.data.enrollment_status).toBe('Open');
   });
 
-  it('throws ForbiddenException if updateEnrollmentStatus returns null', async () => {
-    groupRepository.findByIdForDetail.mockResolvedValueOnce(mockClosedGroup);
+  // TS §20 — the guarded UPDATE's 0-row outcome, which is the archival race
+  // arriving after the step-3 read said the group was still Active.
+  it('returns the BR-42 no-op when the group is archived between the read and the guarded update', async () => {
+    groupRepository.findByIdForDetail
+      .mockResolvedValueOnce(mockClosedGroup)
+      .mockResolvedValueOnce(mockArchivedGroup);
+    groupRepository.updateEnrollmentStatus.mockResolvedValueOnce(null);
+
+    const dto: ToggleEnrollmentDto = { enrollment_status: 'Open' };
+    const result = await useCase.execute(teacherId, groupId, dto);
+
+    // The state the archival won, not the stale snapshot the toggle read.
+    expect(result.data.enrollment_status).toBe('Closed');
+    expect(result.data.lifecycle_state).toBe('Archived');
+    expect(auditRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('throws ForbiddenException when the guarded update matches nothing and the group is gone', async () => {
+    groupRepository.findByIdForDetail
+      .mockResolvedValueOnce(mockClosedGroup)
+      .mockResolvedValueOnce(null);
     groupRepository.updateEnrollmentStatus.mockResolvedValueOnce(null);
 
     const dto: ToggleEnrollmentDto = { enrollment_status: 'Open' };
     await expect(useCase.execute(teacherId, groupId, dto)).rejects.toThrow(
       ForbiddenException,
     );
+    expect(auditRepository.save).not.toHaveBeenCalled();
   });
 });

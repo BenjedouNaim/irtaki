@@ -35,13 +35,12 @@ export class RegisterUseCase {
   async execute(dto: RegisterDto): Promise<RegisterResponseDto> {
     const normalizedEmail = dto.email.toLowerCase().trim();
 
-    // 1. Duplicate check (DB-UQ-01, VR-01)
+    // 1. Duplicate fast path (VR-01). This is only a cheap early exit: the
+    //    authoritative guarantee is `DB-UQ-01`, whose violation step 4
+    //    translates into this same 409 (TS §20, §21).
     const existing = await this.userRepository.findByEmail(normalizedEmail);
     if (existing) {
-      throw new ConflictException({
-        error: 'EMAIL_TAKEN',
-        message: 'البريد الإلكتروني مستخدم بالفعل',
-      });
+      throw this.emailTaken();
     }
 
     // 2. Hash password with argon2id (VR-02)
@@ -58,7 +57,17 @@ export class RegisterUseCase {
       timezone,
     });
 
-    const savedUser = await this.userRepository.save(user);
+    //    The insert races every other registration of the same address; the
+    //    loser hits `DB-UQ-01` and gets the documented 409 rather than a 500.
+    let savedUser: User;
+    try {
+      savedUser = await this.userRepository.save(user);
+    } catch (err: unknown) {
+      if (isUniqueViolation(err)) {
+        throw this.emailTaken();
+      }
+      throw err;
+    }
 
     // 5. Generate token pair (access + refresh)
     const tokens = await this.tokenService.generateTokenPair(
@@ -93,6 +102,18 @@ export class RegisterUseCase {
     };
   }
 
+  /**
+   * The one `409 EMAIL_TAKEN` body (APIS §10.1), shared by the fast-path
+   * pre-check and the `DB-UQ-01` translation so the two can never drift.
+   */
+  private emailTaken(): ConflictException {
+    return new ConflictException({
+      statusCode: 409,
+      error: 'EMAIL_TAKEN',
+      message: 'البريد الإلكتروني مستخدم بالفعل',
+    });
+  }
+
   private resolveTimezone(tz?: string): string {
     if (!tz || typeof tz !== 'string') {
       return this.centerTimezone;
@@ -104,4 +125,13 @@ export class RegisterUseCase {
       return this.centerTimezone;
     }
   }
+}
+
+/** Postgres `unique_violation` as TypeORM surfaces it (DB-UQ-01). */
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as {
+    code?: string;
+    driverError?: { code?: string; constraint?: string };
+  };
+  return e?.code === '23505' || e?.driverError?.code === '23505';
 }
