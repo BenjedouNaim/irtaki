@@ -310,6 +310,22 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       .filter((payload) => payload.resourceId === resourceId);
   }
 
+  /**
+   * A listener's row lands after the response it followed (ADR-032), so a
+   * suite that triggers one waits for it rather than sleeping — otherwise
+   * the write is still in flight when the suite tears its fixtures down.
+   */
+  async function eventuallyLogged(userId: string): Promise<LogRow[]> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const rows = await logFor(userId);
+      if (rows.length > 0) {
+        return rows;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return logFor(userId);
+  }
+
   async function logFor(userId: string): Promise<LogRow[]> {
     return dataSource.query<LogRow[]>(
       `SELECT category, outcome, transport_reference
@@ -1013,7 +1029,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
 
       // ADR-032: the use case does not await its listener, so the row lands
       // after the response. Poll rather than assume an ordering.
-      const rows = await eventually(() => logFor(student.userId));
+      const rows = await eventuallyLogged(student.userId);
 
       expect(rows).toEqual([
         {
@@ -1026,19 +1042,6 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         { eventType: 'N-08', resourceId: student.membershipId },
       ]);
     });
-
-    async function eventually(
-      read: () => Promise<LogRow[]>,
-    ): Promise<LogRow[]> {
-      for (let attempt = 0; attempt < 40; attempt += 1) {
-        const rows = await read();
-        if (rows.length > 0) {
-          return rows;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      return read();
-    }
 
     async function loginAsAdmin(): Promise<string> {
       const password = 'Password123!';
@@ -1074,10 +1077,15 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         state: 'Terminated',
       });
 
-      // The listener runs fire-and-forget after the response; give the
-      // microtask queue a turn and confirm the failure was recorded, not
-      // thrown (BR-60 — the removal itself is unaffected).
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      // The listener runs fire-and-forget after the response. Wait for the
+      // outcome row rather than a fixed delay, so nothing this suite
+      // started is still in flight when it finishes — and confirm the
+      // transport failure was recorded, not thrown (FR-NOTIF-08), while
+      // the removal itself stands (BR-60).
+      const logged = await eventuallyLogged(student.userId);
+      expect(logged).toEqual([
+        { category: 'N-08', outcome: 'Failed', transport_reference: null },
+      ]);
       const rows = await dataSource.query<Array<{ state: string }>>(
         `SELECT state FROM memberships WHERE id = $1`,
         [student.membershipId],

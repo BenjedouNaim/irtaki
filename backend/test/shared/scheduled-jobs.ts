@@ -39,6 +39,20 @@ export function stopScheduledJobs(app: INestApplication): SchedulerRegistry {
 export async function purgeNotificationLog(
   dataSource: DataSource,
 ): Promise<void> {
+  // Listeners are fire-and-forget (ADR-032): a request that has already
+  // answered may still be writing its row, and a row landing between this
+  // purge and the caller's own DELETE FROM users trips the foreign key.
+  // Empty, settle, verify — retrying only while late writes keep arriving.
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await dataSource.query('DELETE FROM notification_log');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const [{ remaining }] = await dataSource.query<
+      Array<{ remaining: number }>
+    >('SELECT count(*)::int AS remaining FROM notification_log');
+    if (remaining === 0) {
+      return;
+    }
+  }
   await dataSource.query('DELETE FROM notification_log');
 }
 
@@ -56,8 +70,6 @@ export async function purgeNotificationLog(
  * any other suite depends on (TDR-03 leaves it without a retention policy
  * either), so a test database empties it with the rest.
  */
-export async function purgeAuditEntries(
-  dataSource: DataSource,
-): Promise<void> {
+export async function purgeAuditEntries(dataSource: DataSource): Promise<void> {
   await dataSource.query('DELETE FROM audit_entries');
 }
