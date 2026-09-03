@@ -68,15 +68,17 @@ describe('PATCH /users/{id}/role (API-052 Integration)', () => {
   });
 
   async function cleanDatabase() {
+    // TS §36 — parameterised, never a SQL string built by interpolation.
+    const pattern = `%${EMAIL_SUFFIX}`;
     await dataSource.query(
-      `DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%${EMAIL_SUFFIX}')`,
+      'DELETE FROM audit_entries WHERE actor_id IN (SELECT id FROM users WHERE email LIKE $1)',
+      [pattern],
     );
     await dataSource.query(
-      `DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%${EMAIL_SUFFIX}')`,
+      'DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
+      [pattern],
     );
-    await dataSource.query(
-      `DELETE FROM users WHERE email LIKE '%${EMAIL_SUFFIX}'`,
-    );
+    await dataSource.query('DELETE FROM users WHERE email LIKE $1', [pattern]);
   }
 
   async function registerAndLogin(
@@ -222,6 +224,19 @@ describe('PATCH /users/{id}/role (API-052 Integration)', () => {
         .patch(`/api/v1/users/${admin.userId}/role`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({ role: UserRole.Teacher })
+        .expect(HttpStatus.FORBIDDEN);
+
+      expect((res.body as ErrorEnvelope).error).toBe('CANNOT_PROMOTE_SELF');
+      expect(await roleOf(admin.userId)).toBe(UserRole.Admin);
+    });
+
+    it('refuses the same self-promotion when the id is written in upper-case hex', async () => {
+      const admin = await registerAndLogin('admin', UserRole.Admin);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/users/${admin.userId.toUpperCase()}/role`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ role: UserRole.Assistant })
         .expect(HttpStatus.FORBIDDEN);
 
       expect((res.body as ErrorEnvelope).error).toBe('CANNOT_PROMOTE_SELF');

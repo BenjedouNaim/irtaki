@@ -120,6 +120,30 @@ describe('PromoteRoleUseCase (UC-17, API-052)', () => {
     expect(userRepository.findById).not.toHaveBeenCalled();
   });
 
+  it('throws 403 CANNOT_PROMOTE_SELF when the caller writes their own id in upper-case hex', async () => {
+    await expect(
+      useCase.execute(ADMIN_ID, ADMIN_ID.toUpperCase(), UserRole.Teacher),
+    ).rejects.toMatchObject({
+      response: { statusCode: 403, error: 'CANNOT_PROMOTE_SELF' },
+    });
+    expect(userRepository.findById).not.toHaveBeenCalled();
+  });
+
+  it('maps an invalid target role escaping the domain guard to 422, never 500 (TS §21)', async () => {
+    userRepository.findById.mockResolvedValue(makeUser(UserRole.User));
+
+    await expect(
+      useCase.execute(
+        ADMIN_ID,
+        TARGET_ID,
+        UserRole.Admin as unknown as PromotionTargetRole,
+      ),
+    ).rejects.toMatchObject({
+      response: { statusCode: 422, error: 'VALIDATION_ERROR' },
+    });
+    expect(userRepository.promoteFromUserRole).not.toHaveBeenCalled();
+  });
+
   it('throws 404 for a non-existent target (Admin route, SA §14)', async () => {
     userRepository.findById.mockResolvedValue(null);
 
