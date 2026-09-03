@@ -11,6 +11,7 @@ import { WeekCard } from '@/features/dashboard/components/WeekCard';
 import { ReportStatusCard } from '@/features/dailyReports/components/ReportStatusCard';
 import { ProgressSection } from '@/features/progress/components/ProgressSection';
 import { PaymentScreen } from '@/features/payments/screens/PaymentScreen';
+import { PerformanceSection } from '@/features/performance/components/PerformanceSection';
 import { logoutUser } from '@/shared/api/auth.client';
 import {
   useAuthStore,
@@ -133,7 +134,12 @@ export function StudentTabs() {
             }}
             contentInsetAdjustmentBehavior="automatic"
           >
-            <ProgressSection />
+            {/* F-PERF-01 wraps F-PRG-02's card so SCR-13 keeps Figma's
+                order: selector · score · memorization · breakdown · tiles ·
+                days-since. */}
+            <PerformanceSection>
+              <ProgressSection />
+            </PerformanceSection>
 
             {/* Progress tab → History (UF §26); SCR-14 (F-DR-05). */}
             <Pressable

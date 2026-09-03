@@ -59,3 +59,47 @@ export function addDays(isoDate: string, days: number): string {
     shifted.getUTCDate(),
   )}`;
 }
+
+/** Days in `month` (1-12) of `year`, Gregorian, leap years included. */
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * The `YYYY-MM-DD` calendar date `months` months after (negative: before)
+ * `isoDate`, clamping the day to the last valid day of the target month —
+ * the convention SAS §18.5 recommends for the same calendar arithmetic
+ * (⚠️ ISS-14 leaves it formally open there; it is chosen here only for the
+ * relative `month` / `3months` performance windows, which no document
+ * defines otherwise, and never for a payment cycle boundary).
+ *
+ * `addMonths('2026-03-31', -1) = '2026-02-28'`.
+ */
+export function addMonths(isoDate: string, months: number): string {
+  if (!ISO_DATE_REGEX.test(isoDate)) {
+    throw new RangeError(`Invalid ISO calendar date: ${isoDate}`);
+  }
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const shifted = year * 12 + (month - 1) + months;
+  const targetYear = Math.floor(shifted / 12);
+  const targetMonth = shifted - targetYear * 12 + 1;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${targetYear}-${pad(targetMonth)}-${pad(
+    Math.min(day, daysInMonth(targetYear, targetMonth)),
+  )}`;
+}
+
+/**
+ * Whole days from `from` to `to` (`to − from`), negative when `to` precedes
+ * `from`. UTC arithmetic on date-only values — no DST or offset interferes.
+ */
+export function daysBetween(from: string, to: string): number {
+  if (!ISO_DATE_REGEX.test(from) || !ISO_DATE_REGEX.test(to)) {
+    throw new RangeError(`Invalid ISO calendar date: ${from}..${to}`);
+  }
+  const utc = (iso: string): number => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}

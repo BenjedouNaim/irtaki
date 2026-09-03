@@ -323,6 +323,29 @@ export class DailyReportRepository implements IDailyReportRepository {
     }));
   }
 
+  async findLastReportDateByMembershipId(
+    membershipId: string,
+  ): Promise<string | null> {
+    // One backward walk of DB-IDX-01 (membership_id, report_date) stopped at
+    // the first row — the newest live report of this membership.
+    const rows = await this.dailyReportRepo.manager.query<
+      Array<{ report_date: string }>
+    >(
+      `SELECT r.report_date::text AS report_date
+         FROM daily_reports r
+        WHERE r.membership_id = $1
+          AND r.deleted_at IS NULL
+        ORDER BY r.report_date DESC
+        LIMIT 1`,
+      [membershipId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+    return rows[0].report_date;
+  }
+
   async findOwnHistoryByUserId(
     params: FindOwnDailyReportsParams,
   ): Promise<DailyReportPage> {

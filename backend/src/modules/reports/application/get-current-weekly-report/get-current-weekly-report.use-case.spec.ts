@@ -72,6 +72,7 @@ describe('GetCurrentWeeklyReportUseCase (F-WR-01 / API-033)', () => {
       findOwnById: jest.fn(),
       finaliseByStudent: jest.fn(),
       findAllOpenWithTimezone: jest.fn(),
+      countAttendedFinalisedWeeks: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
@@ -83,6 +84,7 @@ describe('GetCurrentWeeklyReportUseCase (F-WR-01 / API-033)', () => {
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
       findDaySnapshotsByMembershipAndRange: jest.fn(),
+      findLastReportDateByMembershipId: jest.fn(),
     };
     useCase = new GetCurrentWeeklyReportUseCase(
       weeklyRepository,

@@ -15,9 +15,24 @@ import { rowStart, itemsStart } from '@/shared/theme/rtl';
  *   side, a type pill on the far side) — mirrors SCR-14's list rows.
  * - `metricRow`: a label/value row (label on the reading side, a short bold
  *   value on the far side) — mirrors the Metric row (UF §29) stack of SCR-12.
+ * - `performanceScore`: the SCR-13 commitment-score card — label, display
+ *   number, caption (UF §22).
+ * - `performanceDetail`: the rest of the SCR-13 Performance stack below the
+ *   memorization card — a donut card, a two-up tile row and one short row.
+ * - `groupPerformance`: the SCR-23 Group Performance stack below the period
+ *   selector — a two-up tile row, the absence-reasons donut card, the list
+ *   head and three student rows.
  */
 export type SkeletonVariant =
-  'row' | 'dashboard' | 'ring' | 'card' | 'reportRow' | 'metricRow';
+  | 'row'
+  | 'dashboard'
+  | 'ring'
+  | 'card'
+  | 'reportRow'
+  | 'metricRow'
+  | 'performanceScore'
+  | 'performanceDetail'
+  | 'groupPerformance';
 
 export interface SkeletonLoaderProps {
   variant?: SkeletonVariant;
@@ -82,6 +97,154 @@ export function SkeletonLoader({
             tone="subtle"
             className="w-full h-10 rounded-md"
           />
+        </View>
+      </View>
+    );
+  }
+
+  if (variant === 'performanceScore') {
+    return (
+      <View
+        testID={testID}
+        accessibilityLabel="جارٍ التحميل"
+        className={`w-full p-5 gap-2 ${itemsStart} ${CARD} ${className ?? ''}`}
+        style={[{ borderCurve: 'continuous' }, style]}
+      >
+        <SkeletonBlock
+          testID="skeleton-performance-score-label"
+          className="w-1/3 h-3 rounded-sm"
+        />
+        <SkeletonBlock
+          testID="skeleton-performance-score-value"
+          tone="subtle"
+          className="w-2/5 h-[52px] rounded-md"
+        />
+        <SkeletonBlock
+          testID="skeleton-performance-score-caption"
+          className="w-3/5 h-3 rounded-sm"
+        />
+      </View>
+    );
+  }
+
+  if (variant === 'performanceDetail') {
+    return (
+      <View
+        testID={testID}
+        accessibilityLabel="جارٍ التحميل"
+        className={`w-full gap-4 ${className ?? ''}`}
+        style={style}
+      >
+        {/* Breakdown card: title, donut circle and its legend rows. */}
+        <View className={`w-full p-5 gap-4 ${itemsStart} ${CARD}`}>
+          <SkeletonBlock
+            testID="skeleton-performance-breakdown-title"
+            className="w-2/5 h-5 rounded-md"
+          />
+          <View className={`${rowStart} items-center justify-between w-full`}>
+            <View className={`flex-1 gap-2 ${itemsStart}`}>
+              {[0, 1, 2, 3, 4].map((row) => (
+                <SkeletonBlock
+                  key={row}
+                  testID={`skeleton-performance-legend-${row}`}
+                  tone="subtle"
+                  className="w-3/5 h-3 rounded-sm"
+                />
+              ))}
+            </View>
+            <SkeletonBlock
+              testID="skeleton-performance-donut"
+              tone="subtle"
+              className="w-[112px] h-[112px] rounded-full"
+            />
+          </View>
+        </View>
+
+        {/* Two-up tile row. */}
+        <View className={`${rowStart} gap-3 w-full`}>
+          <SkeletonBlock
+            testID="skeleton-performance-tile-0"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+          <SkeletonBlock
+            testID="skeleton-performance-tile-1"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+        </View>
+
+        {/* Days-since row. */}
+        <SkeletonBlock
+          testID="skeleton-performance-days-since"
+          tone="subtle"
+          className={`w-full h-[66px] ${CARD}`}
+        />
+      </View>
+    );
+  }
+
+  if (variant === 'groupPerformance') {
+    return (
+      <View
+        testID={testID}
+        accessibilityLabel="جارٍ التحميل"
+        className={`w-full gap-3.5 ${className ?? ''}`}
+        style={style}
+      >
+        {/* Two-up tile row: submission rate and commitment average. */}
+        <View className={`${rowStart} gap-2.5 w-full`}>
+          <SkeletonBlock
+            testID="skeleton-group-tile-0"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+          <SkeletonBlock
+            testID="skeleton-group-tile-1"
+            tone="subtle"
+            className={`flex-1 h-[96px] ${CARD}`}
+          />
+        </View>
+
+        {/* Absence-reasons donut card. */}
+        <View className={`w-full p-[18px] gap-3.5 ${itemsStart} ${CARD}`}>
+          <SkeletonBlock
+            testID="skeleton-group-absences-title"
+            className="w-2/5 h-5 rounded-md"
+          />
+          <View className={`${rowStart} items-center justify-between w-full`}>
+            <View className={`flex-1 gap-2 ${itemsStart}`}>
+              {[0, 1, 2].map((row) => (
+                <SkeletonBlock
+                  key={row}
+                  testID={`skeleton-group-legend-${row}`}
+                  tone="subtle"
+                  className="w-3/5 h-3 rounded-sm"
+                />
+              ))}
+            </View>
+            <SkeletonBlock
+              testID="skeleton-group-donut"
+              tone="subtle"
+              className="w-[112px] h-[112px] rounded-full"
+            />
+          </View>
+        </View>
+
+        {/* List head and the weakest-first student rows. */}
+        <SkeletonBlock
+          testID="skeleton-group-list-head"
+          className="w-1/4 h-3 rounded-sm"
+        />
+        <View className="w-full gap-2">
+          {[0, 1, 2].map((row) => (
+            <SkeletonBlock
+              key={row}
+              testID={`skeleton-group-student-${row}`}
+              tone="subtle"
+              className="w-full h-[66px] rounded-md bg-surface dark:bg-surface-dark border border-line dark:border-line-dark"
+            />
+          ))}
         </View>
       </View>
     );

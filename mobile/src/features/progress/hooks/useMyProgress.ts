@@ -22,10 +22,13 @@ export function myProgressQueryKey(userId?: string | null) {
  * Adheres to TS.md §10/§26/§37 ("screens/components consume hooks, never call the API client directly").
  * Inherits default QueryClient options (5m staleTime, retry 1) from RootLayout.
  */
-export function useMyProgress() {
+export function useMyProgress(options: { enabled?: boolean } = {}) {
   const userId = useAuthStore((s) => s.userId);
   return useQuery<ProgressDto, Error>({
     queryKey: myProgressQueryKey(userId),
     queryFn: getMyProgress,
+    // SCR-24 reuses this card against API-042 instead; the own-scope query
+    // is then left un-run rather than fetching a second student's coverage.
+    enabled: options.enabled ?? true,
   });
 }

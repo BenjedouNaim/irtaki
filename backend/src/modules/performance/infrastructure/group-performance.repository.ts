@@ -1,0 +1,303 @@
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import {
+  GroupMemberRecord,
+  GroupPerformanceContextRecord,
+  IGroupPerformanceRepository,
+  MemberAttendedWeek,
+  MemberDaySnapshot,
+  MemberLastReport,
+  SoftDeleteVisibility,
+} from '../domain/group-performance.repository.interface';
+
+interface RawContextRow {
+  recitation_day: number | string;
+  archived_at: string | Date | null;
+  caller_timezone: string;
+}
+
+interface RawMemberRow {
+  id: string;
+  state: 'Active' | 'Terminated';
+  started_at: string;
+  ended_at: string | null;
+  full_name: string | null;
+  timezone: string;
+}
+
+interface RawMemberDaySnapshotRow {
+  membership_id: string;
+  report_date: string;
+  type: 'Normal' | 'Absent' | 'Revision';
+  absence_reason: 'Sick' | 'Studying' | 'Other' | null;
+  no_memorization_today: boolean | null;
+  no_revision_today: boolean | null;
+  has_memo_range: boolean;
+  completed_50_repetitions: boolean | null;
+  repetitions_in_single_session: boolean | null;
+}
+
+interface RawAttendedWeekRow {
+  membership_id: string;
+  week_start: string;
+}
+
+interface RawLastReportRow {
+  membership_id: string;
+  last_report_date: string;
+}
+
+/**
+ * The four reads below are written out as complete, literal, parameterised
+ * statements — one per soft-delete scope — rather than one statement whose
+ * `WHERE` is assembled at run time (TS §36: no raw SQL string
+ * concatenation). The pairs differ only in the `deleted_at` predicate,
+ * which SAS §20.2 requires to be period-aware rather than global.
+ */
+const DAY_SNAPSHOTS_PROJECTION = `SELECT r.membership_id,
+              r.report_date::text AS report_date,
+              r.type,
+              r.absence_reason,
+              r.no_memorization_today,
+              r.no_revision_today,
+              (r.memo_from_ordinal IS NOT NULL) AS has_memo_range,
+              r.completed_50_repetitions,
+              r.repetitions_in_single_session
+         FROM daily_reports r
+        WHERE r.membership_id = ANY($1::uuid[])
+          AND r.report_date >= $2::date
+          AND r.report_date <= $3::date`;
+
+/** Ordinary scope — soft-deleted rows are invisible (SAS §20.2). */
+const DAY_SNAPSHOTS_LIVE_SQL = `${DAY_SNAPSHOTS_PROJECTION}
+          AND r.deleted_at IS NULL
+        ORDER BY r.membership_id ASC, r.report_date ASC`;
+
+/**
+ * FR-PERF-09 / DEC-C04 scope — the removed student's own reports, stamped
+ * `deleted_at` by the termination cascade, still feed a historical group
+ * aggregate. Bounded by the caller's period and, per member, by
+ * `EffectiveWindow(m)`, which is SAS §20.2's "only for the period the
+ * membership was active".
+ */
+const DAY_SNAPSHOTS_HISTORICAL_SQL = `${DAY_SNAPSHOTS_PROJECTION}
+        ORDER BY r.membership_id ASC, r.report_date ASC`;
+
+const ATTENDED_WEEKS_PROJECTION = `SELECT w.membership_id,
+              w.week_start::text AS week_start
+         FROM weekly_reports w
+        WHERE w.membership_id = ANY($1::uuid[])
+          AND w.week_start >= $2::date
+          AND w.week_start <= $3::date
+          AND w.state = 'Finalised'
+          AND w.attended_recitation_call = true`;
+
+const ATTENDED_WEEKS_LIVE_SQL = `${ATTENDED_WEEKS_PROJECTION}
+          AND w.deleted_at IS NULL`;
+
+const ATTENDED_WEEKS_HISTORICAL_SQL = ATTENDED_WEEKS_PROJECTION;
+
+/**
+ * The member-set projection shared by both FR-PERF-09/10 branches. Kept as
+ * one literal fragment used inside two complete, literal statements — never
+ * concatenated with anything caller-supplied (TS §36).
+ */
+function toMemberRecord(row: RawMemberRow): GroupMemberRecord {
+  return {
+    membershipId: row.id,
+    state: row.state,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    fullName: row.full_name,
+    timezone: row.timezone,
+  };
+}
+
+/**
+ * API-038's reads, owned by the Performance module (APIS §12 UC-07:
+ * "reads `memberships`, `daily_reports`, `weekly_reports`"). Every
+ * statement is literal and parameterised (TS §36), index-backed (DBD §23)
+ * and auto-committing — no transaction, no locking, no elevated isolation
+ * (TS §19, §20).
+ */
+@Injectable()
+export class GroupPerformanceRepository implements IGroupPerformanceRepository {
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+
+  async findContext(
+    groupId: string,
+    callerId: string,
+  ): Promise<GroupPerformanceContextRecord | null> {
+    // Two primary-key lookups in one statement: the group's week anchor and
+    // archival bound, and the caller's own timezone (T-01). Zero rows means
+    // the group does not exist — the Admin path's 404 (APIS §9.6).
+    const rows = await this.dataSource.query<RawContextRow[]>(
+      `SELECT g.recitation_day,
+              g.archived_at,
+              u.timezone AS caller_timezone
+         FROM groups g
+         JOIN users u ON u.id = $2::uuid
+        WHERE g.id = $1::uuid
+        LIMIT 1`,
+      [groupId, callerId],
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return null;
+    }
+    const row = rows[0];
+    return {
+      recitationDay: Number(row.recitation_day),
+      archivedAt:
+        row.archived_at === null
+          ? null
+          : new Date(row.archived_at).toISOString(),
+      callerTimezone: row.caller_timezone,
+    };
+  }
+
+  async findActiveMembers(groupId: string): Promise<GroupMemberRecord[]> {
+    // FR-PERF-10: the current-week view sees Active memberships only.
+    // One DB-IDX-03 (group_id, state) scan.
+    const rows = await this.dataSource.query<RawMemberRow[]>(
+      `SELECT m.id,
+              m.state,
+              m.started_at::text AS started_at,
+              m.ended_at::text   AS ended_at,
+              u.full_name,
+              u.timezone
+         FROM memberships m
+         JOIN users u ON u.id = m.user_id
+        WHERE m.group_id = $1
+          AND m.state = 'Active'
+        ORDER BY m.id ASC`,
+      [groupId],
+    );
+    return rows.map(toMemberRecord);
+  }
+
+  async findMembersIntersecting(
+    groupId: string,
+    from: string,
+    to: string,
+  ): Promise<GroupMemberRecord[]> {
+    // FR-PERF-09: Active AND Terminated memberships whose active window
+    // [started_at, ended_at ?? ∞] intersects [from, to]. One DB-IDX-04
+    // (group_id, started_at, ended_at) scan — DBD §26's "period-aware
+    // historical aggregation" access path.
+    const rows = await this.dataSource.query<RawMemberRow[]>(
+      `SELECT m.id,
+              m.state,
+              m.started_at::text AS started_at,
+              m.ended_at::text   AS ended_at,
+              u.full_name,
+              u.timezone
+         FROM memberships m
+         JOIN users u ON u.id = m.user_id
+        WHERE m.group_id = $1
+          AND m.started_at <= $3::date
+          AND (m.ended_at IS NULL OR m.ended_at >= $2::date)
+        ORDER BY m.id ASC`,
+      [groupId, from, to],
+    );
+    return rows.map(toMemberRecord);
+  }
+
+  async findDaySnapshots(
+    membershipIds: readonly string[],
+    from: string,
+    to: string,
+    visibility: SoftDeleteVisibility,
+  ): Promise<MemberDaySnapshot[]> {
+    if (membershipIds.length === 0) {
+      return [];
+    }
+    // One DB-IDX-01 (membership_id, report_date) walk per membership inside
+    // a single statement. Only the VO-09 classification inputs are
+    // projected; the memorisation range is reduced to its presence so no
+    // ordinal leaves the query.
+    //
+    // Two complete literal statements, never one built by concatenation
+    // (TS §36): the soft-delete scope is SAS §20.2's period-aware exception,
+    // so the historical branch reads the rows the termination cascade
+    // stamped `deleted_at` on — without them a removed student would be
+    // listed by FR-PERF-09 and then contribute no data at all.
+    const rows = await this.dataSource.query<RawMemberDaySnapshotRow[]>(
+      visibility === 'historical'
+        ? DAY_SNAPSHOTS_HISTORICAL_SQL
+        : DAY_SNAPSHOTS_LIVE_SQL,
+      [membershipIds, from, to],
+    );
+
+    return rows.map((row) => ({
+      membershipId: row.membership_id,
+      reportDate: row.report_date,
+      type: row.type,
+      absenceReason: row.absence_reason ?? null,
+      noMemorizationToday: row.no_memorization_today ?? null,
+      noRevisionToday: row.no_revision_today ?? null,
+      hasMemoRange: row.has_memo_range,
+      completed50Repetitions: row.completed_50_repetitions ?? null,
+      repetitionsInSingleSession: row.repetitions_in_single_session ?? null,
+    }));
+  }
+
+  async findAttendedWeeks(
+    membershipIds: readonly string[],
+    fromWeekStart: string,
+    toWeekStart: string,
+    visibility: SoftDeleteVisibility,
+  ): Promise<MemberAttendedWeek[]> {
+    if (membershipIds.length === 0) {
+      return [];
+    }
+    // One DB-IDX-02 (membership_id, week_start) range scan. Only `Finalised`
+    // rows count: an `Open` row carries no confirmed answer yet (ST-06,
+    // FR-WR-06). The soft-delete scope is the same SAS §20.2 period-aware
+    // exception `findDaySnapshots` applies.
+    const rows = await this.dataSource.query<RawAttendedWeekRow[]>(
+      visibility === 'historical'
+        ? ATTENDED_WEEKS_HISTORICAL_SQL
+        : ATTENDED_WEEKS_LIVE_SQL,
+      [membershipIds, fromWeekStart, toWeekStart],
+    );
+
+    return rows.map((row) => ({
+      membershipId: row.membership_id,
+      weekStart: row.week_start,
+    }));
+  }
+
+  async findLastReportDates(
+    membershipIds: readonly string[],
+  ): Promise<MemberLastReport[]> {
+    if (membershipIds.length === 0) {
+      return [];
+    }
+    // DS-04's whole report input: `MAX(report_date)` per membership, a
+    // grouped probe of DB-IDX-01 (membership_id, report_date) — the bulk
+    // form of the `findLastReportDateByMembershipId` walk API-037/039 make
+    // one membership at a time, so a member's `days_since_last_report` is
+    // the same number on the group list and on their own dashboard (CON-07).
+    //
+    // `deleted_at IS NULL` is SAS §20.2's scope for the at-risk view. It
+    // costs nothing here — the list is built from Active memberships alone
+    // (FR-PERF-10), whose reports the termination cascade has never
+    // stamped — and keeps the read correct if it is ever pointed elsewhere.
+    const rows = await this.dataSource.query<RawLastReportRow[]>(
+      `SELECT r.membership_id,
+              MAX(r.report_date)::text AS last_report_date
+         FROM daily_reports r
+        WHERE r.membership_id = ANY($1::uuid[])
+          AND r.deleted_at IS NULL
+        GROUP BY r.membership_id`,
+      [membershipIds],
+    );
+
+    return rows.map((row) => ({
+      membershipId: row.membership_id,
+      lastReportDate: row.last_report_date,
+    }));
+  }
+}
