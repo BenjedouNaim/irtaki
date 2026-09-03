@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -14,6 +15,8 @@ import { RegisterDeviceUseCase } from '../application/register-device/register-d
 import { RegisterDeviceDto } from '../application/register-device/register-device.dto';
 import { RegisterDeviceResponseDto } from '../application/register-device/register-device-response.dto';
 import { UnregisterDeviceUseCase } from '../application/unregister-device/unregister-device.use-case';
+import { GetNotificationPreferencesUseCase } from '../application/get-notification-preferences/get-notification-preferences.use-case';
+import { GetNotificationPreferencesResponseDto } from '../application/get-notification-preferences/get-notification-preferences-response.dto';
 import { OwnDeviceScopeGuard } from './guards/own-device-scope.guard';
 
 interface AuthenticatedRequest extends Request {
@@ -27,14 +30,15 @@ interface AuthenticatedRequest extends Request {
 /**
  * Notifications routes (TS §13 API implementation mapping —
  * `NotificationsController`). The path is spelled in full because this one
- * controller serves both the `/devices` resource (API-048/049) and, later,
- * `/me/notification-preferences` (API-050/051).
+ * controller serves both the `/devices` resource (API-048/049) and
+ * `/me/notification-preferences` (API-050, and API-051 next).
  */
 @Controller()
 export class NotificationsController {
   constructor(
     private readonly registerDeviceUseCase: RegisterDeviceUseCase,
     private readonly unregisterDeviceUseCase: UnregisterDeviceUseCase,
+    private readonly getNotificationPreferencesUseCase: GetNotificationPreferencesUseCase,
   ) {}
 
   /**
@@ -69,5 +73,20 @@ export class NotificationsController {
     @Param('id') id: string,
   ): Promise<void> {
     return this.unregisterDeviceUseCase.execute(req.user.id, id);
+  }
+
+  /**
+   * API-050 `GET /me/notification-preferences` — "Any authenticated / Own"
+   * (APIS §6.1), so the route carries no `@Roles()`: every role reads its own
+   * catalogue and `AuthGuard` is the whole gate. There is no path id, so
+   * there is no ScopeGuard either — the caller is the scope (SA §14).
+   * Returns the bounded `{ data: [...] }` collection of APIS §9.1, with no
+   * `pagination` keys (the catalogue is eight rows, DEC-D03).
+   */
+  @Get('me/notification-preferences')
+  async preferences(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<GetNotificationPreferencesResponseDto> {
+    return this.getNotificationPreferencesUseCase.execute(req.user.id);
   }
 }
