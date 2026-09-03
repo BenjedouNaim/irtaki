@@ -43,6 +43,7 @@ describe('ListPendingJoinRequestsUseCase', () => {
       }),
       acceptConditionally: jest.fn(),
       rejectConditionally: jest.fn(),
+      countPendingForAssistant: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

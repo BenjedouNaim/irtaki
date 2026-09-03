@@ -19,6 +19,14 @@ export interface GroupListRow {
 
 export interface IGroupRepository {
   findAllForList(): Promise<GroupListRow[]>;
+  /**
+   * API-009's Admin `group_count` — every group row, archived included, so
+   * the tile and the `GET /groups` list the tile taps through to
+   * (APIS §10.4, which applies no lifecycle filter either) always agree.
+   * ONE parameterised `COUNT(*)`; the list read is never fetched just to be
+   * measured.
+   */
+  countAll(): Promise<number>;
   findByStaffIdForList(staffId: string): Promise<GroupListRow[]>;
   findByActiveMemberForList(userId: string): Promise<GroupListRow | null>;
   findAvailableForGender(gender: 'Male' | 'Female'): Promise<GroupListRow[]>;

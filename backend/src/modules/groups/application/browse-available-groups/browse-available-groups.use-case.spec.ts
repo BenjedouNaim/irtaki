@@ -26,6 +26,7 @@ describe('BrowseAvailableGroupsUseCase', () => {
   beforeEach(() => {
     mockGroupRepo = {
       findAllForList: jest.fn(),
+      countAll: jest.fn(),
       findByStaffIdForList: jest.fn(),
       findByActiveMemberForList: jest.fn(),
       findAvailableForGender: jest.fn(),

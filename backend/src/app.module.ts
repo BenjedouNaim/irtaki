@@ -26,6 +26,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { AdministrationModule } from './modules/administration/administration.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PerformanceModule } from './modules/performance/performance.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CorrelationIdMiddleware, SharedModule } from './shared';
 
 interface ValidationDetail {
@@ -87,6 +88,9 @@ function flattenValidationErrors(
     NotificationsModule,
     PaymentsModule,
     PerformanceModule,
+    // Last: API-009 composes the modules above and is imported by none of
+    // them (TS §12 — a cross-module orchestrator with no owning module).
+    DashboardModule,
   ],
 
   controllers: [AppController],

@@ -250,6 +250,22 @@ export class MembershipRepository implements IMembershipRepository {
     }));
   }
 
+  /**
+   * API-009's Admin `pending_recovery_count`: how many memberships are in
+   * the given state across the whole center. ONE literal parameterised
+   * statement (TS §36); no new index is introduced for it — DBD §23's index
+   * set is closed and names no global membership-state read, and the table
+   * is bounded by the center's own enrollment history.
+   */
+  async countByState(state: 'Active' | 'Terminated'): Promise<number> {
+    const rows = await this.membershipRepo.query<Array<{ count: number }>>(
+      'SELECT COUNT(*)::int AS count FROM memberships m WHERE m.state = $1',
+      [state],
+    );
+
+    return rows[0]?.count ?? 0;
+  }
+
   async findByIdForRecovery(
     id: string,
   ): Promise<

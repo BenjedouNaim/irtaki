@@ -37,6 +37,14 @@ export interface UserDirectoryPage {
   hasMore: boolean;
 }
 
+/**
+ * How many accounts hold each role — the input to API-009's Admin
+ * `staff_count` and `student_count` tiles (APIS §10.3). A role with no
+ * account is simply absent from the map; the caller reads a missing role as
+ * zero, which is a genuine count and not a defaulted unknown (DEC-B04).
+ */
+export type UserRoleCounts = Partial<Record<UserRole, number>>;
+
 export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
@@ -47,6 +55,13 @@ export interface IUserRepository {
    * `COUNT(*)` (APIS §9.1: no totals on any collection).
    */
   findPageByRole(params: FindUsersPageParams): Promise<UserDirectoryPage>;
+  /**
+   * API-009's two Admin population tiles, from ONE `GROUP BY role` pass over
+   * `users` — never one `COUNT(*)` per role, and never a page of the
+   * cursor-paginated directory measured by its length (APIS §9.1 puts no
+   * total on any collection, so a page cannot answer this).
+   */
+  countByRole(): Promise<UserRoleCounts>;
   save(user: User): Promise<User>;
   promoteToStudent(
     userId: string,

@@ -5,6 +5,7 @@ import {
   FindUsersPageParams,
   IUserRepository,
   UserDirectoryPage,
+  UserRoleCounts,
 } from '../domain/user.repository.interface';
 import { User } from '../domain/user.entity';
 import { PromotionTargetRole, UserRole } from '../domain/user-role.enum';
@@ -84,6 +85,25 @@ export class UserRepository implements IUserRepository {
       })),
       hasMore,
     };
+  }
+
+  /**
+   * API-009's Admin population tiles. ONE literal statement, one pass over
+   * `users`, grouped by the role column — the table is bounded by the
+   * center's own membership and there is no DB-IDX for a role count in
+   * DBD §23, so no index is invented here for it (DBD's index set is
+   * closed: "every index traces to a named read path").
+   */
+  async countByRole(): Promise<UserRoleCounts> {
+    const rows = await this.repo.manager.query<
+      Array<{ role: string; count: number }>
+    >(`SELECT u.role, COUNT(*)::int AS count FROM users u GROUP BY u.role`);
+
+    const counts: UserRoleCounts = {};
+    for (const row of rows) {
+      counts[row.role as UserRole] = row.count;
+    }
+    return counts;
   }
 
   async save(user: User): Promise<User> {

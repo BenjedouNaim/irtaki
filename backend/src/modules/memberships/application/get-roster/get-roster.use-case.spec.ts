@@ -37,6 +37,7 @@ describe('GetRosterUseCase', () => {
       findActiveByUserId: jest.fn(),
       findRosterByGroupId: jest.fn(),
       findByIdForRecovery: jest.fn(),
+      countByState: jest.fn(),
       findStateAndUserById: jest.fn(),
       terminateConditionally: jest.fn(),
       softDeleteMembershipRecords: jest.fn(),

@@ -47,6 +47,7 @@ describe('ListUsersUseCase (F-ADM-02 / API-053)', () => {
   beforeEach(async () => {
     const mockRepo: Partial<jest.Mocked<IUserRepository>> = {
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

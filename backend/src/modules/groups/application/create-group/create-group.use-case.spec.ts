@@ -91,6 +91,7 @@ describe('CreateGroupUseCase', () => {
       findById: jest.fn(),
       findByEmail: jest.fn(),
       findPageByRole: jest.fn(),
+      countByRole: jest.fn(),
       save: jest.fn(),
     };
 
