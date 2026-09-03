@@ -107,6 +107,14 @@ export interface FindOwnWeeklyReportsParams extends WeeklyReportsPageParams {
   userId: string;
 }
 
+/**
+ * API-036: the membership id that already passed the route-specific
+ * ScopeGuard (TS §15.2 step 4 — "never a second, independently-trusted ID").
+ */
+export interface FindMembershipWeeklyReportsParams extends WeeklyReportsPageParams {
+  membershipId: string;
+}
+
 export interface WeeklyReportPage {
   rows: WeeklyReportRecord[];
   hasMore: boolean;
@@ -125,6 +133,19 @@ export interface IWeeklyReportRepository {
    */
   findOwnHistoryByUserId(
     params: FindOwnWeeklyReportsParams,
+  ): Promise<WeeklyReportPage>;
+
+  /**
+   * API-036 staff view: the live `Finalised` rows of ONE membership,
+   * `week_start DESC, id DESC`, keyset paginated on DB-IDX-02 — the same
+   * page shape and the same finalised-only rule as API-035. Scope is NOT
+   * re-derived here: the membership id is the one the route-specific
+   * ScopeGuard already verified (TS §15.2), and the query is bound to
+   * exactly that id (SA §14 NFR-19 backstop). Fetches `limit + 1` rows to
+   * derive `hasMore` without a count (APIS §9.1).
+   */
+  findHistoryByMembershipId(
+    params: FindMembershipWeeklyReportsParams,
   ): Promise<WeeklyReportPage>;
   /**
    * Own-scope context for API-033. Null when the caller has no Active

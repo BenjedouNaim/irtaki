@@ -61,6 +61,7 @@ describe('ConfirmWeeklyReportUseCase (F-WR-02 / API-034)', () => {
       findAllOpenWithTimezone: jest.fn(),
       finaliseAsScheduler: jest.fn(),
       findOwnHistoryByUserId: jest.fn(),
+      findHistoryByMembershipId: jest.fn(),
     };
     eventEmitter = { emit: jest.fn().mockReturnValue(true) };
     useCase = new ConfirmWeeklyReportUseCase(

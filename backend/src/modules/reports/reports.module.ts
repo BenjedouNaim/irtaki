@@ -24,6 +24,8 @@ import { WEEKLY_REPORT_SCOPE } from './domain/weekly-report-scope.interface';
 import { WeeklyReportScope } from './infrastructure/weekly-report-scope';
 import { OwnWeeklyReportScopeGuard } from './presentation/guards/own-weekly-report-scope.guard';
 import { ListOwnWeeklyReportsUseCase } from './application/list-own-weekly-reports/list-own-weekly-reports.use-case';
+import { ListRosterWeeklyReportsUseCase } from './application/list-roster-weekly-reports/list-roster-weekly-reports.use-case';
+import { MembershipWeeklyReportsScopeGuard } from './presentation/guards/membership-weekly-reports-scope.guard';
 
 /**
  * Reports module (SA §11): owns `daily_reports` / `weekly_reports`. Scope is
@@ -66,6 +68,8 @@ import { ListOwnWeeklyReportsUseCase } from './application/list-own-weekly-repor
       useClass: MembershipReportScope,
     },
     MembershipDailyReportsScopeGuard,
+    // F-WR-04: the same staff-scope resolution for /memberships/{id}/weekly-reports.
+    MembershipWeeklyReportsScopeGuard,
     // F-WR-02: own-scope resolution for POST /weekly-reports/{id}/confirm
     // (API-034), consumed by its route-specific ScopeGuard (SA §14).
     {
@@ -81,6 +85,8 @@ import { ListOwnWeeklyReportsUseCase } from './application/list-own-weekly-repor
     ConfirmWeeklyReportUseCase,
     // F-WR-03: own weekly history (API-035), scope inside the repository.
     ListOwnWeeklyReportsUseCase,
+    // F-WR-04: staff weekly history (API-036), scope resolved by its guard.
+    ListRosterWeeklyReportsUseCase,
     // F-WR-02: DS-02 and its ADR-024 cron trigger (SA §19 background jobs).
     WeeklyReportFinalizationService,
     WeeklyReportFinalizationJob,

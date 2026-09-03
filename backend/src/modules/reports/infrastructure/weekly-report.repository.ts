@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   CurrentWeekContextRecord,
+  FindMembershipWeeklyReportsParams,
   FindOwnWeeklyReportsParams,
   IWeeklyReportRepository,
   NewWeeklyReport,
@@ -408,6 +409,31 @@ export class WeeklyReportRepository implements IWeeklyReportRepository {
         ORDER BY w.week_start DESC, w.id DESC
         LIMIT $6`,
       [params.userId, ...pageParameters(params)],
+    );
+
+    return toPage(rows ?? [], params.limit);
+  }
+
+  async findHistoryByMembershipId(
+    params: FindMembershipWeeklyReportsParams,
+  ): Promise<WeeklyReportPage> {
+    // API-036: the membership id already passed the route-specific
+    // ScopeGuard (TS §15.2 step 4), so the query binds to exactly that id
+    // and re-derives nothing. Same DB-IDX-02 backward range walk, same
+    // keyset cursor, same finalised-only rule and `limit + 1` page as the
+    // own history above.
+    const rows = await this.weeklyReportRepo.manager.query<
+      RawWeeklyReportRow[]
+    >(
+      `SELECT ${WEEKLY_REPORT_COLUMNS}
+         FROM weekly_reports w
+        WHERE w.membership_id = $1
+          AND w.deleted_at IS NULL
+          AND w.state = 'Finalised'
+          ${HISTORY_PAGE_PREDICATE}
+        ORDER BY w.week_start DESC, w.id DESC
+        LIMIT $6`,
+      [params.membershipId, ...pageParameters(params)],
     );
 
     return toPage(rows ?? [], params.limit);
