@@ -1,11 +1,31 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render as rtlRender, screen } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootNavigator } from '../RootNavigator';
 import { useAuthStore } from '../../shared/auth/authStore';
+
+// StudentTabs hosts the Daily Report CTA card (F-DR-01), which reads API-029
+// through TanStack Query — RootLayout provides the QueryClient in the app.
+jest.mock('@/shared/api/dailyReports.client');
+
+let queryClient: QueryClient;
+
+function render(ui: React.ReactElement) {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
 
 describe('RootNavigator', () => {
   beforeEach(() => {
     useAuthStore.getState().clearSession();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
   });
 
   it('renders AuthStack when unauthenticated', async () => {

@@ -13,8 +13,10 @@ import Animated, {
  * - `dashboard`: title + two stat cards + one wide block.
  * - `ring`: a metric card built around a circular gauge (title, 176dp circle,
  *   a text line and a notice block) — mirrors the Progress section's layout (UF §22).
+ * - `card`: a status/CTA card (badge, title, one text line, one 48dp button)
+ *   — mirrors the Daily Report CTA card on Student Home (UF §22).
  */
-export type SkeletonVariant = 'row' | 'dashboard' | 'ring';
+export type SkeletonVariant = 'row' | 'dashboard' | 'ring' | 'card';
 
 export interface SkeletonLoaderProps {
   variant?: SkeletonVariant;
@@ -108,6 +110,37 @@ export function SkeletonLoader({
             className="w-full h-10 rounded-lg bg-gray-100 dark:bg-gray-800"
           />
         </View>
+      </View>
+    );
+  }
+
+  if (variant === 'card') {
+    return (
+      <View
+        testID={testID}
+        className={`w-full p-5 gap-3 ${className ?? ''}`}
+        style={style}
+      >
+        <Animated.View
+          testID="skeleton-card-badge"
+          style={[animatedStyle, { borderCurve: 'continuous' }]}
+          className="w-24 h-6 self-start rounded-full bg-gray-200 dark:bg-gray-700"
+        />
+        <Animated.View
+          testID="skeleton-card-title"
+          style={[animatedStyle, { borderCurve: 'continuous' }]}
+          className="w-3/5 h-6 self-end rounded-md bg-gray-200 dark:bg-gray-700"
+        />
+        <Animated.View
+          testID="skeleton-card-line"
+          style={[animatedStyle, { borderCurve: 'continuous' }]}
+          className="w-full h-4 rounded bg-gray-100 dark:bg-gray-800"
+        />
+        <Animated.View
+          testID="skeleton-card-button"
+          style={[animatedStyle, { borderCurve: 'continuous' }]}
+          className="w-full h-12 rounded-lg bg-gray-200 dark:bg-gray-700"
+        />
       </View>
     );
   }
