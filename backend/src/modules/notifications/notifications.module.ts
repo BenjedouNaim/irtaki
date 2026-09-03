@@ -13,6 +13,13 @@ import { GetNotificationPreferencesUseCase } from './application/get-notificatio
 import { SetNotificationPreferenceUseCase } from './application/set-notification-preference/set-notification-preference.use-case';
 import { OwnDeviceScopeGuard } from './presentation/guards/own-device-scope.guard';
 import { NotificationsController } from './presentation/notifications.controller';
+import { NOTIFICATION_LOG_REPOSITORY } from './domain/notification-log.repository.interface';
+import { NOTIFICATION_DISPATCH_CONTEXT_REPOSITORY } from './domain/notification-dispatch-context.repository.interface';
+import { PUSH_SENDER } from './domain/push-sender.interface';
+import { NotificationLogRepository } from './infrastructure/notification-log.repository';
+import { NotificationDispatchContextRepository } from './infrastructure/notification-dispatch-context.repository';
+import { ExpoPushSender } from './infrastructure/expo-push.sender';
+import { NotificationService } from './application/dispatch/notification.service';
 
 /**
  * Notifications module (SA §11): owns `device_tokens`,
@@ -25,6 +32,12 @@ import { NotificationsController } from './presentation/notifications.controller
  * the two use cases TS §13 names. F-NOT-03/F-NOT-04 add the E-10
  * `notification_preferences` half (API-050/051), which needs no ScopeGuard —
  * both routes address the caller's own collection with no path id.
+ *
+ * F-NOT-05 adds the dispatch half: `NotificationService`, the single path
+ * every one of SAS §22.2's eight events takes (ADR-009, SA §21), the E-11
+ * `notification_log` writer behind it and the EXT-03 push adapter
+ * (ADR-020). None of it is exported — SA §11 keeps this module a
+ * subscriber, so the only way in is an event or a tick of its own.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([DeviceTokenTypeOrmEntity])],
@@ -51,6 +64,21 @@ import { NotificationsController } from './presentation/notifications.controller
     },
     GetNotificationPreferencesUseCase,
     SetNotificationPreferenceUseCase,
+    // F-NOT-05: the SA §21 dispatch path — E-11 logging, the §22.3
+    // re-check reads and the ADR-020 transport behind one service.
+    {
+      provide: NOTIFICATION_LOG_REPOSITORY,
+      useClass: NotificationLogRepository,
+    },
+    {
+      provide: NOTIFICATION_DISPATCH_CONTEXT_REPOSITORY,
+      useClass: NotificationDispatchContextRepository,
+    },
+    {
+      provide: PUSH_SENDER,
+      useClass: ExpoPushSender,
+    },
+    NotificationService,
   ],
   // SA §11: Notifications is a module other modules never call into directly —
   // they emit events and it listens. Only the device-token pair predating
