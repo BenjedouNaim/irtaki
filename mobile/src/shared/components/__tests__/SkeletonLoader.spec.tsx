@@ -71,4 +71,34 @@ describe('SkeletonLoader', () => {
     expect(screen.queryByTestId('skeleton-metric-row-6')).toBeNull();
     expect(screen.queryByTestId('skeleton-report-row-0')).toBeNull();
   });
+
+  it('renders performanceScore variant as a label, display value and caption (UF §22)', async () => {
+    await render(
+      <SkeletonLoader variant="performanceScore" testID="score-skeleton" />,
+    );
+
+    expect(screen.getByTestId('score-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-score-label')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-score-value')).toBeTruthy();
+    expect(
+      screen.getByTestId('skeleton-performance-score-caption'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('skeleton-performance-donut')).toBeNull();
+  });
+
+  it('renders performanceDetail variant as a donut card, two tiles and one row (UF §22)', async () => {
+    await render(
+      <SkeletonLoader variant="performanceDetail" testID="detail-skeleton" />,
+    );
+
+    expect(screen.getByTestId('detail-skeleton')).toBeTruthy();
+    expect(
+      screen.getByTestId('skeleton-performance-breakdown-title'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-donut')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-legend-4')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-tile-0')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-tile-1')).toBeTruthy();
+    expect(screen.getByTestId('skeleton-performance-days-since')).toBeTruthy();
+  });
 });
