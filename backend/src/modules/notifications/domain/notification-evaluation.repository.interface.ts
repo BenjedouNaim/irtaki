@@ -49,8 +49,8 @@ export interface PaymentCandidate {
   startedAt: string;
   endedAt: string | null;
   archivedAt: string | null;
-  /** `payment_records.cycle_index` of every live row (DB-UQ-06). */
-  paidCycleIndexes: number[];
+  /** Every live `payment_records` row of the membership (DB-UQ-06). */
+  paidCycles: Array<{ cycleIndex: number; paidAt: string }>;
 }
 
 /**

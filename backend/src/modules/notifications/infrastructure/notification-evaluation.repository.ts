@@ -33,7 +33,7 @@ interface RawPaymentRow {
   started_at: string;
   ended_at: string | null;
   archived_at: string | null;
-  paid_cycle_indexes: number[] | null;
+  paid_cycles: Array<{ cycle_index: number; paid_at: string }> | null;
 }
 
 /**
@@ -117,10 +117,15 @@ export class NotificationEvaluationRepository implements INotificationEvaluation
               m.started_at::text AS started_at,
               m.ended_at::text   AS ended_at,
               (g.archived_at AT TIME ZONE u.timezone)::date::text AS archived_at,
-              (SELECT COALESCE(array_agg(p.cycle_index ORDER BY p.cycle_index), ARRAY[]::smallint[])
+              (SELECT COALESCE(
+                        json_agg(json_build_object(
+                          'cycle_index', p.cycle_index,
+                          'paid_at', p.paid_at
+                        ) ORDER BY p.cycle_index),
+                        '[]'::json)
                  FROM payment_records p
                 WHERE p.membership_id = m.id
-                  AND p.deleted_at IS NULL) AS paid_cycle_indexes
+                  AND p.deleted_at IS NULL) AS paid_cycles
          FROM memberships m
          JOIN groups g ON g.id = m.group_id
          JOIN users u ON u.id = m.user_id
@@ -135,7 +140,10 @@ export class NotificationEvaluationRepository implements INotificationEvaluation
       startedAt: row.started_at,
       endedAt: row.ended_at,
       archivedAt: row.archived_at,
-      paidCycleIndexes: (row.paid_cycle_indexes ?? []).map(Number),
+      paidCycles: (row.paid_cycles ?? []).map((paid) => ({
+        cycleIndex: Number(paid.cycle_index),
+        paidAt: new Date(paid.paid_at).toISOString(),
+      })),
     }));
   }
 }

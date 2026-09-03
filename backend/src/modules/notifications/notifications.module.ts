@@ -20,6 +20,14 @@ import { NotificationLogRepository } from './infrastructure/notification-log.rep
 import { NotificationDispatchContextRepository } from './infrastructure/notification-dispatch-context.repository';
 import { ExpoPushSender } from './infrastructure/expo-push.sender';
 import { NotificationService } from './application/dispatch/notification.service';
+import { NOTIFICATION_EVALUATION_REPOSITORY } from './domain/notification-evaluation.repository.interface';
+import { NotificationEvaluationRepository } from './infrastructure/notification-evaluation.repository';
+import { EnrollmentNotificationListener } from './application/listeners/enrollment-notification.listener';
+import { MembershipNotificationListener } from './application/listeners/membership-notification.listener';
+import { DailyReminderEvaluator } from './application/evaluators/daily-reminder.evaluator';
+import { WeeklyReportAvailableEvaluator } from './application/evaluators/weekly-report-available.evaluator';
+import { AtRiskEvaluator } from './application/evaluators/at-risk.evaluator';
+import { PaymentDueSoonEvaluator } from './application/evaluators/payment-due-soon.evaluator';
 
 /**
  * Notifications module (SA §11): owns `device_tokens`,
@@ -79,6 +87,19 @@ import { NotificationService } from './application/dispatch/notification.service
       useClass: ExpoPushSender,
     },
     NotificationService,
+    // F-NOT-05: the four event listeners (N-03/N-04/N-05/N-08) and the four
+    // scheduler-evaluated events (N-01/N-02/N-06/N-07). Every one of the
+    // eight goes through NotificationService and nothing else.
+    EnrollmentNotificationListener,
+    MembershipNotificationListener,
+    {
+      provide: NOTIFICATION_EVALUATION_REPOSITORY,
+      useClass: NotificationEvaluationRepository,
+    },
+    DailyReminderEvaluator,
+    WeeklyReportAvailableEvaluator,
+    AtRiskEvaluator,
+    PaymentDueSoonEvaluator,
   ],
   // SA §11: Notifications is a module other modules never call into directly —
   // they emit events and it listens. Only the device-token pair predating
