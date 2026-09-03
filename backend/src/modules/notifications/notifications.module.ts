@@ -10,6 +10,7 @@ import { NotificationPreferenceRepository } from './infrastructure/notification-
 import { RegisterDeviceUseCase } from './application/register-device/register-device.use-case';
 import { UnregisterDeviceUseCase } from './application/unregister-device/unregister-device.use-case';
 import { GetNotificationPreferencesUseCase } from './application/get-notification-preferences/get-notification-preferences.use-case';
+import { SetNotificationPreferenceUseCase } from './application/set-notification-preference/set-notification-preference.use-case';
 import { OwnDeviceScopeGuard } from './presentation/guards/own-device-scope.guard';
 import { NotificationsController } from './presentation/notifications.controller';
 
@@ -21,9 +22,9 @@ import { NotificationsController } from './presentation/notifications.controller
  *
  * F-NOT-01/F-NOT-02 wire the `device_tokens` half: the E-09 repository, the
  * module's own own-scope resolver behind `OwnDeviceScopeGuard` (SA §14), and
- * the two use cases TS §13 names. F-NOT-03 adds the E-10
- * `notification_preferences` half (API-050), which needs no ScopeGuard —
- * the route addresses the caller's own collection with no path id.
+ * the two use cases TS §13 names. F-NOT-03/F-NOT-04 add the E-10
+ * `notification_preferences` half (API-050/051), which needs no ScopeGuard —
+ * both routes address the caller's own collection with no path id.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([DeviceTokenTypeOrmEntity])],
@@ -43,12 +44,13 @@ import { NotificationsController } from './presentation/notifications.controller
     OwnDeviceScopeGuard,
     RegisterDeviceUseCase,
     UnregisterDeviceUseCase,
-    // F-NOT-03: E-10 preference resolution for API-050.
+    // F-NOT-03/F-NOT-04: E-10 preference resolution for API-050/051.
     {
       provide: NOTIFICATION_PREFERENCE_REPOSITORY,
       useClass: NotificationPreferenceRepository,
     },
     GetNotificationPreferencesUseCase,
+    SetNotificationPreferenceUseCase,
   ],
   exports: [
     DEVICE_TOKEN_REPOSITORY,

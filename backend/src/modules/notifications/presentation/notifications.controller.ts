@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -17,6 +18,9 @@ import { RegisterDeviceResponseDto } from '../application/register-device/regist
 import { UnregisterDeviceUseCase } from '../application/unregister-device/unregister-device.use-case';
 import { GetNotificationPreferencesUseCase } from '../application/get-notification-preferences/get-notification-preferences.use-case';
 import { GetNotificationPreferencesResponseDto } from '../application/get-notification-preferences/get-notification-preferences-response.dto';
+import { SetNotificationPreferenceUseCase } from '../application/set-notification-preference/set-notification-preference.use-case';
+import { SetPreferenceDto } from '../application/set-notification-preference/set-preference.dto';
+import { SetNotificationPreferenceResponseDto } from '../application/set-notification-preference/set-notification-preference-response.dto';
 import { OwnDeviceScopeGuard } from './guards/own-device-scope.guard';
 
 interface AuthenticatedRequest extends Request {
@@ -31,7 +35,7 @@ interface AuthenticatedRequest extends Request {
  * Notifications routes (TS §13 API implementation mapping —
  * `NotificationsController`). The path is spelled in full because this one
  * controller serves both the `/devices` resource (API-048/049) and
- * `/me/notification-preferences` (API-050, and API-051 next).
+ * `/me/notification-preferences` (API-050/051).
  */
 @Controller()
 export class NotificationsController {
@@ -39,6 +43,7 @@ export class NotificationsController {
     private readonly registerDeviceUseCase: RegisterDeviceUseCase,
     private readonly unregisterDeviceUseCase: UnregisterDeviceUseCase,
     private readonly getNotificationPreferencesUseCase: GetNotificationPreferencesUseCase,
+    private readonly setNotificationPreferenceUseCase: SetNotificationPreferenceUseCase,
   ) {}
 
   /**
@@ -88,5 +93,21 @@ export class NotificationsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<GetNotificationPreferencesResponseDto> {
     return this.getNotificationPreferencesUseCase.execute(req.user.id);
+  }
+
+  /**
+   * API-051 `PATCH /me/notification-preferences` — same "Any / Own" gate as
+   * API-050. `200` (APIS §9.6: a successful `PATCH` is `200`, never `201`).
+   * `422 ACCOUNT_CRITICAL_CATEGORY` when the category's `is_mutable` is
+   * `false` (VR-38) — decided on the catalogue row, so N-03 / N-04 / N-08
+   * are refused whatever the client sends.
+   */
+  @Patch('me/notification-preferences')
+  @HttpCode(HttpStatus.OK)
+  async setPreference(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: SetPreferenceDto,
+  ): Promise<SetNotificationPreferenceResponseDto> {
+    return this.setNotificationPreferenceUseCase.execute(req.user.id, dto);
   }
 }
