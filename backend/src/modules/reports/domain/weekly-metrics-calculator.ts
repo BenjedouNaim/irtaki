@@ -57,6 +57,21 @@ export interface WeeklyMetricsInput {
 }
 
 /**
+ * `classify()` (VO-09) tallied over `ExpectedDays(m, w)` — the five-segment
+ * day breakdown UF §17 renders ("Normal · Revision · Excused · Unexcused ·
+ * Missed") and `GET /me/performance` returns (APIS §10.9). Not a weekly
+ * metric: no `missed_*` rule applies, and the five counts sum to
+ * `expectedDays` by construction, `ABSENT_EXCUSED` days included.
+ */
+export interface DayBreakdown {
+  normal: number;
+  revision: number;
+  absentExcused: number;
+  absentOther: number;
+  noReport: number;
+}
+
+/**
  * The six E-06 metrics (SAS §18.2) plus the three §18.1 denominators
  * (`|ExpectedDays|`, `|EffectiveDays|`, `|MemorizationExpectedDays|`) and the
  * "days on which memorisation actually occurred" count that §18.2 names as
@@ -77,6 +92,8 @@ export interface WeeklyMetrics {
   memorizationExpectedDays: number;
   /** `NORMAL` days bearing a memorisation range (§18.2 `missed_50_repetitions` denominator). */
   memorizationDays: number;
+  /** The VO-09 tally over `ExpectedDays(m, w)` (APIS §10.9 `day_breakdown`). */
+  dayBreakdown: DayBreakdown;
 }
 
 /**
@@ -103,6 +120,14 @@ function expectedDays(week: ReportingWeek, window: EffectiveWindow): string[] {
     }
   }
   return days;
+}
+
+/** Count of the expected days carrying one VO-09 classification. */
+function countOf(
+  days: readonly ClassifiedDay[],
+  classification: DayClassification,
+): number {
+  return days.filter((d) => d.classification === classification).length;
 }
 
 /**
@@ -178,5 +203,14 @@ export function computeWeeklyMetrics(input: WeeklyMetricsInput): WeeklyMetrics {
     effectiveDays: effective.length,
     memorizationExpectedDays: memorizationExpected.length,
     memorizationDays: memorizationDays.length,
+    // VO-09 tallied over ExpectedDays — every classification, excused
+    // included, so the five counts sum to `expectedDays` (APIS §10.9).
+    dayBreakdown: {
+      normal: countOf(days, 'NORMAL'),
+      revision: countOf(days, 'REVISION'),
+      absentExcused: countOf(days, 'ABSENT_EXCUSED'),
+      absentOther: countOf(days, 'ABSENT_OTHER'),
+      noReport: countOf(days, 'NO_REPORT'),
+    },
   };
 }

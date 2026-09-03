@@ -90,6 +90,13 @@ const zeroMetrics: Omit<WeeklyMetrics, 'expectedDays'> = {
   effectiveDays: 0,
   memorizationExpectedDays: 0,
   memorizationDays: 0,
+  dayBreakdown: {
+    normal: 0,
+    revision: 0,
+    absentExcused: 0,
+    absentOther: 0,
+    noReport: 0,
+  },
 };
 
 describe('computeEffectiveWindow (SAS §18.1 EffectiveWindow)', () => {
@@ -179,6 +186,13 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
         effectiveDays: 6,
         memorizationExpectedDays: 6,
         memorizationDays: 6,
+        dayBreakdown: {
+          normal: 6,
+          revision: 0,
+          absentExcused: 0,
+          absentOther: 0,
+          noReport: 0,
+        },
       });
     });
 
@@ -204,6 +218,13 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
           effectiveDays: 5,
           memorizationExpectedDays: 5,
           memorizationDays: 5,
+          dayBreakdown: {
+            normal: 5,
+            revision: 0,
+            absentExcused: 1,
+            absentOther: 0,
+            noReport: 0,
+          },
         });
       }
     });
@@ -228,6 +249,13 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
         effectiveDays: 6,
         memorizationExpectedDays: 5,
         memorizationDays: 5,
+        dayBreakdown: {
+          normal: 5,
+          revision: 1,
+          absentExcused: 0,
+          absentOther: 0,
+          noReport: 0,
+        },
       });
     });
 
@@ -288,7 +316,17 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
         absent(DAY[4], 'Sick'),
         absent(DAY[5], 'Studying'),
       ]);
-      expect(result).toEqual({ expectedDays: 6, ...zeroMetrics });
+      expect(result).toEqual({
+        expectedDays: 6,
+        ...zeroMetrics,
+        dayBreakdown: {
+          normal: 0,
+          revision: 0,
+          absentExcused: 6,
+          absentOther: 0,
+          noReport: 0,
+        },
+      });
     });
 
     it('a week with zero reports is produced with every daily miss counted (FR-WR-08, DEC-A07)', () => {
@@ -302,7 +340,54 @@ describe('computeWeeklyMetrics (WeeklyMetricsCalculator, SAS §18.2 / TS §22)',
         effectiveDays: 6,
         memorizationExpectedDays: 6,
         memorizationDays: 0,
+        dayBreakdown: {
+          normal: 0,
+          revision: 0,
+          absentExcused: 0,
+          absentOther: 0,
+          noReport: 6,
+        },
       });
+    });
+  });
+
+  describe('day breakdown (VO-09 over ExpectedDays, APIS §10.9)', () => {
+    it('tallies every classification and sums to expectedDays', () => {
+      const week: DatedDailyReportSnapshot[] = [
+        normalFull(DAY[0]),
+        normalNoMemo(DAY[1]),
+        revision(DAY[2]),
+        absent(DAY[3], 'Sick'),
+        absent(DAY[4], 'Other'),
+        // DAY[5] left unreported.
+      ];
+      const result = compute(week);
+      expect(result.dayBreakdown).toEqual({
+        normal: 2,
+        revision: 1,
+        absentExcused: 1,
+        absentOther: 1,
+        noReport: 1,
+      });
+      const b = result.dayBreakdown;
+      expect(
+        b.normal + b.revision + b.absentExcused + b.absentOther + b.noReport,
+      ).toBe(result.expectedDays);
+    });
+
+    it('keeps ABSENT_EXCUSED days visible even though they leave every metric (BR-24)', () => {
+      const result = compute([absent(DAY[0], 'Studying')]);
+      expect(result.effectiveDays).toBe(5);
+      expect(result.dayBreakdown.absentExcused).toBe(1);
+      expect(result.dayBreakdown.noReport).toBe(5);
+    });
+
+    it('never counts the recitation day, even when a report sits on it (BR-45)', () => {
+      const result = compute([
+        ...DAY.map(normalFull),
+        normalFull(WEEK.weekEnd),
+      ]);
+      expect(result.dayBreakdown.normal).toBe(6);
     });
   });
 

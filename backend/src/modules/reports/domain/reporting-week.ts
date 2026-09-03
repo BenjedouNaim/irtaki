@@ -41,3 +41,33 @@ export function reportingWeekContaining(
   const weekEnd = addDays(date, daysUntilRecitation);
   return { weekStart: addDays(weekEnd, -6), weekEnd };
 }
+
+/**
+ * Every VO-04 reporting week intersecting the inclusive calendar range
+ * `[from, to]`, oldest first — the week set SAS §18.3 quantifies over
+ * ("for all reporting weeks w ∩ P" and "W(P) = reporting weeks
+ * intersecting P ∩ [m.started_at, today]"). Empty when `to < from`.
+ *
+ * The first week is the one containing `from`; each subsequent week starts
+ * the day after the previous one ends (BR-15), so the walk is exact and
+ * bounded by the range the caller already clamped.
+ */
+export function reportingWeeksIntersecting(
+  from: string,
+  to: string,
+  recitationDay: number,
+): ReportingWeek[] {
+  const weeks: ReportingWeek[] = [];
+  if (to < from) {
+    return weeks;
+  }
+  let week = reportingWeekContaining(from, recitationDay);
+  while (week.weekStart <= to) {
+    weeks.push(week);
+    week = {
+      weekStart: addDays(week.weekEnd, 1),
+      weekEnd: addDays(week.weekEnd, 7),
+    };
+  }
+  return weeks;
+}
