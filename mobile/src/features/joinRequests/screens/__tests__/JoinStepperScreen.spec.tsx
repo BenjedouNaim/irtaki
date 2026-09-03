@@ -1,5 +1,11 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from '@testing-library/react-native';
 import { JoinStepperScreen } from '../JoinStepperScreen';
 import * as groupsApi from '@/shared/api/groups.client';
 import * as joinRequestsApi from '@/shared/api/joinRequests.client';
@@ -29,6 +35,22 @@ function selectMinimumAhzab(getByTestId: any) {
   for (let hizb = 1; hizb <= 5; hizb += 1) {
     fireEvent.press(getByTestId(`ahzab-chip-${hizb}`));
   }
+}
+
+/** Step 3 filled to the state that enables the submit button (VR-04a et al). */
+function fillValidApplication(getByTestId: any) {
+  fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
+  fireEvent.changeText(getByTestId('input-age'), '28');
+  fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
+  fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
+  fireEvent.changeText(getByTestId('input-city'), 'تونس');
+
+  selectMinimumAhzab(getByTestId);
+
+  fireEvent.press(getByTestId('tajweed-option-Intermediate'));
+  fireEvent.press(getByTestId('theory-yes'));
+  fireEvent.press(getByTestId('qalun-yes'));
+  fireEvent.press(getByTestId('fee-agreement-checkbox'));
 }
 
 describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
@@ -236,230 +258,150 @@ describe('JoinStepperScreen (SCR-06 Steps 1, 2, and 3)', () => {
     ).toBe(true);
   });
 
-  it('completes the Step 3 form and submits successfully (201)', async () => {
-    jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockResolvedValueOnce({
-      data: {
-        id: 'request-101',
-        status: 'Pending',
-        score: 55.0,
-        created_at: new Date().toISOString(),
-      },
+  /**
+   * The five submit outcomes. Reaching any of them means walking the stepper
+   * to Step 3 and filling every required field first — fourteen interactions,
+   * each one a render of the whole stepper including its sixty ahzab chips.
+   * That arrangement lives in the hook: it is written once instead of five
+   * times, and a loaded machine times it against its own budget rather than
+   * stacking it on top of the outcome each case is actually asserting.
+   */
+  describe('Step 3 — submitting the application', () => {
+    beforeEach(async () => {
+      render(<JoinStepperScreen />);
+      await navigateToStep3(screen.getByTestId);
+      fillValidApplication(screen.getByTestId);
     });
 
-    const { getByTestId } = render(<JoinStepperScreen />);
-    await navigateToStep3(getByTestId);
+    it('submits the completed form successfully (201)', async () => {
+      jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockResolvedValueOnce({
+        data: {
+          id: 'request-101',
+          status: 'Pending',
+          score: 55.0,
+          created_at: new Date().toISOString(),
+        },
+      });
 
-    // Fill textual fields
-    fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
-    fireEvent.changeText(getByTestId('input-age'), '28');
-    fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
-    fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
-    fireEvent.changeText(getByTestId('input-city'), 'تونس');
+      expect(
+        screen.getByTestId('submit-application-button').props.accessibilityState
+          .disabled,
+      ).toBe(false);
 
-    // Select 5 ahzab
-    fireEvent.press(getByTestId('ahzab-chip-1'));
-    fireEvent.press(getByTestId('ahzab-chip-2'));
-    fireEvent.press(getByTestId('ahzab-chip-3'));
-    fireEvent.press(getByTestId('ahzab-chip-4'));
-    fireEvent.press(getByTestId('ahzab-chip-5'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('submit-application-button'));
+      });
 
-    // Select tajweed level
-    fireEvent.press(getByTestId('tajweed-option-Intermediate'));
+      expect(joinRequestsApi.submitJoinRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          group_id: 'group-101',
+          full_name: 'أحمد التونسي',
+          gender: 'Male',
+          age: 28,
+          phone_number: '98123456',
+          occupation: 'مهندس',
+          city: 'تونس',
+          memorized_ahzab: [1, 2, 3, 4, 5],
+          tajweed_level: 'Intermediate',
+          studied_tajweed_theory: true,
+          studied_qalun: true,
+          fee_agreement: true,
+          program_goal: 'Memorization',
+        }),
+      );
 
-    // Theory & Qalun
-    fireEvent.press(getByTestId('theory-yes'));
-    fireEvent.press(getByTestId('qalun-yes'));
-
-    // Fee Agreement
-    fireEvent.press(getByTestId('fee-agreement-checkbox'));
-
-    // Submit button should now be enabled
-    const submitBtn = getByTestId('submit-application-button');
-    expect(submitBtn.props.accessibilityState.disabled).toBe(false);
-
-    // Submit form
-    await act(async () => {
-      fireEvent.press(submitBtn);
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/user');
     });
 
-    expect(joinRequestsApi.submitJoinRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        group_id: 'group-101',
-        full_name: 'أحمد التونسي',
-        gender: 'Male',
-        age: 28,
-        phone_number: '98123456',
-        occupation: 'مهندس',
-        city: 'تونس',
-        memorized_ahzab: [1, 2, 3, 4, 5],
-        tajweed_level: 'Intermediate',
-        studied_tajweed_theory: true,
-        studied_qalun: true,
-        fee_agreement: true,
-        program_goal: 'Memorization',
-      }),
-    );
+    it('blocks progression and disables submit if Revision program goal is selected (BR-36)', async () => {
+      expect(
+        screen.getByTestId('submit-application-button').props.accessibilityState
+          .disabled,
+      ).toBe(false);
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/user');
-  });
+      // Switch to Revision
+      fireEvent.press(screen.getByTestId('goal-revision'));
 
-  it('blocks progression and disables submit if Revision program goal is selected (BR-36)', async () => {
-    const { getByTestId, findByText } = render(<JoinStepperScreen />);
-    await navigateToStep3(getByTestId);
+      expect(screen.getByTestId('revision-block-notice')).toBeTruthy();
+      expect(
+        await screen.findByText(
+          'عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.',
+        ),
+      ).toBeTruthy();
 
-    // Fill form to valid state
-    fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
-    fireEvent.changeText(getByTestId('input-age'), '28');
-    fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
-    fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
-    fireEvent.changeText(getByTestId('input-city'), 'تونس');
-
-    fireEvent.press(getByTestId('ahzab-chip-1'));
-    fireEvent.press(getByTestId('ahzab-chip-2'));
-    fireEvent.press(getByTestId('ahzab-chip-3'));
-    fireEvent.press(getByTestId('ahzab-chip-4'));
-    fireEvent.press(getByTestId('ahzab-chip-5'));
-
-    fireEvent.press(getByTestId('tajweed-option-Beginner'));
-    fireEvent.press(getByTestId('theory-no'));
-    fireEvent.press(getByTestId('qalun-no'));
-    fireEvent.press(getByTestId('fee-agreement-checkbox'));
-
-    expect(
-      getByTestId('submit-application-button').props.accessibilityState
-        .disabled,
-    ).toBe(false);
-
-    // Switch to Revision
-    fireEvent.press(getByTestId('goal-revision'));
-
-    expect(getByTestId('revision-block-notice')).toBeTruthy();
-    expect(
-      await findByText(
-        'عذراً، التسجيل متاح حالياً فقط لبرنامج الحفظ والمتابعة اليومية. لا يمكن قبول طلبات المراجعة فقط في هذا الوقت.',
-      ),
-    ).toBeTruthy();
-
-    expect(
-      getByTestId('submit-application-button').props.accessibilityState
-        .disabled,
-    ).toBe(true);
-  });
-
-  it('handles 422 validation errors by rendering inline field errors', async () => {
-    jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
-      new ApiError({
-        statusCode: 422,
-        error: 'VALIDATION_ERROR',
-        message: 'فشل التحقق من صحة بيانات طلب الانضمام',
-        details: [
-          {
-            field: 'full_name',
-            rule: 'VR-03',
-            message: 'الاسم الكامل غير صالح',
-          },
-        ],
-      }),
-    );
-
-    const { getByTestId, findByText } = render(<JoinStepperScreen />);
-    await navigateToStep3(getByTestId);
-
-    fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
-    fireEvent.changeText(getByTestId('input-age'), '28');
-    fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
-    fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
-    fireEvent.changeText(getByTestId('input-city'), 'تونس');
-
-    fireEvent.press(getByTestId('ahzab-chip-1'));
-    fireEvent.press(getByTestId('ahzab-chip-2'));
-    fireEvent.press(getByTestId('ahzab-chip-3'));
-    fireEvent.press(getByTestId('ahzab-chip-4'));
-    fireEvent.press(getByTestId('ahzab-chip-5'));
-
-    fireEvent.press(getByTestId('tajweed-option-Beginner'));
-    fireEvent.press(getByTestId('theory-no'));
-    fireEvent.press(getByTestId('qalun-no'));
-    fireEvent.press(getByTestId('fee-agreement-checkbox'));
-
-    await act(async () => {
-      fireEvent.press(getByTestId('submit-application-button'));
+      expect(
+        screen.getByTestId('submit-application-button').props.accessibilityState
+          .disabled,
+      ).toBe(true);
+      expect(joinRequestsApi.submitJoinRequest).not.toHaveBeenCalled();
     });
 
-    expect(await findByText('الاسم الكامل غير صالح')).toBeTruthy();
-    expect(getByTestId('form-error-banner')).toBeTruthy();
-  });
+    it('handles 422 validation errors by rendering inline field errors', async () => {
+      jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 422,
+          error: 'VALIDATION_ERROR',
+          message: 'فشل التحقق من صحة بيانات طلب الانضمام',
+          details: [
+            {
+              field: 'full_name',
+              rule: 'VR-03',
+              message: 'الاسم الكامل غير صالح',
+            },
+          ],
+        }),
+      );
 
-  it('handles 409 GROUP_UNAVAILABLE by returning to Step 2 and re-fetching groups (EC-09)', async () => {
-    jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
-      new ApiError({
-        statusCode: 409,
-        error: 'GROUP_UNAVAILABLE',
-        message: 'الحلقة غير متاحة للتسجيل حالياً',
-      }),
-    );
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('submit-application-button'));
+      });
 
-    jest.spyOn(groupsApi, 'listAvailableGroups').mockResolvedValue({
-      data: [],
+      expect(await screen.findByText('الاسم الكامل غير صالح')).toBeTruthy();
+      expect(screen.getByTestId('form-error-banner')).toBeTruthy();
     });
 
-    const { getByTestId, findByText } = render(<JoinStepperScreen />);
-    await navigateToStep3(getByTestId);
+    it('handles 409 GROUP_UNAVAILABLE by returning to Step 2 and re-fetching groups (EC-09)', async () => {
+      jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 409,
+          error: 'GROUP_UNAVAILABLE',
+          message: 'الحلقة غير متاحة للتسجيل حالياً',
+        }),
+      );
+      // The list Step 2 comes back to: the group this application named is
+      // gone from it.
+      jest.spyOn(groupsApi, 'listAvailableGroups').mockResolvedValue({
+        data: [],
+      });
 
-    fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
-    fireEvent.changeText(getByTestId('input-age'), '28');
-    fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
-    fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
-    fireEvent.changeText(getByTestId('input-city'), 'تونس');
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('submit-application-button'));
+      });
 
-    selectMinimumAhzab(getByTestId);
-    fireEvent.press(getByTestId('tajweed-option-Advanced'));
-    fireEvent.press(getByTestId('theory-yes'));
-    fireEvent.press(getByTestId('qalun-yes'));
-    fireEvent.press(getByTestId('fee-agreement-checkbox'));
-
-    await act(async () => {
-      fireEvent.press(getByTestId('submit-application-button'));
+      // Should return to Step 2 with the toast (Figma 54:4735), list re-fetched
+      expect(await screen.findByText('المجموعات المتاحة')).toBeTruthy();
+      expect(screen.getByTestId('group-unavailable-notice')).toBeTruthy();
+      expect(
+        await screen.findByText('المجموعة لم تعد متاحة — حُدِّثت القائمة'),
+      ).toBeTruthy();
+      expect(groupsApi.listAvailableGroups).toHaveBeenLastCalledWith('Male');
     });
 
-    // Should return to Step 2 with the toast (Figma 54:4735), list re-fetched
-    expect(await findByText('المجموعات المتاحة')).toBeTruthy();
-    expect(getByTestId('group-unavailable-notice')).toBeTruthy();
-    expect(
-      await findByText('المجموعة لم تعد متاحة — حُدِّثت القائمة'),
-    ).toBeTruthy();
-    expect(groupsApi.listAvailableGroups).toHaveBeenLastCalledWith('Male');
-  });
+    it('handles duplicate submit 409 as silent success routing to home (UF.md §13)', async () => {
+      jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
+        new ApiError({
+          statusCode: 409,
+          error: 'DUPLICATE_JOIN_REQUEST',
+          message: 'لديك طلب انضمام قيد المراجعة بالفعل',
+        }),
+      );
 
-  it('handles duplicate submit 409 as silent success routing to home (UF.md §13)', async () => {
-    jest.spyOn(joinRequestsApi, 'submitJoinRequest').mockRejectedValueOnce(
-      new ApiError({
-        statusCode: 409,
-        error: 'DUPLICATE_JOIN_REQUEST',
-        message: 'لديك طلب انضمام قيد المراجعة بالفعل',
-      }),
-    );
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('submit-application-button'));
+      });
 
-    const { getByTestId } = render(<JoinStepperScreen />);
-    await navigateToStep3(getByTestId);
-
-    fireEvent.changeText(getByTestId('input-full-name'), 'أحمد التونسي');
-    fireEvent.changeText(getByTestId('input-age'), '28');
-    fireEvent.changeText(getByTestId('input-phone-number'), '98123456');
-    fireEvent.changeText(getByTestId('input-occupation'), 'مهندس');
-    fireEvent.changeText(getByTestId('input-city'), 'تونس');
-
-    selectMinimumAhzab(getByTestId);
-    fireEvent.press(getByTestId('tajweed-option-Advanced'));
-    fireEvent.press(getByTestId('theory-yes'));
-    fireEvent.press(getByTestId('qalun-yes'));
-    fireEvent.press(getByTestId('fee-agreement-checkbox'));
-
-    await act(async () => {
-      fireEvent.press(getByTestId('submit-application-button'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/user');
     });
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/user');
   });
 
   it('steps back from Step 3 to Step 2, then to Step 1, via the top-bar back control', async () => {
