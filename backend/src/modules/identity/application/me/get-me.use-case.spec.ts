@@ -16,6 +16,7 @@ describe('GetMeUseCase', () => {
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     useCase = new GetMeUseCase(mockUserRepository);

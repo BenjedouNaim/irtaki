@@ -42,6 +42,7 @@ describe('TerminateMembershipUseCase (Unit)', () => {
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     mockManager = {} as unknown as jest.Mocked<EntityManager>;

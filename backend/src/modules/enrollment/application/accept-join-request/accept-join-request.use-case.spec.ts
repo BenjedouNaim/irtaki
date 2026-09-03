@@ -78,6 +78,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
       save: jest.fn(),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     mockCoverageRepo = {

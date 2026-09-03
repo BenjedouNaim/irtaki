@@ -17,6 +17,7 @@ describe('UpdateProfileUseCase', () => {
       save: jest.fn().mockImplementation((u) => Promise.resolve(u)),
       promoteToStudent: jest.fn(),
       demoteToUser: jest.fn(),
+      promoteFromUserRole: jest.fn(),
     };
 
     useCase = new UpdateProfileUseCase(mockUserRepository);
