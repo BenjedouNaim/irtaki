@@ -2,7 +2,10 @@ import React from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { Href, useRouter } from 'expo-router';
 import { WeeklyReportDto } from '@/shared/api/weeklyReports.client';
+import { YesNoToggle } from '@/features/dailyReports/components/YesNoToggle';
 import { WeeklyReportMetrics } from '../components/WeeklyReportMetrics';
+
+const noop = () => {};
 
 export interface WeeklyReportDetailScreenProps {
   /** The already-fetched row (no endpoint of its own — UF §26 Detail). */
@@ -15,10 +18,12 @@ export interface WeeklyReportDetailScreenProps {
  * SCR-15 Report Detail, weekly variant (UF §26 "Weekly sub-tab → Detail
  * (read-only)", UF §28 "Same layout as submission form, all fields
  * disabled"): SCR-12's header, week range, state badge and Metric row ×6
- * rendered read-only from the row the history list already holds, plus
- * the finalised note with the recorded attendance answer. This screen owns
- * no query and makes no request; there is no confirm, no editing path
- * (FR-WR-07: a finalised weekly report is immutable).
+ * rendered read-only from the row the history list already holds, then
+ * SCR-12's own Yes/No gate in its disabled state showing the recorded
+ * attendance answer (the F-DR-07 pattern SCR-15 uses for SCR-10's fields),
+ * and the quiet finalised note. This screen owns no query and makes no
+ * request; there is no confirm, no editing path (FR-WR-07: a finalised
+ * weekly report is immutable).
  */
 export function WeeklyReportDetailScreen({
   report,
@@ -75,6 +80,15 @@ export function WeeklyReportDetailScreen({
         <View className="w-full gap-4" testID="weekly-report-detail-content">
           <WeeklyReportMetrics report={report} />
 
+          {/* SCR-12's field, disabled, with the recorded answer (UF §28 SCR-15). */}
+          <YesNoToggle
+            question="هل حضرت جلسة التسميع؟"
+            value={report.attended_recitation_call}
+            onChange={noop}
+            disabled
+            testID="attended-toggle"
+          />
+
           <View
             className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 gap-1"
             style={{ borderCurve: 'continuous' }}
@@ -82,14 +96,6 @@ export function WeeklyReportDetailScreen({
           >
             <Text className="text-sm font-semibold text-gray-800 dark:text-gray-200 text-right">
               تم اعتماد هذا التقرير ولا يمكن تعديله.
-            </Text>
-            <Text
-              className="text-sm text-gray-600 dark:text-gray-400 text-right"
-              testID="weekly-report-detail-attended-line"
-            >
-              {`حضور جلسة التسميع: ${
-                report.attended_recitation_call ? 'نعم' : 'لا'
-              }`}
             </Text>
           </View>
         </View>

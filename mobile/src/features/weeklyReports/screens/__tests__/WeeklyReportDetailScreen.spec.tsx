@@ -83,17 +83,26 @@ describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03)', () => {
     ).toBe('5');
   });
 
-  it('states the recorded attendance answer and that the report is immutable, with no confirm control', () => {
+  it('shows SCR-12 Yes/No gate disabled with the recorded answer and the immutability note, with no confirm control', () => {
     render(<WeeklyReportDetailScreen report={report} />);
 
+    expect(screen.getByTestId('attended-toggle')).toBeTruthy();
     expect(
-      screen.getByTestId('weekly-report-detail-attended-line').props.children,
-    ).toBe('حضور جلسة التسميع: نعم');
+      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
+    ).toEqual({ selected: true, disabled: true });
+    expect(
+      screen.getByTestId('attended-toggle-no').props.accessibilityState,
+    ).toEqual({ selected: false, disabled: true });
     expect(
       screen.getByText('تم اعتماد هذا التقرير ولا يمكن تعديله.'),
     ).toBeTruthy();
     expect(screen.queryByTestId('confirm-weekly-report-button')).toBeNull();
-    expect(screen.queryByTestId('attended-toggle')).toBeNull();
+
+    // Disabled: a tap changes nothing.
+    fireEvent.press(screen.getByTestId('attended-toggle-no'));
+    expect(
+      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
+    ).toEqual({ selected: true, disabled: true });
 
     screen.unmount();
     render(
@@ -106,8 +115,11 @@ describe('WeeklyReportDetailScreen (SCR-15 weekly variant, F-WR-03)', () => {
       />,
     );
     expect(
-      screen.getByTestId('weekly-report-detail-attended-line').props.children,
-    ).toBe('حضور جلسة التسميع: لا');
+      screen.getByTestId('attended-toggle-no').props.accessibilityState,
+    ).toEqual({ selected: true, disabled: true });
+    expect(
+      screen.getByTestId('attended-toggle-yes').props.accessibilityState,
+    ).toEqual({ selected: false, disabled: true });
   });
 
   it('goes back from the top-right control (UF §31) and falls back to Home without history', () => {
