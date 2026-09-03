@@ -2,20 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '@/shared/components/Button';
-import { MetricRow } from '@/shared/components/MetricRow';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
-import {
-  StatusBadge,
-  StatusBadgeVariant,
-} from '@/shared/components/StatusBadge';
 import { ApiError } from '@/shared/api/types';
-import {
-  WeeklyReportLiveDto,
-  WeeklyReportState,
-} from '@/shared/api/weeklyReports.client';
 import { YesNoToggle } from '@/features/dailyReports/components/YesNoToggle';
 import { useCurrentWeeklyReport } from '../hooks/useCurrentWeeklyReport';
 import { useConfirmWeeklyReport } from '../hooks/useConfirmWeeklyReport';
+import { WeeklyReportMetrics } from '../components/WeeklyReportMetrics';
 
 /** Network unavailable (UF §24) — same copy as every other screen. */
 const NETWORK_ERROR_MESSAGE =
@@ -56,45 +48,6 @@ function describeError(error: unknown): string {
   }
   return NETWORK_ERROR_MESSAGE;
 }
-
-const STATE_BADGE: Record<
-  WeeklyReportState,
-  { label: string; variant: StatusBadgeVariant }
-> = {
-  Open: { label: 'مفتوح', variant: 'info' },
-  Finalised: { label: 'معتمد', variant: 'success' },
-};
-
-/**
- * UF §16: "6 read-only metric counts (missed_daily_reports,
- * missed_daily_memorization, missed_daily_revision, missed_50_repetitions,
- * missed_single_session — plus expected_days context line)". One canonical
- * Arabic term per concept (UF §33): daily revision is distinct from a
- * Revision Period (SAS §17.2).
- */
-const MISSED_METRICS: ReadonlyArray<{
-  key: keyof Pick<
-    WeeklyReportLiveDto,
-    | 'missed_daily_reports'
-    | 'missed_daily_memorization'
-    | 'missed_daily_revision'
-    | 'missed_50_repetitions'
-    | 'missed_single_session'
-  >;
-  label: string;
-}> = [
-  { key: 'missed_daily_reports', label: 'التقارير اليومية الفائتة' },
-  { key: 'missed_daily_memorization', label: 'أيام الحفظ الفائتة' },
-  { key: 'missed_daily_revision', label: 'أيام المراجعة اليومية الفائتة' },
-  {
-    key: 'missed_50_repetitions',
-    label: 'أيام لم تُتمّ فيها التكرارات الخمسون',
-  },
-  {
-    key: 'missed_single_session',
-    label: 'أيام لم تكن فيها التكرارات في جلسة واحدة',
-  },
-];
 
 /**
  * SCR-12 Weekly Report (F-WR-01, UF §16 / §28): "Vertical stack: header,
@@ -257,37 +210,12 @@ export function WeeklyReportScreen() {
       </View>
     );
   } else {
-    const badge = STATE_BADGE[data.state];
     const canConfirm = data.can_confirm && data.id !== null;
     const reportId = data.id;
 
     body = (
       <View className="w-full gap-4" testID="weekly-report-content">
-        <View className="flex-row-reverse items-center justify-between">
-          <StatusBadge
-            status={badge.label}
-            variant={badge.variant}
-            testID="weekly-report-state-badge"
-          />
-        </View>
-
-        {/* Metric row ×6 (UF §28): expected_days context line + five misses. */}
-        <View className="w-full gap-3" testID="weekly-report-metrics">
-          <MetricRow
-            label="الأيام المتوقعة"
-            value={data.expected_days}
-            hint="أيام الحفظ المحتسبة هذا الأسبوع (بحد أقصى 6)"
-            testID="metric-expected-days"
-          />
-          {MISSED_METRICS.map(({ key, label }) => (
-            <MetricRow
-              key={key}
-              label={label}
-              value={data[key]}
-              testID={`metric-${key.replace(/_/g, '-')}`}
-            />
-          ))}
-        </View>
+        <WeeklyReportMetrics report={data} />
 
         {canConfirm && reportId !== null ? (
           <View className="w-full gap-2" testID="weekly-report-confirm-section">

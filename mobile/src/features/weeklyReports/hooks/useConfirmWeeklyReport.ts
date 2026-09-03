@@ -6,13 +6,10 @@ import {
 } from '@/shared/api/weeklyReports.client';
 import { ApiError } from '@/shared/api/types';
 import { CURRENT_WEEKLY_REPORT_QUERY_KEY } from './useCurrentWeeklyReport';
+import { OWN_WEEKLY_REPORTS_QUERY_KEY } from './useOwnWeeklyReports';
 
-/**
- * Query key of the Student's own weekly history (API-035, F-WR-03,
- * SCR-14) — declared here ahead of its hook so the confirm mutation already
- * refreshes it: a finalised week "appears in History" (UF §16).
- */
-export const OWN_WEEKLY_REPORTS_QUERY_KEY = ['weekly-reports', 'mine'] as const;
+/** Re-exported for the callers that learnt the key here before F-WR-03. */
+export { OWN_WEEKLY_REPORTS_QUERY_KEY };
 
 /**
  * Query keys a finalisation invalidates (TS §26 — declared once, the single
