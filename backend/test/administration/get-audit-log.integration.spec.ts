@@ -205,6 +205,14 @@ describe('GET /audit (API-054 Integration)', () => {
     },
   ] as const;
 
+  /**
+   * The day window the seeded rows have to themselves (`from`/`to` are
+   * inclusive calendar dates, APIS §9.3). Other suites write LOGIN rows as
+   * they run, always at the current instant, so this window is what makes a
+   * read return this suite's rows and nothing else.
+   */
+  const SEEDED_WINDOW = 'from=2099-01-01&to=2099-01-03';
+
   /** The one action the schema admits but APIS §9.9 never exposes. */
   const UNEXPOSED_ENTRY_ID = '0193f000-0000-7000-8000-0000000000ff';
 
@@ -436,13 +444,23 @@ describe('GET /audit (API-054 Integration)', () => {
     });
 
     it('reaches a last page whose next_cursor is null', async () => {
+      // `audit_entries` is append-only and shared: every other suite that
+      // logs a user in writes a LOGIN row into it, so the table's own last
+      // page is never this suite's to reach. The walk therefore runs over
+      // the far-future day window the seeded rows have to themselves — the
+      // scope this suite created — and asserts the pagination contract on
+      // it: `has_more` mirrors `next_cursor`, the pages tile the window in
+      // `occurred_at DESC` with nothing repeated or skipped, and the last
+      // page closes the cursor.
       const seen: AuditEntryDto[] = [];
       let cursor: string | null = null;
       let pages = 0;
 
       do {
         const page: AuditLogBody = await fetchPage(
-          cursor ? `?limit=3&cursor=${encodeURIComponent(cursor)}` : '?limit=3',
+          cursor
+            ? `?${SEEDED_WINDOW}&limit=3&cursor=${encodeURIComponent(cursor)}`
+            : `?${SEEDED_WINDOW}&limit=3`,
         );
         seen.push(...page.data);
         cursor = page.pagination.next_cursor;
@@ -451,10 +469,9 @@ describe('GET /audit (API-054 Integration)', () => {
       } while (cursor && pages < 50);
 
       expect(cursor).toBeNull();
-      expect(new Set(seen.map((row) => row.id)).size).toBe(seen.length);
-      for (const id of expectedOrder) {
-        expect(seen.some((row) => row.id === id)).toBe(true);
-      }
+      // Five rows, three to a page: a full page then a short one.
+      expect(pages).toBe(2);
+      expect(seen.map((row) => row.id)).toEqual(expectedOrder);
     });
 
     it('paginates a filtered read the same way', async () => {
