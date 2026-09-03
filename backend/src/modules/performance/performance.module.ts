@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ReportsModule } from '../reports/reports.module';
+import { GetAtRiskListUseCase } from './application/get-at-risk-list/get-at-risk-list.use-case';
 import { GetGroupPerformanceUseCase } from './application/get-group-performance/get-group-performance.use-case';
 import { GetMembershipPerformanceUseCase } from './application/get-membership-performance/get-membership-performance.use-case';
 import { GetOwnPerformanceUseCase } from './application/get-own-performance/get-own-performance.use-case';
@@ -67,6 +68,12 @@ import { PerformanceController } from './presentation/performance.controller';
     },
     MembershipPerformanceScopeGuard,
     GetMembershipPerformanceUseCase,
+    // F-PERF-04: API-040 reuses API-038's group reads and its ScopeGuard —
+    // same path parameter, same role pair, same one indexed lookup — and
+    // adds only DS-04's `MAX(report_date)` probe to the repository. DS-04
+    // `AtRiskDetectionService` lives in `domain/` as a pure, framework-free
+    // service (TS §9, §24), holds no state and needs no provider.
+    GetAtRiskListUseCase,
   ],
 })
 export class PerformanceModule {}

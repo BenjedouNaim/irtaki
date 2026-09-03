@@ -7,6 +7,7 @@ import {
   IGroupPerformanceRepository,
   MemberAttendedWeek,
   MemberDaySnapshot,
+  MemberLastReport,
   SoftDeleteVisibility,
 } from '../domain/group-performance.repository.interface';
 
@@ -40,6 +41,11 @@ interface RawMemberDaySnapshotRow {
 interface RawAttendedWeekRow {
   membership_id: string;
   week_start: string;
+}
+
+interface RawLastReportRow {
+  membership_id: string;
+  last_report_date: string;
 }
 
 /**
@@ -260,6 +266,38 @@ export class GroupPerformanceRepository implements IGroupPerformanceRepository {
     return rows.map((row) => ({
       membershipId: row.membership_id,
       weekStart: row.week_start,
+    }));
+  }
+
+  async findLastReportDates(
+    membershipIds: readonly string[],
+  ): Promise<MemberLastReport[]> {
+    if (membershipIds.length === 0) {
+      return [];
+    }
+    // DS-04's whole report input: `MAX(report_date)` per membership, a
+    // grouped probe of DB-IDX-01 (membership_id, report_date) — the bulk
+    // form of the `findLastReportDateByMembershipId` walk API-037/039 make
+    // one membership at a time, so a member's `days_since_last_report` is
+    // the same number on the group list and on their own dashboard (CON-07).
+    //
+    // `deleted_at IS NULL` is SAS §20.2's scope for the at-risk view. It
+    // costs nothing here — the list is built from Active memberships alone
+    // (FR-PERF-10), whose reports the termination cascade has never
+    // stamped — and keeps the read correct if it is ever pointed elsewhere.
+    const rows = await this.dataSource.query<RawLastReportRow[]>(
+      `SELECT r.membership_id,
+              MAX(r.report_date)::text AS last_report_date
+         FROM daily_reports r
+        WHERE r.membership_id = ANY($1::uuid[])
+          AND r.deleted_at IS NULL
+        GROUP BY r.membership_id`,
+      [membershipIds],
+    );
+
+    return rows.map((row) => ({
+      membershipId: row.membership_id,
+      lastReportDate: row.last_report_date,
     }));
   }
 }

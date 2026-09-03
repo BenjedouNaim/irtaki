@@ -55,6 +55,17 @@ export interface MemberDaySnapshot extends DatedDailyReportSnapshot {
   membershipId: string;
 }
 
+/**
+ * The newest LIVE daily report of one membership — DS-04's only input
+ * besides the membership's own window (SAS §18.4). Memberships that have
+ * never reported are simply absent from the result.
+ */
+export interface MemberLastReport {
+  membershipId: string;
+  /** `daily_reports.report_date`, `YYYY-MM-DD`. */
+  lastReportDate: string;
+}
+
 /** One live, Finalised, attended weekly report — AttendanceRate's numerator. */
 export interface MemberAttendedWeek {
   membershipId: string;
@@ -131,4 +142,21 @@ export interface IGroupPerformanceRepository {
     toWeekStart: string,
     visibility: SoftDeleteVisibility,
   ): Promise<MemberAttendedWeek[]>;
+
+  /**
+   * F-PERF-04's only report read: the newest LIVE report date of each of the
+   * given memberships — one DB-IDX-01 `(membership_id, report_date)` probe
+   * per membership inside a single statement, never one query per member
+   * (SA §20). Memberships with no report at all are absent from the result,
+   * which DS-04 reads as "never reported".
+   *
+   * No `visibility` parameter: SAS §20.2 puts the at-risk view squarely in
+   * the `live` column ("Teacher, current-week and at-risk views: **No**"),
+   * and the FR-PERF-09 historical exception has no counterpart here — the
+   * predicate always looks backwards from today over Active memberships
+   * alone (FR-PERF-10, DEC-C04).
+   */
+  findLastReportDates(
+    membershipIds: readonly string[],
+  ): Promise<MemberLastReport[]>;
 }

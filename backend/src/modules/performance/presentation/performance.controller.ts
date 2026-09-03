@@ -2,6 +2,8 @@ import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { Roles } from '../../../shared';
 import { UserRole } from '../../identity/domain/user-role.enum';
+import { GetAtRiskListResponseDto } from '../application/get-at-risk-list/at-risk-list-response.dto';
+import { GetAtRiskListUseCase } from '../application/get-at-risk-list/get-at-risk-list.use-case';
 import { GetGroupPerformanceUseCase } from '../application/get-group-performance/get-group-performance.use-case';
 import { GetGroupPerformanceQueryDto } from '../application/get-group-performance/get-group-performance-query.dto';
 import { GetGroupPerformanceResponseDto } from '../application/get-group-performance/group-performance-response.dto';
@@ -32,6 +34,7 @@ export class PerformanceController {
     private readonly getOwnPerformanceUseCase: GetOwnPerformanceUseCase,
     private readonly getGroupPerformanceUseCase: GetGroupPerformanceUseCase,
     private readonly getMembershipPerformanceUseCase: GetMembershipPerformanceUseCase,
+    private readonly getAtRiskListUseCase: GetAtRiskListUseCase,
   ) {}
 
   /**
@@ -100,5 +103,36 @@ export class PerformanceController {
     @Query() query: GetMembershipPerformanceQueryDto,
   ): Promise<GetMembershipPerformanceResponseDto> {
     return this.getMembershipPerformanceUseCase.execute(id, query);
+  }
+
+  /**
+   * API-040 `GET /groups/{id}/at-risk` — Teacher (assigned group) and Admin
+   * (all), per APIS §6.1's `✓ all` / `✓ (g)` row, which pairs this route
+   * with `/groups/{id}/performance` exactly.
+   *
+   * The Assistant is deliberately absent from `@Roles()` (DEC-B09): the
+   * RolesGuard alone yields the unconditional 403 APIS §10.9 repeats for
+   * every performance endpoint — "regardless of group assignment", "the
+   * single most consequence-bearing scope rule in the whole system".
+   * Student and User are equally absent; the row grants this route to staff.
+   *
+   * `GroupPerformanceScopeGuard` — the module's own route-specific guard for
+   * `/groups/{id}/…`, already resolving exactly this path parameter against
+   * exactly this role pair — resolves the assigned-group scope with one
+   * indexed lookup BEFORE the handler runs (TS §15.2, SA §14).
+   *
+   * No `@Query()` DTO: the predicate is defined without a period (SAS
+   * §18.4) and the payload carries no period-scoped figure, so a `?period=`
+   * a client sends anyway is silently ignored rather than rejected
+   * (APIS §9.3).
+   */
+  @Roles(UserRole.Admin, UserRole.Teacher)
+  @UseGuards(GroupPerformanceScopeGuard)
+  @Get('groups/:id/at-risk')
+  async atRisk(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<GetAtRiskListResponseDto> {
+    return this.getAtRiskListUseCase.execute(req.user.id, id);
   }
 }

@@ -67,12 +67,14 @@ describe('GetGroupPerformanceUseCase (F-PERF-02 / API-038)', () => {
       findMembersIntersecting: jest.fn(),
       findDaySnapshots: jest.fn(),
       findAttendedWeeks: jest.fn(),
+      findLastReportDates: jest.fn(),
     };
     repository.findContext.mockResolvedValue(context);
     repository.findActiveMembers.mockResolvedValue([]);
     repository.findMembersIntersecting.mockResolvedValue([]);
     repository.findDaySnapshots.mockResolvedValue([]);
     repository.findAttendedWeeks.mockResolvedValue([]);
+    repository.findLastReportDates.mockResolvedValue([]);
     useCase = new GetGroupPerformanceUseCase(repository);
   });
 
@@ -419,6 +421,7 @@ describe('GetGroupPerformanceUseCase (F-PERF-02 / API-038)', () => {
         'findMembersIntersecting',
         'findDaySnapshots',
         'findAttendedWeeks',
+        'findLastReportDates',
       ]);
     });
   });
