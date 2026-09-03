@@ -1,8 +1,17 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { METRIC_TILE_NULL_VALUE } from '@/shared/components/MetricTile';
 import { AdminStack } from '../AdminStack';
+import * as dashboardApi from '@/shared/api/dashboard.client';
+import { ApiError } from '@/shared/api/types';
 
+jest.mock('@/shared/api/dashboard.client');
 jest.mock('@/shared/api/auth.client');
 
 const mockPush = jest.fn();
@@ -13,9 +22,32 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+const counts: dashboardApi.AdminDashboardDto = {
+  group_count: 4,
+  staff_count: 5,
+  student_count: 32,
+  pending_recovery_count: 6,
+};
+
+let queryClient: QueryClient;
+
+function render(ui: React.ReactElement) {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
+
 describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockResolvedValue(counts);
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
   });
 
   it('renders the tab-root TopBar and the role line', () => {
@@ -30,15 +62,55 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
     );
   });
 
-  it('renders the four dashboard tiles as an unwired shell', () => {
+  it('renders the F-ADM-04 tile shell fed by API-009, not rebuilt', async () => {
     render(<AdminStack />);
 
-    expect(screen.getByTestId('admin-summary-tiles')).toBeTruthy();
+    // The shell renders its documented Null state until the call resolves.
+    expect(screen.getByTestId('admin-summary-loading')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-summary-tiles')).toBeTruthy();
+    });
+
+    const expected: [string, string][] = [
+      ['groups', '4'],
+      ['staff', '5'],
+      ['students', '32'],
+      ['recoveries', '6'],
+    ];
+    for (const [key, value] of expected) {
+      expect(
+        screen.getByTestId(`admin-summary-tiles-${key}-value`).props.children,
+      ).toBe(value);
+    }
+    expect(dashboardApi.getMyDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the tiles in their Null state and the menu usable when the call fails (UF §24)', async () => {
+    jest.spyOn(dashboardApi, 'getMyDashboard').mockRejectedValue(
+      new ApiError({
+        statusCode: 500,
+        error: 'INTERNAL_ERROR',
+        message: 'relation "users" does not exist',
+      }),
+    );
+
+    render(<AdminStack />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-summary-error')).toBeTruthy();
+    });
+    expect(
+      screen.getByText('حدث خطأ أثناء تحميل الصفحة الرئيسية'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/relation/)).toBeNull();
     for (const key of ['groups', 'staff', 'students', 'recoveries']) {
       expect(
         screen.getByTestId(`admin-summary-tiles-${key}-value`).props.children,
       ).toBe(METRIC_TILE_NULL_VALUE);
     }
+    // The menu is Admin's real workflow and never depends on the tiles.
+    expect(screen.getByTestId('admin-groups-button')).toBeTruthy();
   });
 
   it('renders exactly the three menu rows of the frame', () => {
@@ -76,8 +148,11 @@ describe('AdminStack (SCR-26 Admin Home, Figma 39:2)', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/admin/audit');
   });
 
-  it('gives the group and staff tiles UF §10 tap targets', () => {
+  it('gives the group and staff tiles UF §10 tap targets', async () => {
     render(<AdminStack />);
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-summary-tiles')).toBeTruthy();
+    });
 
     fireEvent.press(screen.getByTestId('admin-summary-tiles-groups'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/admin/groups');

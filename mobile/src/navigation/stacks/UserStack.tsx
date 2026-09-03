@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Banner } from '@/shared/components/Banner';
@@ -12,11 +12,9 @@ import {
   JoinRequestStatusCard,
   NoJoinRequestCard,
 } from '@/features/joinRequests/components/JoinRequestStatusCard';
-import {
-  getMyJoinRequest,
-  GetMyJoinRequestResponse,
-} from '@/shared/api/joinRequests.client';
-import { ApiError } from '@/shared/api/types';
+import type { UserDashboardDto } from '@/shared/api/dashboard.client';
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard';
+import { describeDashboardError } from '@/features/dashboard/utils/dashboardCopy';
 import { logoutUser } from '@/shared/api/auth.client';
 import {
   useAuthStore,
@@ -25,45 +23,27 @@ import {
 } from '@/shared/auth/authStore';
 
 /**
- * SCR-05 User Home (Figma 22:2 / 22:48 / 22:92): greeting + one status
- * card driven by `GET /join-requests/mine` (UF §10). The trailing top-bar
- * slot leads to the profile (SCR-34); the notification bell of the design
- * is not built (SCR-35 is out of scope).
+ * SCR-05 User Home (Figma 22:2 / 22:48 / 22:92): greeting + one status card,
+ * from the ONE `GET /me/dashboard` call (F-DASH-01 / API-009, UF §10 "Every
+ * dashboard is one `GET /me/dashboard` call"). The card itself is F-ENR-02's
+ * `JoinRequestStatusCard`, unchanged — only its data source moved, so this
+ * screen no longer issues the standalone `GET /join-requests/mine` request it
+ * used to (that endpoint remains the applicant's own status read elsewhere;
+ * nothing on this screen calls it any more, so no request is duplicated).
+ *
+ * `has_pending_request = false` with no `pending_request_status` means the
+ * caller has never applied — the "Browse Groups" entry point. A terminal
+ * `Rejected` keeps the status card plus "Apply again" (UF §10, DEC-C09: the
+ * status, never a reason).
+ *
+ * The trailing top-bar slot leads to the profile (SCR-34); the notification
+ * bell of the design is not built (SCR-35 is out of scope).
  */
 export function UserStack() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [joinRequest, setJoinRequest] = useState<
-    GetMyJoinRequestResponse['data'] | null
-  >(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const fetchStatus = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const res = await getMyJoinRequest();
-      setJoinRequest(res.data);
-    } catch (err: unknown) {
-      if (err instanceof ApiError && err.statusCode === 404) {
-        // Fresh user: no join request submitted yet
-        setJoinRequest(null);
-      } else if (err instanceof ApiError) {
-        setErrorMessage(err.message || 'تعذر تحميل حالة طلب الانضمام');
-      } else {
-        setErrorMessage(
-          'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مجدداً.',
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+  const { data, isLoading, isError, error, refetch } =
+    useDashboard<UserDashboardDto>();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -127,23 +107,23 @@ export function UserStack() {
           </Text>
         </View>
 
-        {isLoading ? (
+        {isLoading && !data ? (
           <View
             className="w-full rounded-lg bg-surface dark:bg-surface-dark border border-line dark:border-line-dark"
             style={{ borderCurve: 'continuous' }}
           >
             <SkeletonLoader variant="card" testID="user-stack-loading" />
           </View>
-        ) : errorMessage ? (
+        ) : isError || !data ? (
           <Banner
-            message={errorMessage}
+            message={describeDashboardError(error)}
             tone="error"
-            onRetry={fetchStatus}
+            onRetry={() => void refetch()}
             testID="user-stack-error-banner"
           />
-        ) : joinRequest ? (
+        ) : data.pending_request_status ? (
           <JoinRequestStatusCard
-            status={joinRequest.status}
+            status={data.pending_request_status}
             onApplyAgain={openStepper}
             testID="join-request-status-card"
           />

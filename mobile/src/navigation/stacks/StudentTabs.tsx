@@ -2,12 +2,18 @@ import React, { useContext, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Banner } from '@/shared/components/Banner';
 import { Button } from '@/shared/components/Button';
 import { Icon } from '@/shared/components/Icon';
+import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { TabBar, TabBarItem } from '@/shared/components/TabBar';
 import { TopBar } from '@/shared/components/TopBar';
 import { HomeHeader } from '@/features/dashboard/components/HomeHeader';
+import { StudentSummaryTiles } from '@/features/dashboard/components/StudentSummaryTiles';
 import { WeekCard } from '@/features/dashboard/components/WeekCard';
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard';
+import { describeDashboardError } from '@/features/dashboard/utils/dashboardCopy';
+import type { StudentDashboardDto } from '@/shared/api/dashboard.client';
 import { ReportStatusCard } from '@/features/dailyReports/components/ReportStatusCard';
 import { ProgressSection } from '@/features/progress/components/ProgressSection';
 import { PaymentScreen } from '@/features/payments/screens/PaymentScreen';
@@ -35,20 +41,35 @@ const DEFAULT_BOTTOM_INSET = 22;
 
 /**
  * SCR-08 Student Home + SCR-13 Progress + SCR-16 Payment under one TabBar
- * (UF §8 "Student: Home · Progress · Payment"). Home (Figma 24:2 / 24:145 /
- * 24:250): the greeting header, the DailyCTA hero (F-DR-01) and the "هذا
- * الأسبوع" card (F-WR-01). Progress (Figma 30:553): the
- * memorization-progress card (F-PRG-02) and the "سجلّ التقارير" link to
- * SCR-14 — the period selector, commitment score, day breakdown,
- * quality/attendance tiles and days-since need the unbuilt performance
- * endpoint and are not rendered. Payment (Figma 30:701): the derived cycle
- * ledger (F-PAY-01), which brings its own TopBar and scroll view.
+ * (UF §8 "Student: Home · Progress · Payment").
+ *
+ * Home (Figma 24:2 / 24:145 / 24:250) is assembled from ONE
+ * `GET /me/dashboard` call (F-DASH-01 / API-009): F-DR-01's DailyCTA hero,
+ * now fed the CTA state rather than fetching it, plus the score and payment
+ * tiles of Figma 24:105 that were left out of the earlier restyle for want
+ * of data.
+ *
+ * The weekly strip keeps its own `GET /weekly-reports/current` call. UF §10
+ * says so in as many words — "Every dashboard is one `GET /me/dashboard`
+ * call, except Student's Home which layers in `GET /weekly-reports/current`
+ * for the live weekly card" — and the payload bears it out: API-009's
+ * Student arm carries no per-day array, and `WeeklyStrip` needs a
+ * `reported | excused | missed | today | future | recitation` state per day.
+ * Nothing here invents a shortcut for it.
+ *
+ * Progress (Figma 30:553) and Payment (Figma 30:701) are unchanged.
  */
 export function StudentTabs() {
   const router = useRouter();
   const insets = useContext(SafeAreaInsetsContext);
   const [tab, setTab] = useState<StudentTab>('home');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { data, isLoading, isError, error, refetch } =
+    useDashboard<StudentDashboardDto>();
+  const dashboardPending = isLoading && !data;
+  const dashboardFailed = !dashboardPending && (isError || !data);
+  /** Narrowed once, so both dashboard-driven blocks read the same value. */
+  const dashboard = dashboardPending || dashboardFailed ? null : (data ?? null);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -87,26 +108,62 @@ export function StudentTabs() {
         >
           <HomeHeader onOpenProfile={() => router.push('/(app)/profile')} />
 
-          {/* SCR-08 Daily Report CTA (F-DR-01). Home → Type Selection (UF §26);
-              already_submitted → today's report, read-only (SCR-15, F-DR-07);
-              recitation_day → Weekly Report (SCR-12, F-WR-01). */}
-          <ReportStatusCard
-            onSubmitReport={() =>
-              router.push('/(app)/student/daily-report/type-selection')
-            }
-            onViewReport={(report) =>
-              router.push({
-                pathname: '/(app)/student/reports/[id]',
-                params: { id: report.id },
-              })
-            }
-            onCompleteWeeklyReport={() =>
-              router.push('/(app)/student/weekly-report')
-            }
-          />
+          {/* SCR-08 Daily Report CTA (F-DR-01), driven by the dashboard's
+              own can_submit_today/block_reason. Home → Type Selection
+              (UF §26); already_submitted → today's report, read-only
+              (SCR-15, F-DR-07); recitation_day → Weekly Report (SCR-12). */}
+          {dashboardPending ? (
+            <View className="w-full" testID="student-home-loading">
+              <SkeletonLoader variant="card" />
+            </View>
+          ) : dashboardFailed ? (
+            <Banner
+              tone="error"
+              message={describeDashboardError(error)}
+              onRetry={() => void refetch()}
+              testID="student-home-error"
+            />
+          ) : dashboard ? (
+            <ReportStatusCard
+              status={{
+                can_submit: dashboard.can_submit_today,
+                ...(dashboard.block_reason
+                  ? { block_reason: dashboard.block_reason }
+                  : {}),
+              }}
+              onSubmitReport={() =>
+                router.push('/(app)/student/daily-report/type-selection')
+              }
+              onViewReport={(report) =>
+                router.push({
+                  pathname: '/(app)/student/reports/[id]',
+                  params: { id: report.id },
+                })
+              }
+              onCompleteWeeklyReport={() =>
+                router.push('/(app)/student/weekly-report')
+              }
+            />
+          ) : null}
 
-          {/* UF §10 "This-week live card" — read-only strip from API-033. */}
+          {/* UF §10 "This-week live card" — read-only strip from API-033, the
+              only per-day source there is. Mounted outside the dashboard's
+              own state so the two reads run side by side, not one after the
+              other: SA §20's budget is about elapsed time, not call count. */}
           <WeekCard />
+
+          {/* Figma 24:105 — the score and payment tiles (UF §10). */}
+          {dashboardPending ? (
+            <View className="w-full" testID="student-home-tiles-loading">
+              <SkeletonLoader variant="dashboard" />
+            </View>
+          ) : dashboard ? (
+            <StudentSummaryTiles
+              commitmentScore={dashboard.commitment_score}
+              payment={dashboard.payment}
+              onOpenPayments={() => setTab('payment')}
+            />
+          ) : null}
 
           {/* Session exit (UF §9 Logout: no confirmation, instantly reversible). */}
           <Button
