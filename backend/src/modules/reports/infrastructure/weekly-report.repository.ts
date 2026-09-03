@@ -8,6 +8,7 @@ import {
   NewWeeklyReport,
   WeeklyReportRecord,
   WeeklyReportState,
+  WeeklyReportWithTimezoneRecord,
 } from '../domain/weekly-report.repository.interface';
 import { WeeklyReportTypeOrmEntity } from './weekly-report.typeorm-entity';
 
@@ -37,6 +38,10 @@ interface RawWeeklyReportRow {
   state: WeeklyReportState;
   finalised_at: string | null;
   finalised_by: string | null;
+}
+
+interface RawWeeklyReportWithTimezoneRow extends RawWeeklyReportRow {
+  timezone: string;
 }
 
 /**
@@ -79,6 +84,27 @@ function toRecord(row: RawWeeklyReportRow): WeeklyReportRecord {
       : null,
     finalisedBy: row.finalised_by ?? null,
   };
+}
+
+/**
+ * TypeORM's Postgres driver hands an `UPDATE … RETURNING` back as
+ * `[rows, affectedCount]` (unlike `INSERT … RETURNING`, which yields the
+ * rows directly). Normalises either shape to the returned rows.
+ */
+function returnedRows<T>(raw: unknown): T[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  if (raw.length === 2 && Array.isArray(raw[0]) && typeof raw[1] === 'number') {
+    return raw[0] as T[];
+  }
+  return raw as T[];
+}
+
+function toRecordWithTimezone(
+  row: RawWeeklyReportWithTimezoneRow,
+): WeeklyReportWithTimezoneRecord {
+  return { ...toRecord(row), timezone: row.timezone };
 }
 
 @Injectable()
@@ -205,5 +231,120 @@ export class WeeklyReportRepository implements IWeeklyReportRepository {
       );
     }
     return existing;
+  }
+
+  async findOwnById(
+    reportId: string,
+    userId: string,
+  ): Promise<WeeklyReportWithTimezoneRecord | null> {
+    // Primary-key lookup with the own-scope predicate IN the query (TS
+    // §15.2, NFR-19): zero rows for another student's report, a missing id
+    // and a soft-deleted row alike (NFR-20). `users.timezone` rides along
+    // for the VR-21 evaluation (T-01).
+    const rows = await this.weeklyReportRepo.manager.query<
+      RawWeeklyReportWithTimezoneRow[]
+    >(
+      `SELECT ${WEEKLY_REPORT_COLUMNS},
+              u.timezone
+         FROM weekly_reports w
+         JOIN memberships m ON m.id = w.membership_id
+         JOIN users       u ON u.id = m.user_id
+        WHERE w.id = $1
+          AND m.user_id = $2
+          AND w.deleted_at IS NULL
+        LIMIT 1`,
+      [reportId, userId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return toRecordWithTimezone(rows[0]);
+  }
+
+  async finaliseByStudent(input: {
+    reportId: string;
+    attendedRecitationCall: boolean;
+    finalisedBy: string;
+    finalisedAt: Date;
+  }): Promise<WeeklyReportRecord | null> {
+    // One auto-committed UPDATE (TS §19 "single update, state transition"),
+    // guarded by `state = 'Open'` (TS §20): under READ COMMITTED a
+    // concurrent finalisation — a double tap, or the scheduler — leaves
+    // this statement with zero rows, which the use case answers as
+    // `409 ALREADY_FINALISED` (VR-36). DB-CHK-08 stays the backstop.
+    const raw: unknown = await this.weeklyReportRepo.manager.query(
+      `UPDATE weekly_reports w
+          SET attended_recitation_call = $2,
+              state                    = 'Finalised',
+              finalised_at             = $3::timestamptz,
+              finalised_by             = $4
+        WHERE w.id = $1
+          AND w.state = 'Open'
+          AND w.deleted_at IS NULL
+       RETURNING ${WEEKLY_REPORT_COLUMNS}`,
+      [
+        input.reportId,
+        input.attendedRecitationCall,
+        input.finalisedAt.toISOString(),
+        input.finalisedBy,
+      ],
+    );
+    const rows = returnedRows<RawWeeklyReportRow>(raw);
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return toRecord(rows[0]);
+  }
+
+  async findAllOpenWithTimezone(): Promise<WeeklyReportWithTimezoneRecord[]> {
+    // Bounded candidate set (DBQ-01: a row exists only from the recitation
+    // day on). Literal, parameter-free statement (TS §36).
+    const rows = await this.weeklyReportRepo.manager.query<
+      RawWeeklyReportWithTimezoneRow[]
+    >(
+      `SELECT ${WEEKLY_REPORT_COLUMNS},
+              u.timezone
+         FROM weekly_reports w
+         JOIN memberships m ON m.id = w.membership_id
+         JOIN users       u ON u.id = m.user_id
+        WHERE w.state = 'Open'
+          AND w.deleted_at IS NULL
+        ORDER BY w.week_end ASC, w.id ASC`,
+    );
+
+    return (rows ?? []).map(toRecordWithTimezone);
+  }
+
+  async finaliseAsScheduler(
+    reportIds: readonly string[],
+    finalisedAt: Date,
+  ): Promise<WeeklyReportRecord[]> {
+    if (reportIds.length === 0) {
+      return [];
+    }
+
+    // One auto-committed UPDATE over the id set, guarded by `state = 'Open'`
+    // so a confirmation that landed since the candidate read wins and a
+    // second run rewrites nothing (VR-36, AR-17). `finalised_by` stays NULL
+    // — the scheduler-default marker (DBD §14); `attended` is set to its
+    // FR-WR-06 default explicitly.
+    const raw: unknown = await this.weeklyReportRepo.manager.query(
+      `UPDATE weekly_reports w
+          SET attended_recitation_call = false,
+              state                    = 'Finalised',
+              finalised_at             = $2::timestamptz,
+              finalised_by             = NULL
+        WHERE w.id = ANY($1::uuid[])
+          AND w.state = 'Open'
+          AND w.deleted_at IS NULL
+       RETURNING ${WEEKLY_REPORT_COLUMNS}`,
+      [Array.from(reportIds), finalisedAt.toISOString()],
+    );
+
+    return returnedRows<RawWeeklyReportRow>(raw).map(toRecord);
   }
 }

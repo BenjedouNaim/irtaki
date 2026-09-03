@@ -73,6 +73,15 @@ export interface NewWeeklyReport {
   >;
 }
 
+/**
+ * A live `weekly_reports` row joined to `users.timezone` of the membership
+ * holder — the day-boundary authority every ST-06 guard evaluates against
+ * (T-01, INV-27). Served to API-034 (own scope) and to DS-02 (all Open rows).
+ */
+export interface WeeklyReportWithTimezoneRecord extends WeeklyReportRecord {
+  timezone: string;
+}
+
 export interface IWeeklyReportRepository {
   /**
    * Own-scope context for API-033. Null when the caller has no Active
@@ -99,4 +108,52 @@ export interface IWeeklyReportRepository {
    * read created first. Single auto-committed statement pair (TS §19).
    */
   createIfAbsent(report: NewWeeklyReport): Promise<WeeklyReportRecord>;
+
+  /**
+   * Own-scope read for API-034 — the NFR-19 repository backstop behind the
+   * route's ScopeGuard: ONE indexed primary-key lookup joined on
+   * `memberships` (`user_id = :caller`) and `users` (timezone). Null for
+   * another student's report, a non-existent id and a soft-deleted row
+   * alike (NFR-20).
+   */
+  findOwnById(
+    reportId: string,
+    userId: string,
+  ): Promise<WeeklyReportWithTimezoneRecord | null>;
+
+  /**
+   * Student path of ST-06 `Open → Finalised` (UC-06 step 7): one UPDATE
+   * guarded by `state = 'Open'` — "attempt the write, let the constraint
+   * reject it" (TS §20) — setting `attended_recitation_call`, `state`,
+   * `finalised_at` and `finalised_by` (the four columns DB-CHK-08 leaves
+   * mutable while Open). Single auto-committed statement (TS §19). Resolves
+   * null when zero rows matched: already `Finalised` (VR-36), by a double
+   * confirm or by the scheduler.
+   */
+  finaliseByStudent(input: {
+    reportId: string;
+    attendedRecitationCall: boolean;
+    finalisedBy: string;
+    finalisedAt: Date;
+  }): Promise<WeeklyReportRecord | null>;
+
+  /**
+   * Every live `Open` row with its holder's timezone — DS-02's candidate
+   * set. Bounded by construction: a row exists only from the recitation day
+   * on (DBQ-01), so at most one Open row per membership at any time.
+   */
+  findAllOpenWithTimezone(): Promise<WeeklyReportWithTimezoneRecord[]>;
+
+  /**
+   * Scheduler path of ST-06 (FR-WR-06, AC-12): one UPDATE over the given
+   * ids, guarded by `state = 'Open'` so a student who confirmed in the
+   * meantime wins and a re-run rewrites nothing (VR-36, AR-17, EC-40).
+   * Sets `attended_recitation_call = false`, `state = 'Finalised'`,
+   * `finalised_at = :now`, `finalised_by = NULL` (DBD §14: NULL = scheduler
+   * default). Resolves with the rows actually finalised by this call.
+   */
+  finaliseAsScheduler(
+    reportIds: readonly string[],
+    finalisedAt: Date,
+  ): Promise<WeeklyReportRecord[]>;
 }
