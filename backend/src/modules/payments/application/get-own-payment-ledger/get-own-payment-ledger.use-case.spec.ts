@@ -24,6 +24,8 @@ describe('GetOwnPaymentLedgerUseCase (F-PAY-01 / API-045)', () => {
     paymentRepository = {
       findOwnLedgerContextByUserId: jest.fn(),
       findPaidCyclesByMembershipId: jest.fn().mockResolvedValue([]),
+      findGroupLedgerContextsByGroupId: jest.fn().mockResolvedValue([]),
+      findPaidCyclesByMembershipIds: jest.fn().mockResolvedValue([]),
     };
     useCase = new GetOwnPaymentLedgerUseCase(paymentRepository);
   });
