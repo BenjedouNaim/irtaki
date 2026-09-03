@@ -335,6 +335,31 @@ export class WeeklyReportRepository implements IWeeklyReportRepository {
     return toRecord(rows[0]);
   }
 
+  async countAttendedFinalisedWeeks(
+    membershipId: string,
+    fromWeekStart: string,
+    toWeekStart: string,
+  ): Promise<number> {
+    // One DB-IDX-02 (membership_id, week_start) range scan — the index DBD
+    // §26 names for AttendanceRate. Only `Finalised` rows count: an `Open`
+    // row carries no confirmed answer yet (ST-06, FR-WR-06).
+    const rows = await this.weeklyReportRepo.manager.query<
+      Array<{ attended: string | number }>
+    >(
+      `SELECT count(*) AS attended
+         FROM weekly_reports w
+        WHERE w.membership_id = $1
+          AND w.week_start >= $2::date
+          AND w.week_start <= $3::date
+          AND w.state = 'Finalised'
+          AND w.attended_recitation_call = true
+          AND w.deleted_at IS NULL`,
+      [membershipId, fromWeekStart, toWeekStart],
+    );
+
+    return rows && rows.length > 0 ? Number(rows[0].attended) : 0;
+  }
+
   async findAllOpenWithTimezone(): Promise<WeeklyReportWithTimezoneRecord[]> {
     // Bounded candidate set (DBQ-01: a row exists only from the recitation
     // day on). Literal, parameter-free statement (TS §36).

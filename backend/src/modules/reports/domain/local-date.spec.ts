@@ -57,3 +57,54 @@ describe('addDays', () => {
     expect(() => addDays('2026/09/02', 1)).toThrow(RangeError);
   });
 });
+
+describe('addMonths (relative performance windows, SAS §18.5 clamping)', () => {
+  const { addMonths } =
+    jest.requireActual<typeof import('./local-date')>('./local-date');
+
+  it('walks whole months backwards and forwards', () => {
+    expect(addMonths('2026-09-02', -1)).toBe('2026-08-02');
+    expect(addMonths('2026-09-02', -3)).toBe('2026-06-02');
+    expect(addMonths('2026-09-02', 1)).toBe('2026-10-02');
+  });
+
+  it('crosses year boundaries in both directions', () => {
+    expect(addMonths('2026-01-15', -1)).toBe('2025-12-15');
+    expect(addMonths('2026-01-15', -3)).toBe('2025-10-15');
+    expect(addMonths('2026-12-15', 1)).toBe('2027-01-15');
+  });
+
+  it('clamps the day to the last valid day of the target month', () => {
+    expect(addMonths('2026-03-31', -1)).toBe('2026-02-28');
+    expect(addMonths('2026-05-31', -3)).toBe('2026-02-28');
+    // 2028 is a leap year.
+    expect(addMonths('2028-03-31', -1)).toBe('2028-02-29');
+    expect(addMonths('2026-10-31', -1)).toBe('2026-09-30');
+  });
+
+  it('rejects a malformed date string', () => {
+    expect(() => addMonths('2026/09/02', -1)).toThrow(RangeError);
+  });
+});
+
+describe('daysBetween', () => {
+  const { daysBetween } =
+    jest.requireActual<typeof import('./local-date')>('./local-date');
+
+  it('counts whole days, signed, across month and year boundaries', () => {
+    expect(daysBetween('2026-08-29', '2026-09-04')).toBe(6);
+    expect(daysBetween('2026-09-04', '2026-08-29')).toBe(-6);
+    expect(daysBetween('2026-09-02', '2026-09-02')).toBe(0);
+    expect(daysBetween('2026-12-30', '2027-01-02')).toBe(3);
+  });
+
+  it('is unaffected by a DST transition inside the range', () => {
+    // Europe/Paris springs forward on 2026-03-29; date-only UTC arithmetic
+    // must still report 7 whole days.
+    expect(daysBetween('2026-03-25', '2026-04-01')).toBe(7);
+  });
+
+  it('rejects a malformed date string', () => {
+    expect(() => daysBetween('2026-09-02', 'yesterday')).toThrow(RangeError);
+  });
+});

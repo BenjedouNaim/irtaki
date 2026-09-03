@@ -34,3 +34,22 @@ export async function getMyProgress(): Promise<ProgressDto> {
   const response = await apiClient.get<ProgressResponse>('/me/progress');
   return response.data;
 }
+
+/**
+ * Fetches ONE student's memorization coverage (API-042 — Teacher on an
+ * assigned group, Admin on any) and unwraps the APIS §9.1 envelope. The
+ * payload is `ProgressDto` verbatim (APIS §10.10: "`GET /me/progress` /
+ * `GET /memberships/{id}/progress` → …"), so SCR-24's memorization card is
+ * SCR-13's own.
+ *
+ * `last_memorized_position` is still an ACTIVITY POINTER here (DEC-D02) —
+ * `is_activity_pointer_only` travels in this payload too.
+ */
+export async function getMembershipProgress(
+  membershipId: string,
+): Promise<ProgressDto> {
+  const response = await apiClient.get<ProgressResponse>(
+    `/memberships/${membershipId}/progress`,
+  );
+  return response.data;
+}

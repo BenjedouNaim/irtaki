@@ -58,3 +58,50 @@ describe('reportingWeekContaining (VO-04 ReportingWeek, SAS §18.1, BR-15)', () 
     expect(() => reportingWeekContaining('2026-09-02', 8)).toThrow(RangeError);
   });
 });
+
+describe('reportingWeeksIntersecting (SAS §18.3 week set W(P))', () => {
+  const { reportingWeeksIntersecting } =
+    jest.requireActual<typeof import('./reporting-week')>('./reporting-week');
+
+  // Recitation day Friday (5). The week containing 2026-09-02 (Wed) is
+  // Sat 2026-08-29 … Fri 2026-09-04.
+  it('returns the single week containing a one-day range', () => {
+    expect(reportingWeeksIntersecting('2026-09-02', '2026-09-02', 5)).toEqual([
+      { weekStart: '2026-08-29', weekEnd: '2026-09-04' },
+    ]);
+  });
+
+  it('returns every week the range touches, oldest first, contiguously', () => {
+    const weeks = reportingWeeksIntersecting('2026-08-20', '2026-09-02', 5);
+    expect(weeks).toEqual([
+      { weekStart: '2026-08-15', weekEnd: '2026-08-21' },
+      { weekStart: '2026-08-22', weekEnd: '2026-08-28' },
+      { weekStart: '2026-08-29', weekEnd: '2026-09-04' },
+    ]);
+    // BR-15: each week starts the day after the previous one ends.
+    expect(weeks[1].weekStart).toBe('2026-08-22');
+    expect(weeks[0].weekEnd).toBe('2026-08-21');
+  });
+
+  it('includes a trailing week the range only partially covers', () => {
+    // Range ends mid-week: the week containing the end date still counts.
+    const weeks = reportingWeeksIntersecting('2026-08-29', '2026-09-08', 5);
+    expect(weeks).toHaveLength(2);
+    expect(weeks[1]).toEqual({
+      weekStart: '2026-09-05',
+      weekEnd: '2026-09-11',
+    });
+  });
+
+  it('is empty when the range is inverted (an empty period)', () => {
+    expect(reportingWeeksIntersecting('2026-09-04', '2026-08-29', 5)).toEqual(
+      [],
+    );
+  });
+
+  it('covers roughly thirteen weeks over a three-month window', () => {
+    expect(
+      reportingWeeksIntersecting('2026-06-02', '2026-09-02', 5),
+    ).toHaveLength(14);
+  });
+});

@@ -202,6 +202,20 @@ export interface IWeeklyReportRepository {
   }): Promise<WeeklyReportRecord | null>;
 
   /**
+   * `AttendanceRate`'s numerator (SAS §18.3): how many live `Finalised`
+   * weekly reports of ONE membership, whose `week_start` falls inside the
+   * inclusive range, carry `attended_recitation_call = true`. One DB-IDX-02
+   * range scan (DBD §26 lists this index for exactly this figure). The
+   * denominator is `|W(P)|`, a count of reporting weeks, never of rows —
+   * so a week with no row simply has no attendance to its credit.
+   */
+  countAttendedFinalisedWeeks(
+    membershipId: string,
+    fromWeekStart: string,
+    toWeekStart: string,
+  ): Promise<number>;
+
+  /**
    * Every live `Open` row with its holder's timezone — DS-02's candidate
    * set. Bounded by construction: a row exists only from the recitation day
    * on (DBQ-01), so at most one Open row per membership at any time.
