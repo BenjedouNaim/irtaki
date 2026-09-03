@@ -446,9 +446,13 @@ export class MembershipRepository implements IMembershipRepository {
   async findStateAndUserById(
     membershipId: string,
     manager: EntityManager,
-  ): Promise<{ userId: string; state: string } | null> {
+  ): Promise<{ userId: string; state: string; timezone: string } | null> {
     const queryResult: unknown = await manager.query(
-      `SELECT user_id AS "userId", state FROM memberships WHERE id = $1 LIMIT 1`,
+      `SELECT m.user_id AS "userId", m.state, u.timezone
+       FROM memberships m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.id = $1
+       LIMIT 1`,
       [membershipId],
     );
 
@@ -458,13 +462,17 @@ export class MembershipRepository implements IMembershipRepository {
         : Array.isArray(queryResult)
           ? queryResult
           : []
-    ) as Array<{ userId: string; state: string }>;
+    ) as Array<{ userId: string; state: string; timezone: string }>;
 
     if (!rows || rows.length === 0) {
       return null;
     }
 
-    return { userId: rows[0].userId, state: rows[0].state };
+    return {
+      userId: rows[0].userId,
+      state: rows[0].state,
+      timezone: rows[0].timezone,
+    };
   }
 
   async terminateConditionally(

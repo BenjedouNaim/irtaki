@@ -171,6 +171,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.create.mockResolvedValue({
         id: 'mem-9999-9999',
@@ -202,6 +203,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.create.mockResolvedValue({
         id: 'mem-1111-1111-1111-1111',
@@ -296,6 +298,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
 
       const uniqueConstraintError = {
@@ -335,6 +338,7 @@ describe('AcceptJoinRequestUseCase (Unit)', () => {
         fullName: mockDetailRow.fullName,
         gender: mockDetailRow.gender as 'Male' | 'Female',
         memorizedAhzab: mockDetailRow.memorizedAhzab,
+        timezone: 'Africa/Tunis',
       });
       mockMembershipRepo.create.mockResolvedValue({
         id: 'mem-1111-1111-1111-1111',

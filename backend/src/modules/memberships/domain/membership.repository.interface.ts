@@ -7,6 +7,8 @@ export interface CreateMembershipRecordProps {
   userId: string;
   groupId: string;
   joinRequestId: string;
+  /** The new member's `users.timezone` — `started_at`'s authority (INV-27). */
+  timezone: string;
   startedAt?: string;
 }
 
@@ -133,10 +135,15 @@ export interface IMembershipRepository {
    * recoverable forever. ONE parameterised `COUNT(*)`.
    */
   countByState(state: 'Active' | 'Terminated'): Promise<number>;
+  /**
+   * Reads the member's `users.timezone` alongside the row so
+   * `TerminateMembershipUseCase` can date `ended_at` in the member's own
+   * calendar rather than the server's (INV-27, DBD `ended_at DATE`).
+   */
   findStateAndUserById(
     membershipId: string,
     manager: EntityManager,
-  ): Promise<{ userId: string; state: string } | null>;
+  ): Promise<{ userId: string; state: string; timezone: string } | null>;
   terminateConditionally(
     membershipId: string,
     endedBy: string,

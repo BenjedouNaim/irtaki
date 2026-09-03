@@ -46,6 +46,14 @@ export interface JoinRequestAcceptRow {
   fullName: string;
   gender: 'Male' | 'Female';
   memorizedAhzab: number[];
+  /**
+   * The applicant's `users.timezone`, read in the same statement that flips
+   * the request to `Accepted`. DS-01 dates the new Membership's `started_at`
+   * with it: INV-27 / T-01 make the User's own timezone the single
+   * authority for every day-boundary evaluation involving that User, and
+   * `started_at` is a calendar date (DBD `DATE`).
+   */
+  timezone: string;
 }
 
 export interface JoinRequestRejectRow {
