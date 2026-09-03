@@ -128,3 +128,17 @@ export function formatGender(gender: string | null | undefined): string | null {
   if (gender === 'Female') return 'أنثى';
   return null;
 }
+
+/**
+ * Days, for SCR-23's "N أيام منذ آخر تقرير" line (Figma 37:238). The
+ * at-risk list only ever carries counts ≥ 3 (SAS §18.4), so `few` and
+ * `many` are the live branches; the smaller forms exist for agreement, not
+ * for a case this screen reaches.
+ */
+export const DAY_COUNT_FORMS: ArabicCountForms = {
+  zero: 'لا أيام',
+  one: 'يوم واحد',
+  two: 'يومان',
+  few: 'أيام',
+  many: 'يومًا',
+};

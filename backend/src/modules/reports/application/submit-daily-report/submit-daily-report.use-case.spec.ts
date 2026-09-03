@@ -100,6 +100,7 @@ describe('SubmitDailyReportUseCase (F-DR-02 / API-030)', () => {
       findOwnHistoryByUserId: jest.fn(),
       findHistoryByMembershipId: jest.fn(),
       findDaySnapshotsByMembershipAndRange: jest.fn(),
+      findLastReportDateByMembershipId: jest.fn(),
     };
     surahs = {
       findAll: jest.fn().mockResolvedValue([

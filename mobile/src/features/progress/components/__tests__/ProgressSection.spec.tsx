@@ -257,4 +257,61 @@ describe('ProgressSection (SCR-13 — تقدّم الحفظ card, F-PRG-02, Figm
     expect(screen.getByTestId('progress-section-error-icon')).toBeTruthy();
     expect(screen.queryByText(/Network request failed/)).toBeNull();
   });
+
+  describe('SCR-24 reuse: the same card against API-042', () => {
+    function renderForMembership() {
+      queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+      });
+      return render(
+        <QueryClientProvider client={queryClient}>
+          <ProgressSection membershipId="membership-1" />
+        </QueryClientProvider>,
+      );
+    }
+
+    it('reads the membership route and leaves the own route un-run', async () => {
+      jest
+        .spyOn(progressApi, 'getMembershipProgress')
+        .mockResolvedValue(mockProgress);
+      jest.spyOn(progressApi, 'getMyProgress').mockImplementation(NEVER);
+
+      renderForMembership();
+
+      await waitFor(() =>
+        expect(progressApi.getMembershipProgress).toHaveBeenCalledWith(
+          'membership-1',
+        ),
+      );
+      expect(progressApi.getMyProgress).not.toHaveBeenCalled();
+    });
+
+    it('renders the same count and activity pointer from the identical payload', async () => {
+      jest
+        .spyOn(progressApi, 'getMembershipProgress')
+        .mockResolvedValue(mockProgress);
+
+      renderForMembership();
+
+      expect(
+        (await screen.findByTestId('progress-section-count')).props.children,
+      ).toBe('23 من 60');
+      expect(screen.getByTestId('progress-section-pointer-text')).toBeTruthy();
+    });
+
+    it('shows the generic 5xx copy, never the server message (UF §24)', async () => {
+      jest.spyOn(progressApi, 'getMembershipProgress').mockRejectedValue(
+        new ApiError({
+          statusCode: 500,
+          error: 'INTERNAL_ERROR',
+          message: 'upstream down',
+        }),
+      );
+
+      renderForMembership();
+
+      expect(await screen.findByText(GENERIC_SERVER_MESSAGE)).toBeTruthy();
+      expect(screen.queryByText('upstream down')).toBeNull();
+    });
+  });
 });

@@ -10,12 +10,20 @@ import { Icon } from '@/shared/components/Icon';
 import { SkeletonLoader } from '@/shared/components/SkeletonLoader';
 import { ApiError } from '@/shared/api/types';
 import { AyahPositionDto } from '@/shared/api/progress.client';
+import { useMembershipProgress } from '@/features/progress/hooks/useMembershipProgress';
 import { useMyProgress } from '@/features/progress/hooks/useMyProgress';
 import { useSurahs } from '@/features/progress/hooks/useSurahs';
 import { typography } from '@/shared/theme/typography';
 import { itemsStart, rowStart } from '@/shared/theme/rtl';
 
 export interface ProgressSectionProps {
+  /**
+   * SCR-24 (UF §28 "same layout as the Progress Tab"): read this
+   * membership's coverage through API-042 instead of the caller's own
+   * API-041. The payload is identical (APIS §10.10), so the card renders
+   * unchanged. Omitted on SCR-13.
+   */
+  membershipId?: string;
   testID?: string;
   className?: string;
   style?: StyleProp<ViewStyle>;
@@ -60,7 +68,8 @@ function describePosition(
 }
 
 /**
- * "تقدّم الحفظ" card of SCR-13 (F-PRG-02, UF §17; Figma 30:603): title,
+ * "تقدّم الحفظ" card of SCR-13 (F-PRG-02, UF §17; Figma 30:603) and of
+ * SCR-24 (Figma 38:213), which UF §28 gives the Progress Tab's layout: title,
  * then a row with the text column on the reading side — "الأحزاب المكتملة",
  * "23 من 60" and the last-worked-on position as PLAIN TEXT with an info
  * glyph — and the CompletionRing on the far side. `last_memorized_position`
@@ -69,11 +78,20 @@ function describePosition(
  * is always `true` (APIS §10.10) and is not used as a rendering switch.
  */
 export function ProgressSection({
+  membershipId,
   testID = 'progress-section',
   className,
   style,
 }: ProgressSectionProps) {
-  const { data, isLoading, isError, error, refetch } = useMyProgress();
+  // Exactly one of the two runs — the card is the same on SCR-13 and
+  // SCR-24, only its source route differs.
+  const ownQuery = useMyProgress({ enabled: !membershipId });
+  const membershipQuery = useMembershipProgress(membershipId ?? '', {
+    enabled: Boolean(membershipId),
+  });
+  const { data, isLoading, isError, error, refetch } = membershipId
+    ? membershipQuery
+    : ownQuery;
   const { data: surahs } = useSurahs();
 
   if (isLoading && !data) {

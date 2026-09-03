@@ -84,7 +84,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     );
     expect(getByText('ترتيب ثابت: الأعلى نقاطًا أولًا')).toBeTruthy();
 
-    // Assistant tab bar: queue active, payments inert (not built)
+    // Assistant tab bar: queue active, every tab live since F-PAY-02
     expect(
       getByTestId('assistant-tab-bar-join-requests').props.accessibilityState
         .selected,
@@ -92,7 +92,7 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     expect(
       getByTestId('assistant-tab-bar-payments').props.accessibilityState
         .disabled,
-    ).toBe(true);
+    ).toBeUndefined();
 
     // Item 1
     expect(getByTestId('join-request-row-jr-1111-1111-1111-1111')).toBeTruthy();
@@ -281,8 +281,10 @@ describe('JoinRequestsQueueScreen (SCR-18 / F-ENR-03)', () => {
     fireEvent.press(getByTestId('assistant-tab-bar-home'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/assistant');
 
-    // The inert Payments tab never navigates
+    // The Payments tab is live since F-PAY-02, and sits at the same stack
+    // depth as the queue, so switching replaces rather than deepens.
     fireEvent.press(getByTestId('assistant-tab-bar-payments'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/assistant/payments');
     expect(mockPush).not.toHaveBeenCalled();
   });
 });

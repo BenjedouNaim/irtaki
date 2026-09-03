@@ -10,6 +10,8 @@ import { HomeHeader } from '@/features/dashboard/components/HomeHeader';
 import { WeekCard } from '@/features/dashboard/components/WeekCard';
 import { ReportStatusCard } from '@/features/dailyReports/components/ReportStatusCard';
 import { ProgressSection } from '@/features/progress/components/ProgressSection';
+import { PaymentScreen } from '@/features/payments/screens/PaymentScreen';
+import { PerformanceSection } from '@/features/performance/components/PerformanceSection';
 import { logoutUser } from '@/shared/api/auth.client';
 import {
   useAuthStore,
@@ -21,28 +23,26 @@ import { rowStart } from '@/shared/theme/rtl';
 
 export type StudentTab = 'home' | 'progress' | 'payment';
 
-/**
- * Figma TabBar.Role=Student (10:151): Home · Progress · Payment. The
- * Payment tab (SCR-16) is not built yet — it is listed, dimmed and never
- * selectable, so the bar still reads as the design without faking a screen.
- */
+/** Figma TabBar.Role=Student (10:151): Home · Progress · Payment. */
 const STUDENT_TAB_ITEMS: TabBarItem[] = [
   { key: 'home', label: 'الرئيسية', icon: 'home' },
   { key: 'progress', label: 'التقدّم', icon: 'chart' },
-  { key: 'payment', label: 'الدفع', icon: 'wallet', disabled: true },
+  { key: 'payment', label: 'الدفع', icon: 'wallet' },
 ];
 
 /** Figma's 84px bar includes the home indicator; on device the safe-area inset replaces it. */
 const DEFAULT_BOTTOM_INSET = 22;
 
 /**
- * SCR-08 Student Home + SCR-13 Progress under one TabBar (UF §8 "Student:
- * Home · Progress · Payment"). Home (Figma 24:2 / 24:145 / 24:250): the
- * greeting header, the DailyCTA hero (F-DR-01) and the "هذا الأسبوع" card
- * (F-WR-01). Progress (Figma 30:553): the memorization-progress card
- * (F-PRG-02) and the "سجلّ التقارير" link to SCR-14 — the period selector,
- * commitment score, day breakdown, quality/attendance tiles and days-since
- * need the unbuilt performance endpoint and are not rendered.
+ * SCR-08 Student Home + SCR-13 Progress + SCR-16 Payment under one TabBar
+ * (UF §8 "Student: Home · Progress · Payment"). Home (Figma 24:2 / 24:145 /
+ * 24:250): the greeting header, the DailyCTA hero (F-DR-01) and the "هذا
+ * الأسبوع" card (F-WR-01). Progress (Figma 30:553): the
+ * memorization-progress card (F-PRG-02) and the "سجلّ التقارير" link to
+ * SCR-14 — the period selector, commitment score, day breakdown,
+ * quality/attendance tiles and days-since need the unbuilt performance
+ * endpoint and are not rendered. Payment (Figma 30:701): the derived cycle
+ * ledger (F-PAY-01), which brings its own TopBar and scroll view.
  */
 export function StudentTabs() {
   const router = useRouter();
@@ -119,6 +119,8 @@ export function StudentTabs() {
             textClassName="text-fg-error"
           />
         </ScrollView>
+      ) : tab === 'payment' ? (
+        <PaymentScreen />
       ) : (
         <View className="flex-1" testID="student-progress">
           <TopBar title="التقدّم" back={false} testID="progress-top-bar" />
@@ -132,7 +134,12 @@ export function StudentTabs() {
             }}
             contentInsetAdjustmentBehavior="automatic"
           >
-            <ProgressSection />
+            {/* F-PERF-01 wraps F-PRG-02's card so SCR-13 keeps Figma's
+                order: selector · score · memorization · breakdown · tiles ·
+                days-since. */}
+            <PerformanceSection>
+              <ProgressSection />
+            </PerformanceSection>
 
             {/* Progress tab → History (UF §26); SCR-14 (F-DR-05). */}
             <Pressable
@@ -161,7 +168,7 @@ export function StudentTabs() {
         items={STUDENT_TAB_ITEMS}
         activeKey={tab}
         onSelect={(key) => {
-          if (key === 'home' || key === 'progress') {
+          if (key === 'home' || key === 'progress' || key === 'payment') {
             setTab(key);
           }
         }}

@@ -8,6 +8,12 @@ import { useAuthStore } from '@/shared/auth/authStore';
 
 jest.mock('@/shared/api/me.client');
 jest.mock('@/shared/api/auth.client');
+
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, back: jest.fn() }),
+  router: { back: jest.fn() },
+}));
 jest.mock('@/shared/auth/authStore', () => {
   const original = jest.requireActual('@/shared/auth/authStore');
   return {
@@ -233,5 +239,22 @@ describe('ProfileScreen (SCR-34)', () => {
 
     expect(authApi.logoutUser).toHaveBeenCalledWith('stored-refresh-token');
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it('offers the SCR-35 menu row and navigates to it (UF §26)', async () => {
+    jest.spyOn(meApi, 'getMe').mockResolvedValueOnce(sampleProfile);
+
+    const { findByTestId, getByTestId, getByText } = await render(
+      <ProfileScreen />,
+    );
+
+    await findByTestId('profile-screen');
+    // Figma 43:92 — title + subtitle + bell.
+    expect(getByText('تفضيلات الإشعارات')).toBeTruthy();
+    expect(getByText('كتم فئات محددة')).toBeTruthy();
+
+    fireEvent.press(getByTestId('profile-notification-preferences-row'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/notification-preferences');
   });
 });
