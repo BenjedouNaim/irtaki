@@ -10,9 +10,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
-  NotoNaskhArabic_400Regular,
-  NotoNaskhArabic_700Bold,
-} from '@expo-google-fonts/noto-naskh-arabic';
+  NotoSansArabic_400Regular,
+  NotoSansArabic_500Medium,
+  NotoSansArabic_600SemiBold,
+} from '@expo-google-fonts/noto-sans-arabic';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { enforceRTL } from '@/shared/config/rtl';
@@ -35,9 +36,12 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [authHydrated, setAuthHydrated] = React.useState(false);
 
+  // Noto Sans Arabic Regular/Medium/SemiBold — the Figma type scale. If the
+  // fonts fail to load the app still renders with the platform fallback.
   const [fontsLoaded, fontError] = useFonts({
-    NotoNaskhArabic_400Regular,
-    NotoNaskhArabic_700Bold,
+    NotoSansArabic_400Regular,
+    NotoSansArabic_500Medium,
+    NotoSansArabic_600SemiBold,
   });
 
   useEffect(() => {

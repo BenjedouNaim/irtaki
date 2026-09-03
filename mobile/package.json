@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@expo-google-fonts/noto-naskh-arabic": "^0.4.5",
+    "@expo-google-fonts/noto-sans-arabic": "0.4.3",
     "@expo/ui": "~0.2.0-beta.9",
     "@tanstack/react-query": "^5.101.4",
     "expo": "~54.0.37",
