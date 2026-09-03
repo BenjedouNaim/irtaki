@@ -175,7 +175,7 @@ Don't casually change, while "cleaning up" nearby code: the 30 TND / 3-month pay
 
 ## 14. When You Hit a Spec Gap
 
-This has happened before in this project and has a house style: don't resolve it silently in code. Post a comment on the relevant GitHub issue (or the PR, if you're mid-implementation) describing exactly what's missing or contradictory, tag Naim, and wait. One example already logged and still open: **ISS-14**, end-of-month payment-cycle clamping behavior, not yet confirmed — don't implement a guess for this before it's resolved.
+This has happened before in this project and has a house style: don't resolve it silently in code. Post a comment on the relevant GitHub issue (or the PR, if you're mid-implementation) describing exactly what's missing or contradictory, tag Naim, and wait. **ISS-14** (end-of-month payment-cycle arithmetic) is the worked example of that process running its course: it was logged rather than guessed, and is now resolved as *clamp to the last valid day of the target month*, implemented in `DS-06` (`SAS.md` §18.5, `TS.md` §25, EPIC-07 F-PAY-01). Anything still unresolved gets the same treatment — logged, not guessed.
 
 ## 15. Current Repo / Team State (snapshot — verify against GitHub, don't trust this going stale)
 
