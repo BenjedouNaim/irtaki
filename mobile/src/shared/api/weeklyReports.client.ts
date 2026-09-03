@@ -42,3 +42,58 @@ export async function getCurrentWeeklyReport(): Promise<WeeklyReportLiveDto> {
   );
   return response.data;
 }
+
+/**
+ * SAS §9 E-06 `finalised_by` — `Student` / `Scheduler`; null while `Open`.
+ */
+export type WeeklyReportFinalisedBy = 'Student' | 'Scheduler';
+
+/**
+ * One stored E-06 row as API-034/035/036 return it (`WeeklyReportDto`,
+ * TS §13): the six snapshotted metrics, the attendance answer and the
+ * finalisation facts. Unlike `WeeklyReportLiveDto` it always has an `id`
+ * and carries no `can_confirm`.
+ */
+export interface WeeklyReportDto {
+  id: string;
+  week_start: string;
+  week_end: string;
+  expected_days: number;
+  missed_daily_reports: number;
+  missed_daily_memorization: number;
+  missed_daily_revision: number;
+  missed_50_repetitions: number;
+  missed_single_session: number;
+  attended_recitation_call: boolean;
+  state: WeeklyReportState;
+  /** ISO-8601 instant; null while `Open`. */
+  finalised_at: string | null;
+  finalised_by: WeeklyReportFinalisedBy | null;
+}
+
+/** API-034 `POST /weekly-reports/{id}/confirm` request body (APIS §10.8). */
+export interface ConfirmWeeklyReportPayload {
+  attended_recitation_call: boolean;
+}
+
+/** APIS §9.1 single-resource envelope. */
+export interface ConfirmWeeklyReportResponse {
+  data: WeeklyReportDto;
+}
+
+/**
+ * Confirms recitation attendance and finalises the week (Student only,
+ * API-034), unwrapping the APIS §9.1 envelope. Errors surface as `ApiError`
+ * unchanged: `422 NOT_RECITATION_DAY` (VR-21), `409 ALREADY_FINALISED`
+ * (VR-36), `403 SCOPE_DENIED` for anyone else's report.
+ */
+export async function confirmWeeklyReport(
+  reportId: string,
+  payload: ConfirmWeeklyReportPayload,
+): Promise<WeeklyReportDto> {
+  const response = await apiClient.post<ConfirmWeeklyReportResponse>(
+    `/weekly-reports/${encodeURIComponent(reportId)}/confirm`,
+    payload,
+  );
+  return response.data;
+}
