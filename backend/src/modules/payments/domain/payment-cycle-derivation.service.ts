@@ -1,4 +1,5 @@
 import { addDays } from '../../reports/domain/local-date';
+import { computeEffectiveWindow } from '../../reports/domain/weekly-metrics-calculator';
 import {
   DUE_SOON_WINDOW_DAYS,
   PaymentCycle,
@@ -98,12 +99,18 @@ export class PaymentCycleDerivationService {
 
   /**
    * `min(today, ended_at, archived_at)` — the last date a cycle may start on
-   * (SAS §18.5's `cycle_count` bound, FR-PAY-12).
+   * (SAS §18.5's `cycle_count` bound, FR-PAY-12). This is exactly the upper
+   * bound of `EffectiveWindow(m)` (SAS §18.1), which SA §12 places in the
+   * domain as one shared pure function "used identically by Performance and
+   * Payments" — so it is reused here, never restated.
    */
   private static generationHorizon(input: DeriveLedgerInput): string {
-    return [input.today, input.endedAt, input.archivedAt]
-      .filter((date): date is string => date !== null)
-      .reduce((earliest, date) => (date < earliest ? date : earliest));
+    return computeEffectiveWindow({
+      startedAt: input.startedAt,
+      today: input.today,
+      endedAt: input.endedAt,
+      archivedAt: input.archivedAt,
+    }).to;
   }
 
   private static statusOf(
