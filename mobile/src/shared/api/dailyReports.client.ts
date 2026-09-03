@@ -149,3 +149,44 @@ export async function submitDailyReport(
   );
   return response.data;
 }
+
+/**
+ * API-031 `GET /daily-reports?from=&to=` query (APIS §9.2 cursor params,
+ * §9.3 `from`/`to` as `YYYY-MM-DD`). SCR-14 sends no date filter (UF §15:
+ * "no date-range filter control despite API support") — the fields exist
+ * so the client mirrors the contract, not because a screen uses them.
+ */
+export interface ListOwnDailyReportsParams {
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/** APIS §9.1 collection envelope — cursor block, no totals. */
+export interface ListOwnDailyReportsResponse {
+  data: DailyReportDto[];
+  pagination: {
+    next_cursor: string | null;
+    has_more: boolean;
+  };
+}
+
+/**
+ * Fetches one page of the caller's own daily report history (Student only,
+ * API-031), `report_date DESC`. Returns the whole `{ data, pagination }`
+ * envelope because the cursor block is part of the resource the list
+ * screen consumes (APIS §9.2).
+ */
+export async function listOwnDailyReports(
+  params: ListOwnDailyReportsParams = {},
+): Promise<ListOwnDailyReportsResponse> {
+  return apiClient.get<ListOwnDailyReportsResponse>('/daily-reports', {
+    params: {
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
+      ...(params.cursor ? { cursor: params.cursor } : {}),
+      ...(params.limit !== undefined ? { limit: params.limit } : {}),
+    },
+  });
+}

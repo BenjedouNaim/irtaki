@@ -5,7 +5,9 @@ import { uuidv7 } from 'uuidv7';
 import { DailyReport } from '../domain/daily-report.entity';
 import {
   DailyReportAyahPositionRecord,
+  DailyReportPage,
   DailyReportRecord,
+  FindOwnDailyReportsParams,
   IDailyReportRepository,
   TodayReportContextRecord,
 } from '../domain/daily-report.repository.interface';
@@ -62,6 +64,32 @@ function toHourMinute(value: string | null): string | null {
     return null;
   }
   return value.slice(0, 5);
+}
+
+/** One raw `daily_reports` row (ordinals already resolved) → record. */
+function toRecord(row: RawDailyReportRow): DailyReportRecord {
+  return {
+    id: row.id,
+    membershipId: row.membership_id,
+    reportDate: row.report_date,
+    type: row.type,
+    submittedAt: new Date(row.submitted_at).toISOString(),
+    submittedTimezone: row.submitted_timezone,
+    noMemorizationToday: row.no_memorization_today ?? null,
+    memoFrom: toPosition(row.memo_from_surah, row.memo_from_ayah),
+    memoTo: toPosition(row.memo_to_surah, row.memo_to_ayah),
+    memoTimeFrom: toHourMinute(row.memo_time_from),
+    memoTimeTo: toHourMinute(row.memo_time_to),
+    completed50Repetitions: row.completed_50_repetitions ?? null,
+    repetitionsInSingleSession: row.repetitions_in_single_session ?? null,
+    noRevisionToday: row.no_revision_today ?? null,
+    revFrom: toPosition(row.rev_from_surah, row.rev_from_ayah),
+    revTo: toPosition(row.rev_to_surah, row.rev_to_ayah),
+    revTimeFrom: toHourMinute(row.rev_time_from),
+    revTimeTo: toHourMinute(row.rev_time_to),
+    readTafsir: row.read_tafsir ?? null,
+    absenceReason: row.absence_reason ?? null,
+  };
 }
 
 @Injectable()
@@ -201,28 +229,91 @@ export class DailyReportRepository implements IDailyReportRepository {
       return null;
     }
 
-    const row = rows[0];
-    return {
-      id: row.id,
-      membershipId: row.membership_id,
-      reportDate: row.report_date,
-      type: row.type,
-      submittedAt: new Date(row.submitted_at).toISOString(),
-      submittedTimezone: row.submitted_timezone,
-      noMemorizationToday: row.no_memorization_today ?? null,
-      memoFrom: toPosition(row.memo_from_surah, row.memo_from_ayah),
-      memoTo: toPosition(row.memo_to_surah, row.memo_to_ayah),
-      memoTimeFrom: toHourMinute(row.memo_time_from),
-      memoTimeTo: toHourMinute(row.memo_time_to),
-      completed50Repetitions: row.completed_50_repetitions ?? null,
-      repetitionsInSingleSession: row.repetitions_in_single_session ?? null,
-      noRevisionToday: row.no_revision_today ?? null,
-      revFrom: toPosition(row.rev_from_surah, row.rev_from_ayah),
-      revTo: toPosition(row.rev_to_surah, row.rev_to_ayah),
-      revTimeFrom: toHourMinute(row.rev_time_from),
-      revTimeTo: toHourMinute(row.rev_time_to),
-      readTafsir: row.read_tafsir ?? null,
-      absenceReason: row.absence_reason ?? null,
-    };
+    return toRecord(rows[0]);
+  }
+
+  async findOwnHistoryByUserId(
+    params: FindOwnDailyReportsParams,
+  ): Promise<DailyReportPage> {
+    // Scope = the caller's Active membership, resolved by the join (DB-UQ-02
+    // partial index on Active memberships). The report scan is a backward
+    // range walk of DB-IDX-01 (membership_id, report_date), which serves
+    // both the optional `from`/`to` bounds and the `report_date DESC` order
+    // (APIS §9.4); `id DESC` (UUIDv7, time-ordered) is the tie-breaker that
+    // makes the keyset cursor stable. The optional filters are expressed as
+    // nullable parameters so the statement stays ONE literal, parameterised
+    // query (TS §36). Ordinals resolve to (surah, ayah) as in
+    // findByMembershipAndDate (TS §23, APIS §11). `LIMIT limit + 1` derives
+    // `hasMore` without a COUNT (APIS §9.1).
+    const rows = await this.dailyReportRepo.manager.query<RawDailyReportRow[]>(
+      `SELECT r.id,
+              r.membership_id,
+              r.report_date::text        AS report_date,
+              r.type,
+              r.submitted_at::text       AS submitted_at,
+              r.submitted_timezone,
+              r.no_memorization_today,
+              mf.number                  AS memo_from_surah,
+              r.memo_from_ordinal - mf.ordinal_offset AS memo_from_ayah,
+              mt.number                  AS memo_to_surah,
+              r.memo_to_ordinal - mt.ordinal_offset   AS memo_to_ayah,
+              r.memo_time_from::text     AS memo_time_from,
+              r.memo_time_to::text       AS memo_time_to,
+              r.completed_50_repetitions,
+              r.repetitions_in_single_session,
+              r.no_revision_today,
+              rf.number                  AS rev_from_surah,
+              r.rev_from_ordinal - rf.ordinal_offset  AS rev_from_ayah,
+              rt.number                  AS rev_to_surah,
+              r.rev_to_ordinal - rt.ordinal_offset    AS rev_to_ayah,
+              r.rev_time_from::text      AS rev_time_from,
+              r.rev_time_to::text        AS rev_time_to,
+              r.read_tafsir,
+              r.absence_reason
+         FROM memberships m
+         JOIN daily_reports r ON r.membership_id = m.id
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.memo_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) mt ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_from_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rf ON true
+         LEFT JOIN LATERAL (
+           SELECT s.number, s.ordinal_offset FROM surahs s
+            WHERE s.ordinal_offset < r.rev_to_ordinal
+            ORDER BY s.ordinal_offset DESC LIMIT 1
+         ) rt ON true
+        WHERE m.user_id = $1
+          AND m.state = 'Active'
+          AND r.deleted_at IS NULL
+          AND ($2::date IS NULL OR r.report_date >= $2::date)
+          AND ($3::date IS NULL OR r.report_date <= $3::date)
+          AND ($4::date IS NULL
+               OR r.report_date < $4::date
+               OR (r.report_date = $4::date AND r.id < $5::uuid))
+        ORDER BY r.report_date DESC, r.id DESC
+        LIMIT $6`,
+      [
+        params.userId,
+        params.from,
+        params.to,
+        params.cursor?.sortKey.reportDate ?? null,
+        params.cursor?.id ?? null,
+        params.limit + 1,
+      ],
+    );
+
+    const hasMore = rows.length > params.limit;
+    const page = hasMore ? rows.slice(0, params.limit) : rows;
+    return { rows: page.map(toRecord), hasMore };
   }
 }

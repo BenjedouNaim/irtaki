@@ -8,6 +8,7 @@ import {
 import { ApiError } from '@/shared/api/types';
 import { MY_PROGRESS_QUERY_KEY } from '@/features/progress/hooks/useMyProgress';
 import { TODAY_REPORT_STATUS_QUERY_KEY } from './useTodayReportStatus';
+import { OWN_DAILY_REPORTS_QUERY_KEY } from './useOwnDailyReports';
 
 /**
  * Query keys a successful submission invalidates (TS §26): today's status
@@ -18,7 +19,7 @@ import { TODAY_REPORT_STATUS_QUERY_KEY } from './useTodayReportStatus';
  */
 export const SUBMIT_DAILY_REPORT_INVALIDATES = [
   TODAY_REPORT_STATUS_QUERY_KEY,
-  ['daily-reports', 'mine'],
+  OWN_DAILY_REPORTS_QUERY_KEY,
   ['performance', 'mine'],
   MY_PROGRESS_QUERY_KEY,
 ] as const;

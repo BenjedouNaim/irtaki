@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -15,6 +16,9 @@ import { TodayReportStatusResponseDto } from '../application/get-today-report-st
 import { SubmitDailyReportUseCase } from '../application/submit-daily-report/submit-daily-report.use-case';
 import { SubmitDailyReportDto } from '../application/submit-daily-report/submit-daily-report.dto';
 import { SubmitDailyReportResponseDto } from '../application/submit-daily-report/submit-daily-report-response.dto';
+import { ListOwnDailyReportsUseCase } from '../application/list-own-daily-reports/list-own-daily-reports.use-case';
+import { ListOwnDailyReportsQueryDto } from '../application/list-own-daily-reports/list-own-daily-reports-query.dto';
+import { ListOwnDailyReportsResponseDto } from '../application/list-own-daily-reports/list-own-daily-reports-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -33,6 +37,7 @@ export class DailyReportsController {
   constructor(
     private readonly getTodayReportStatusUseCase: GetTodayReportStatusUseCase,
     private readonly submitDailyReportUseCase: SubmitDailyReportUseCase,
+    private readonly listOwnDailyReportsUseCase: ListOwnDailyReportsUseCase,
   ) {}
 
   /**
@@ -63,5 +68,21 @@ export class DailyReportsController {
     @Body() dto: SubmitDailyReportDto,
   ): Promise<SubmitDailyReportResponseDto> {
     return this.submitDailyReportUseCase.execute(req.user.id, dto);
+  }
+
+  /**
+   * API-031 `GET /daily-reports?from=&to=` — Student only (APIS §6.1;
+   * Assistant absent from @Roles(), DEC-B09). Own history, `report_date
+   * DESC`, cursor-paginated (APIS §9.2/§9.4). Scope is the caller's own
+   * Active membership, applied inside the repository query — a list route
+   * has no path id to guard (TS §15.2 "repository scope filter").
+   */
+  @Roles(UserRole.Student)
+  @Get()
+  async mine(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: ListOwnDailyReportsQueryDto,
+  ): Promise<ListOwnDailyReportsResponseDto> {
+    return this.listOwnDailyReportsUseCase.execute(req.user.id, query);
   }
 }

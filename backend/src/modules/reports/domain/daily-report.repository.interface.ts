@@ -52,6 +52,31 @@ export interface DailyReportRecord {
   absenceReason: 'Sick' | 'Studying' | 'Other' | null;
 }
 
+/**
+ * Keyset position for API-031 — the `{id, sort_key}` of the last item on the
+ * previous page (APIS §9.2), sort key `report_date` (APIS §9.4).
+ */
+export interface OwnDailyReportsCursor {
+  id: string;
+  sortKey: { reportDate: string };
+}
+
+export interface FindOwnDailyReportsParams {
+  userId: string;
+  /** `YYYY-MM-DD`, inclusive lower bound on `report_date`; null = unbounded. */
+  from: string | null;
+  /** `YYYY-MM-DD`, inclusive upper bound on `report_date`; null = unbounded. */
+  to: string | null;
+  /** Already clamped to [1, 100] (APIS §9.2). */
+  limit: number;
+  cursor: OwnDailyReportsCursor | null;
+}
+
+export interface DailyReportPage {
+  rows: DailyReportRecord[];
+  hasMore: boolean;
+}
+
 export interface IDailyReportRepository {
   /**
    * Own-scope context for API-029. Null when the caller has no Active
@@ -69,6 +94,18 @@ export interface IDailyReportRepository {
     membershipId: string,
     reportDate: string,
   ): Promise<DailyReportRecord | null>;
+
+  /**
+   * API-031 own history: the live reports of the caller's Active membership
+   * (BR-40 — a re-accepted student starts with zero history, so earlier
+   * memberships never contribute), `report_date DESC, id DESC`, keyset
+   * paginated on DB-IDX-01. Scope is the `memberships.user_id` join inside
+   * the query (TS §15.2 repository scope filter), never a post-filter.
+   * Fetches `limit + 1` rows to derive `hasMore` without a count (APIS §9.1).
+   */
+  findOwnHistoryByUserId(
+    params: FindOwnDailyReportsParams,
+  ): Promise<DailyReportPage>;
 
   /**
    * Persists one E-05 as a single auto-committing insert (TS §19: "single

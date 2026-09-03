@@ -62,4 +62,15 @@ describe('StudentTabs (SCR-08 stub + Daily Report CTA, F-DR-01)', () => {
     fireEvent.press(screen.getByTestId('profile-button'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/profile');
   });
+
+  it('offers Report History and routes it to SCR-14 (UF §26 Progress tab → History)', async () => {
+    jest
+      .spyOn(dailyReportsApi, 'getTodayReportStatus')
+      .mockResolvedValue({ can_submit: true });
+
+    renderTabs();
+
+    fireEvent.press(await screen.findByTestId('report-history-button'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/student/reports/history');
+  });
 });
