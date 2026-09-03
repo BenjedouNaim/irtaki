@@ -80,14 +80,34 @@ export class GetOwnPerformanceUseCase {
       recitationDay: context.recitationDay,
     });
 
-    // W(P) = reporting weeks intersecting P ∩ [m.started_at, today] (SAS
-    // §18.3, DEC-A10). Clamping here also bounds the walk to the
-    // membership's own lifetime, whatever a custom range asks for.
+    // The reporting weeks intersecting P (SAS §18.3, DEC-A10) — the day sets
+    // D_eff(P) and D_memo(P) are the union of their EffectiveDays /
+    // MemorizationExpectedDays. §18.3: "All four components are computed over
+    // the caller-supplied period P, INTERSECTED WITH EffectiveWindow(m)
+    // (FR-PERF-07)" — so the walk stops at `window.to`, which truncates at
+    // `groups.archived_at` (FR-WR-10, BR-42: an Archived group produces no
+    // further weekly report) as well as at today. That also bounds the walk to
+    // the membership's own lifetime, whatever a custom range asks for.
     const weeks = reportingWeeksIntersecting(
-      maxDate(period.from, context.startedAt),
-      minDate(period.to, today),
+      maxDate(period.from, window.from),
+      minDate(period.to, window.to),
       context.recitationDay,
     );
+
+    // `weeks elapsed`, AttendanceRate's denominator (SRS §9.4.3, DEC-A10):
+    // only the weeks whose recitation day has already passed. DEC-A03 —
+    // "the recitation day contributes only to the Weekly Report and to
+    // AttendanceRate" — so a week that has not reached its recitation day
+    // has fed nothing into attendance yet, and §18.2 leaves the answer
+    // itself undetermined until student-local midnight of that day. Counting
+    // the running week would score it 0 and drag the mean down for data that
+    // does not exist yet — EC-44 ("enrolled less than one week, weeks
+    // elapsed = 0 → AttendanceRate undefined and excluded") and AC-26 (a
+    // fully-excused week yields a NULL score, "never 0"). The bound is
+    // `window.to`, not today, so a week whose recitation day falls after the
+    // group was archived — and therefore never produced an E-06 row (BR-42) —
+    // is excluded too.
+    const elapsedWeeks = weeks.filter((week) => week.weekEnd < window.to);
 
     const metrics = await this.weeklyMetrics(
       context.membershipId,
@@ -96,12 +116,12 @@ export class GetOwnPerformanceUseCase {
     );
 
     const attendedWeeks =
-      weeks.length === 0
+      elapsedWeeks.length === 0
         ? 0
         : await this.weeklyReportRepository.countAttendedFinalisedWeeks(
             context.membershipId,
-            weeks[0].weekStart,
-            weeks[weeks.length - 1].weekStart,
+            elapsedWeeks[0].weekStart,
+            elapsedWeeks[elapsedWeeks.length - 1].weekStart,
           );
 
     const lastReportDate =
@@ -113,7 +133,7 @@ export class GetOwnPerformanceUseCase {
       data: toPerformanceDto({
         score: CommitmentScoreCalculator.calculate({
           weeks: metrics,
-          weekCount: weeks.length,
+          weekCount: elapsedWeeks.length,
           attendedWeeks,
         }),
         repetitionQuality: CommitmentScoreCalculator.repetitionQuality(metrics),

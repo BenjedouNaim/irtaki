@@ -100,11 +100,11 @@ describe('GetOwnPerformanceUseCase (F-PERF-01 / API-037)', () => {
       expect(
         dailyRepository.findDaySnapshotsByMembershipAndRange,
       ).toHaveBeenCalledWith('membership-1', '2026-08-29', '2026-09-04');
-      expect(weeklyRepository.countAttendedFinalisedWeeks).toHaveBeenCalledWith(
-        'membership-1',
-        '2026-08-29',
-        '2026-08-29',
-      );
+      // The running week has not reached its recitation day (Fri 4 Sep), so
+      // `weeks elapsed` is 0 and attendance is not read at all (EC-44).
+      expect(
+        weeklyRepository.countAttendedFinalisedWeeks,
+      ).not.toHaveBeenCalled();
     });
 
     it('reads one month of reporting weeks for period=month', async () => {
@@ -114,10 +114,12 @@ describe('GetOwnPerformanceUseCase (F-PERF-01 / API-037)', () => {
       expect(
         dailyRepository.findDaySnapshotsByMembershipAndRange,
       ).toHaveBeenCalledWith('membership-1', '2026-08-01', '2026-09-04');
+      // Attendance covers only the four weeks already past their recitation
+      // day; the running week (starting 2026-08-29) is excluded.
       expect(weeklyRepository.countAttendedFinalisedWeeks).toHaveBeenCalledWith(
         'membership-1',
         '2026-08-01',
-        '2026-08-29',
+        '2026-08-22',
       );
     });
 
@@ -159,6 +161,30 @@ describe('GetOwnPerformanceUseCase (F-PERF-01 / API-037)', () => {
       ).toHaveBeenCalledWith('membership-1', '2026-08-29', '2026-09-04');
     });
 
+    it('truncates the period at groups.archived_at (FR-PERF-07, FR-WR-10)', async () => {
+      weeklyRepository.findCurrentWeekContextByUserId.mockResolvedValue({
+        ...context,
+        // Archived on Friday 2026-08-21 — the recitation day of the week
+        // starting 2026-08-15.
+        archivedAt: '2026-08-21T12:00:00.000Z',
+      });
+
+      await useCase.execute(userId, { period: 'month' }, wednesday);
+
+      // EffectiveWindow ends at the archive date, so the walk stops with the
+      // week containing it — no week after the group closed is counted.
+      expect(
+        dailyRepository.findDaySnapshotsByMembershipAndRange,
+      ).toHaveBeenCalledWith('membership-1', '2026-08-01', '2026-08-21');
+      // …and that final week's recitation day is the archive date itself, so
+      // it produced no E-06 row (BR-42) and stays out of `weeks elapsed`.
+      expect(weeklyRepository.countAttendedFinalisedWeeks).toHaveBeenCalledWith(
+        'membership-1',
+        '2026-08-01',
+        '2026-08-08',
+      );
+    });
+
     it('reads nothing when the clamped period is empty', async () => {
       await useCase.execute(
         userId,
@@ -189,11 +215,14 @@ describe('GetOwnPerformanceUseCase (F-PERF-01 / API-037)', () => {
 
       expect(result).toEqual({
         data: {
+          // Mean of the three DEFINED components: the running week has not
+          // reached its recitation day, so AttendanceRate is undefined and
+          // excluded rather than scored (EC-44, DEC-B04).
           commitment_score: 100,
           submission_rate: 100,
           memorization_rate: 100,
           revision_rate: 100,
-          attendance_rate: 100,
+          attendance_rate: null,
           repetition_quality: 100,
           day_breakdown: {
             normal: 5,
@@ -231,10 +260,31 @@ describe('GetOwnPerformanceUseCase (F-PERF-01 / API-037)', () => {
       expect(result.data.memorization_rate).toBeNull();
       expect(result.data.revision_rate).toBeNull();
       expect(result.data.repetition_quality).toBeNull();
-      // W(P) is not empty — one reporting week, none attended: a REAL 0 %.
-      expect(result.data.attendance_rate).toBe(0);
-      expect(result.data.commitment_score).toBe(0);
+      // AC-26: a week whose every expected day is `Absent — Sick` yields a
+      // NULL score, "never 0". The running week is not yet elapsed, so
+      // `weeks elapsed` = 0 and AttendanceRate is undefined too.
+      expect(result.data.attendance_rate).toBeNull();
+      expect(result.data.commitment_score).toBeNull();
       expect(result.data.day_breakdown.absent_excused).toBe(5);
+    });
+
+    it('defines attendance over the weeks that have elapsed (SRS §9.4.3)', async () => {
+      // period=month reaches four weeks past their recitation day; two of
+      // them carry a Finalised row with attended = true.
+      weeklyRepository.countAttendedFinalisedWeeks.mockResolvedValue(2);
+
+      const result = await useCase.execute(
+        userId,
+        { period: 'month' },
+        wednesday,
+      );
+
+      expect(weeklyRepository.countAttendedFinalisedWeeks).toHaveBeenCalledWith(
+        'membership-1',
+        '2026-08-01',
+        '2026-08-22',
+      );
+      expect(result.data.attendance_rate).toBe(50);
     });
 
     it('returns a null score when the period contains no data at all', async () => {

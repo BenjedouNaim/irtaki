@@ -37,7 +37,13 @@ export interface CommitmentScoreInput {
    * never re-derives a classification (TS §22 single source of truth).
    */
   weeks: readonly WeeklyMetrics[];
-  /** `|W(P)|` — reporting weeks intersecting `P ∩ [m.started_at, today]`. */
+  /**
+   * `|W(P)|` — the "weeks elapsed" of SRS §9.4.3: the reporting weeks in
+   * `P ∩ [m.started_at, today]` whose recitation day has already passed.
+   * A week still running has fed nothing into attendance (DEC-A03) and its
+   * answer is undetermined until student-local midnight (SAS §18.2), so it
+   * is excluded rather than scored 0 (EC-44, AC-26, DEC-B04).
+   */
   weekCount: number;
   /** Finalised weekly reports in `W(P)` with `attended_recitation_call = true`. */
   attendedWeeks: number;

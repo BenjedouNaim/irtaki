@@ -353,8 +353,12 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
      *
      *   |ExpectedDays| = 6 · |D_eff| = 5 · |D_memo| = 4 · memo days = 2
      *   submission   = (5−1)/5 = 80    memorization = (4−2)/4 = 50
-     *   revision     = (5−1)/5 = 80    attendance   =  1/1    = 100
-     *   quality      = (2−1)/2 = 50    score = mean(80,50,80,100) = 77.5
+     *   revision     = (5−1)/5 = 80    quality      = (2−1)/2 = 50
+     *
+     * `weeks elapsed` = 0: today IS this week's recitation day, so the week
+     * has not passed it yet and AttendanceRate is undefined and excluded
+     * (EC-44, DEC-A03) — the seeded Finalised row proves the running week is
+     * not counted. score = mean(80, 50, 80) = 70.
      */
     async function seedFixtureWeek(): Promise<
       TestActor & { membershipId: string }
@@ -380,11 +384,11 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
 
       expect(response.body).toEqual({
         data: {
-          commitment_score: 77.5,
+          commitment_score: 70,
           submission_rate: 80,
           memorization_rate: 50,
           revision_rate: 80,
-          attendance_rate: 100,
+          attendance_rate: null,
           repetition_quality: 50,
           day_breakdown: {
             normal: 3,
@@ -426,13 +430,40 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
       expect(explicit.body).toEqual(implicit.body);
     });
 
-    it('counts only Finalised weekly rows towards attendance (ST-06)', async () => {
+    it('counts only Finalised weekly rows among the elapsed weeks (ST-06)', async () => {
+      // Four weeks back, so ?period=month reaches weeks that HAVE passed
+      // their recitation day — the only ones in `weeks elapsed`.
+      const student = await enrolStudent({ startedAt: shift(today, -60) });
+      await createFinalisedWeek(student.membershipId, shift(today, -13), true);
+      await createFinalisedWeek(student.membershipId, shift(today, -20), false);
+      // An `Open` row carries no confirmed answer yet and never counts.
+      await dataSource.query(
+        `INSERT INTO weekly_reports (
+           id, membership_id, week_start, week_end, expected_days,
+           missed_daily_reports, missed_daily_memorization,
+           missed_daily_revision, missed_50_repetitions, missed_single_session,
+           attended_recitation_call, state
+         ) VALUES ($1, $2, $3::date, $4::date, 6, 0, 0, 0, 0, 0, true, 'Open')`,
+        [uuidv7(), student.membershipId, shift(today, -27), shift(today, -21)],
+      );
+
+      const response = await getPerformance(student, '?period=month').expect(
+        HttpStatus.OK,
+      );
+
+      // Four elapsed weeks in the month window; exactly one Finalised row
+      // with attended = true.
+      expect(response.body.data.attendance_rate).toBe(25);
+    });
+
+    it('excludes the running week from `weeks elapsed` (EC-44, DEC-A03)', async () => {
       const student = await enrolStudent();
       await createNormalReport(student.membershipId, shift(today, -6));
-      // No weekly row at all → W(P) = 1, attended = 0: a REAL 0 %, not null.
+      // No week has passed its recitation day yet → the component is
+      // UNDEFINED, never a fabricated 0 (DEC-B04).
       const response = await getPerformance(student).expect(HttpStatus.OK);
 
-      expect(response.body.data.attendance_rate).toBe(0);
+      expect(response.body.data.attendance_rate).toBeNull();
     });
 
     it('never persists anything — DS-03 is recomputed on every call (DBD §68, TS §24)', async () => {
@@ -589,9 +620,11 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
       expect(data.revision_rate).toBeNull();
       expect(data.memorization_rate).toBeNull();
       expect(data.repetition_quality).toBeNull();
-      // W(P) is still one week — attendance is a real 0 %, not null.
-      expect(data.attendance_rate).toBe(0);
-      expect(data.commitment_score).toBe(0);
+      // AC-26: "a week in which every expected day is Absent — Sick yields a
+      // null Commitment Score displayed as 'not enough data', never 0" — so
+      // the running week must not enter `weeks elapsed` either.
+      expect(data.attendance_rate).toBeNull();
+      expect(data.commitment_score).toBeNull();
       expect(data.day_breakdown.absent_excused).toBe(6);
     });
 
@@ -659,8 +692,9 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
     });
 
     it('never returns 0 in place of an undefined rate on a brand-new membership', async () => {
-      // Started today, and today is the recitation day: no expected day
-      // exists yet (EC-13), but the week itself is in W(P).
+      // EC-44: "Student enrolled less than one week, weeks elapsed = 0 →
+      // AttendanceRate undefined and excluded". Started today, and today is
+      // the recitation day, so no expected day exists yet either (EC-13).
       const student = await enrolStudent({ startedAt: today });
 
       const { data } = (await getPerformance(student).expect(HttpStatus.OK))
@@ -670,6 +704,8 @@ describe('GET /me/performance (F-PERF-01 / API-037 Integration)', () => {
       expect(data.memorization_rate).toBeNull();
       expect(data.revision_rate).toBeNull();
       expect(data.repetition_quality).toBeNull();
+      expect(data.attendance_rate).toBeNull();
+      expect(data.commitment_score).toBeNull();
       expect(data.days_since_last_report).toBe(0);
     });
   });
