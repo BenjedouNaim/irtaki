@@ -48,6 +48,7 @@ import {
   isAllowed,
   isScoped,
 } from './authorization-matrix';
+import { purgeNotificationLog, stopScheduledJobs } from './scheduled-jobs';
 
 const EMAIL_DOMAIN = '@test-authz-matrix.com';
 const GROUP_PREFIX = 'F-TEST-02 authz';
@@ -174,6 +175,11 @@ describe('APIS §6.1 authorization matrix (F-TEST-02 / TS §36)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // TS §31's five crons are live in a real AppModule boot. Their
+    // evaluators sweep this suite's fixtures on the next tick and write
+    // notification_log rows against users it is about to delete, which
+    // fails this suite and every suite behind it on the shared database.
+    stopScheduledJobs(app);
 
     // DS-02's cron must not finalise the fixture week mid-suite (ADR-024).
     void app
@@ -287,6 +293,8 @@ describe('APIS §6.1 authorization matrix (F-TEST-02 / TS §36)', () => {
         [emailLike],
       );
     }
+    // DBT-17 holds ON DELETE RESTRICT references to these users.
+    await purgeNotificationLog(dataSource);
     await dataSource.query('DELETE FROM users WHERE email LIKE $1', [
       emailLike,
     ]);

@@ -50,6 +50,7 @@ import {
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { ErrorEnvelope } from '../../src/shared/filters/http-exception.filter';
 import { MUTATION_ROUTES } from './mutation-endpoints';
+import { stopScheduledJobs } from '../shared/scheduled-jobs';
 
 const TEST_EMAIL_DOMAIN = '@test-mass-assignment.com';
 const TEST_GROUP_PREFIX = 'F-TEST-03 mass assignment group';
@@ -136,6 +137,10 @@ describe('Mass assignment across every mutation endpoint (F-TEST-03, TS §16/§3
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // TS §31's five crons are live inside a real AppModule boot: their
+    // evaluators would sweep this suite's fixtures on the next tick and
+    // write notification_log rows against users it is about to delete.
+    stopScheduledJobs(app);
 
     dataSource = app.get(DataSource);
     passwordHasher = app.get<IPasswordHasher>(PASSWORD_HASHER);

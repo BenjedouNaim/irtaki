@@ -50,6 +50,10 @@ import {
   expectNoInternalLeakage,
   findInternalLeak,
 } from '../shared/no-internal-leakage';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 const TEST_EMAIL_DOMAIN = '@test-error-leakage.com';
 const PASSWORD = 'Password123!';
@@ -119,6 +123,10 @@ describe('Error-envelope leakage (F-TEST-03, APIS §9.5 / SA §24 / TS §36)', (
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // TS §31's five crons are live inside a real AppModule boot: their
+    // evaluators would sweep this suite's fixtures on the next tick and
+    // write notification_log rows against users it is about to delete.
+    stopScheduledJobs(app);
     dataSource = app.get(DataSource);
     await cleanDatabase();
   });
@@ -140,6 +148,8 @@ describe('Error-envelope leakage (F-TEST-03, APIS §9.5 / SA §24 / TS §36)', (
       'DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [email],
     );
+    // DBT-17 holds ON DELETE RESTRICT references to these users.
+    await purgeNotificationLog(dataSource);
     await dataSource.query('DELETE FROM users WHERE email LIKE $1', [email]);
   }
 

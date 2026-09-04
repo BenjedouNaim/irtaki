@@ -17,6 +17,10 @@ import {
 } from '../../src/modules/identity/domain/password-hasher.interface';
 import { UserRole } from '../../src/modules/identity/domain/user-role.enum';
 import { WEEKLY_REPORT_FINALIZATION_CRON } from '../../src/modules/reports/infrastructure/jobs/weekly-report-finalization.job';
+import {
+  purgeNotificationLog,
+  stopScheduledJobs,
+} from '../shared/scheduled-jobs';
 
 interface TestActor {
   accessToken: string;
@@ -122,6 +126,11 @@ describe('GET /me/dashboard (F-DASH-01 / API-009 Integration)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
+    // TS §31's five crons are live in a real AppModule boot. Their
+    // evaluators sweep this suite's fixtures on the next tick and write
+    // notification_log rows against users it is about to delete, which
+    // fails this suite and every suite behind it on the shared database.
+    stopScheduledJobs(app);
 
     // DS-02's cron must not finalise a fixture week mid-suite (ADR-024).
     void app
@@ -201,6 +210,8 @@ describe('GET /me/dashboard (F-DASH-01 / API-009 Integration)', () => {
       'DELETE FROM auth_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
       [`%${testEmailDomain}`],
     );
+    // DBT-17 holds ON DELETE RESTRICT references to these users.
+    await purgeNotificationLog(dataSource);
     await dataSource.query('DELETE FROM users WHERE email LIKE $1', [
       `%${testEmailDomain}`,
     ]);
