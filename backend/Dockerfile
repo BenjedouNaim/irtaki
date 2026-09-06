@@ -30,8 +30,16 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/migrations ./migrations
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node -e \"require('./dist/database/data-source').AppDataSource.initialize().then(ds => ds.runMigrations()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\" && node dist/main.js"]
+# Paths are `dist/src/…`, not `dist/…`. `migrations/` and `seed/` sit beside
+# `src/` and are inside the build program, so TypeScript's common source
+# directory is the package root and the emit is `dist/src/`, `dist/migrations/`,
+# `dist/seed/`. `nest start` hides this in development (it joins outDir with
+# nest-cli.json's sourceRoot), which is why the un-prefixed paths that used to
+# be here were never exercised — they only ran here, and they failed with
+# MODULE_NOT_FOUND. `dist/src/database/data-source.js` resolves its own
+# migrations glob as `../../migrations` → `dist/migrations/*.js`, which this
+# same emit produces, so the compiled migrations need no separate COPY.
+CMD ["sh", "-c", "node -e \"require('./dist/src/database/data-source').AppDataSource.initialize().then(ds => ds.runMigrations()).then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\" && node dist/src/main.js"]

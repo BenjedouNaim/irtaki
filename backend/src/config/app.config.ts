@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   Max,
   MinLength,
@@ -44,9 +45,18 @@ export class EnvironmentVariables {
   @IsOptional()
   DB_PORT?: number = 5432;
 
+  /**
+   * Required, and deliberately without a default (ISS #145). `DB_USER` and
+   * `DB_PASS` may default because a wrong credential fails to connect; a wrong
+   * database name connects and writes to the wrong database. The integration
+   * suite's teardown helpers issue unscoped `DELETE`s, so the default that used
+   * to sit here pointed them at a working database.
+   */
   @IsString()
-  @IsOptional()
-  DB_NAME?: string = 'irtaki';
+  @Matches(/\S/, {
+    message: 'DB_NAME is required and must not be blank (no default)',
+  })
+  DB_NAME!: string;
 
   @IsString()
   @IsOptional()

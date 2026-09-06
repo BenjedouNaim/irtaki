@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveDatabaseName } from './database-name';
 
 // Load env variables
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -11,7 +12,7 @@ export const AppDataSource = new DataSource({
   port: parseInt(process.env.DB_PORT ?? '5432', 10),
   username: process.env.DB_USER ?? 'irtaki',
   password: process.env.DB_PASS ?? 'irtaki',
-  database: process.env.DB_NAME ?? 'irtaki',
+  database: resolveDatabaseName(),
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   entities: [path.join(__dirname, '../**/*.entity.{ts,js}')],
