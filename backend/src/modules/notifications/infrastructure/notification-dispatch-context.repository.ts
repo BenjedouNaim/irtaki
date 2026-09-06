@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { localDateInTimezone } from '../../reports/domain/local-date';
 import type {
   INotificationDispatchContextRepository,
+  JoinRequestApplicant,
   LiveDeviceToken,
 } from '../domain/notification-dispatch-context.repository.interface';
 import type { MembershipSuppressionContext } from '../domain/notification-suppression';
@@ -166,5 +167,35 @@ export class NotificationDispatchContextRepository implements INotificationDispa
       [groupId],
     );
     return rows.length === 0 ? null : rows[0].assistant_id;
+  }
+
+  /**
+   * DE-10's recipients: the Applicants of the JoinRequests DS-07 auto-
+   * rejected on archival (issue #133). One `= ANY($1)` statement for the
+   * whole batch rather than a read per id — the ids arrive together and the
+   * PK serves the lookup, so N-04's fan-out costs one round trip whatever
+   * the queue's depth.
+   *
+   * The empty case short-circuits: an archived group with no pending
+   * requests is the common case, and `= ANY('{}')` would be a pointless
+   * round trip. No `status` filter — the caller is announcing a rejection
+   * that already committed inside the archival transaction (TS §20), and
+   * re-testing it here would only reintroduce a read-then-act window.
+   */
+  async findJoinRequestApplicants(
+    joinRequestIds: readonly string[],
+  ): Promise<JoinRequestApplicant[]> {
+    if (joinRequestIds.length === 0) {
+      return [];
+    }
+    const rows = await this.dataSource.query<
+      Array<{ id: string; user_id: string }>
+    >(`SELECT id, user_id FROM join_requests WHERE id = ANY($1)`, [
+      [...joinRequestIds],
+    ]);
+    return rows.map((row) => ({
+      joinRequestId: row.id,
+      userId: row.user_id,
+    }));
   }
 }

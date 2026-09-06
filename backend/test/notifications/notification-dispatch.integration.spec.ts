@@ -17,6 +17,7 @@ import {
 import { JoinRequestAcceptedEvent } from '../../src/modules/enrollment/domain/events/join-request-accepted.event';
 import { JoinRequestRejectedEvent } from '../../src/modules/enrollment/domain/events/join-request-rejected.event';
 import { JoinRequestSubmittedEvent } from '../../src/modules/enrollment/domain/events/join-request-submitted.event';
+import { GroupArchivedEvent } from '../../src/modules/groups/domain/events/group-archived.event';
 import { MembershipTerminatedEvent } from '../../src/modules/memberships/domain/events/membership-terminated.event';
 import { AtRiskEvaluator } from '../../src/modules/notifications/application/evaluators/at-risk.evaluator';
 import { DailyReminderEvaluator } from '../../src/modules/notifications/application/evaluators/daily-reminder.evaluator';
@@ -24,6 +25,7 @@ import { PaymentDueSoonEvaluator } from '../../src/modules/notifications/applica
 import { WeeklyReportAvailableEvaluator } from '../../src/modules/notifications/application/evaluators/weekly-report-available.evaluator';
 import { NotificationService } from '../../src/modules/notifications/application/dispatch/notification.service';
 import { EnrollmentNotificationListener } from '../../src/modules/notifications/application/listeners/enrollment-notification.listener';
+import { GroupNotificationListener } from '../../src/modules/notifications/application/listeners/group-notification.listener';
 import { MembershipNotificationListener } from '../../src/modules/notifications/application/listeners/membership-notification.listener';
 import { NOTIFICATION_EVENT_TYPES } from '../../src/modules/notifications/domain/notification-event';
 import type { PushPayload } from '../../src/modules/notifications/domain/push-payload';
@@ -71,6 +73,13 @@ interface LogRow {
   transport_reference: string | null;
 }
 
+/** The same row seen through ISS #135's `subject_id` (what it was ABOUT). */
+interface SubjectLogRow {
+  category: string;
+  outcome: string;
+  subject_id: string | null;
+}
+
 /**
  * F-NOT-05 end to end against real Postgres: every one of SAS §22.2's eight
  * events driven through the ONE `NotificationService` path (ADR-009,
@@ -88,6 +97,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let enrollmentListener: EnrollmentNotificationListener;
+  let groupListener: GroupNotificationListener;
   let membershipListener: MembershipNotificationListener;
   let dailyReminder: DailyReminderEvaluator;
   let weeklyAvailable: WeeklyReportAvailableEvaluator;
@@ -143,6 +153,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
 
     dataSource = app.get(DataSource);
     enrollmentListener = app.get(EnrollmentNotificationListener);
+    groupListener = app.get(GroupNotificationListener);
     membershipListener = app.get(MembershipNotificationListener);
     dailyReminder = app.get(DailyReminderEvaluator);
     weeklyAvailable = app.get(WeeklyReportAvailableEvaluator);
@@ -182,6 +193,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       `DELETE FROM coverage_intervals WHERE coverage_id IN (SELECT id FROM memorization_coverage WHERE membership_id IN (SELECT id FROM memberships WHERE user_id IN ${mine}))`,
       `DELETE FROM memorization_coverage WHERE membership_id IN (SELECT id FROM memberships WHERE user_id IN ${mine})`,
       `DELETE FROM memberships WHERE user_id IN ${mine}`,
+      `DELETE FROM join_requests WHERE user_id IN ${mine}`,
       `DELETE FROM groups WHERE name LIKE '${testGroupPrefix}%' AND $1::text IS NOT NULL`,
       `DELETE FROM audit_entries WHERE actor_id IN ${mine}`,
       `DELETE FROM auth_tokens WHERE user_id IN ${mine}`,
@@ -276,6 +288,26 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
     return { userId, membershipId, groupId, deviceTokenId };
   }
 
+  /**
+   * The seeded Admin, with a known password, for the cases that drive a real
+   * endpoint rather than a listener directly.
+   */
+  async function loginAsAdmin(): Promise<string> {
+    const password = 'Password123!';
+    const admins: Array<{ id: string; email: string }> = await dataSource.query(
+      "SELECT id, email FROM users WHERE role = 'Admin' LIMIT 1",
+    );
+    const hasher = app.get<IPasswordHasher>(PASSWORD_HASHER);
+    await dataSource.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [await hasher.hash(password), admins[0].id],
+    );
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email: admins[0].email, password });
+    return login.body.access_token as string;
+  }
+
   async function mute(userId: string, category: string): Promise<void> {
     await dataSource.query(
       `INSERT INTO notification_preferences (id, user_id, category, muted)
@@ -336,6 +368,45 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
     );
   }
 
+  /**
+   * ISS #135's column, read back. `logFor` above deliberately does not
+   * select it — every assertion written before this issue compares the whole
+   * row — so the subject is asserted separately where it is the point.
+   */
+  async function subjectLogFor(userId: string): Promise<SubjectLogRow[]> {
+    return dataSource.query<SubjectLogRow[]>(
+      `SELECT category, outcome, subject_id
+         FROM notification_log
+        WHERE user_id = $1
+        ORDER BY dispatched_at, subject_id`,
+      [userId],
+    );
+  }
+
+  /** Just the subjects this user was notified about, in dispatch order. */
+  async function subjectsFor(userId: string): Promise<Array<string | null>> {
+    return (await subjectLogFor(userId)).map((row) => row.subject_id);
+  }
+
+  /**
+   * A listener's rows land after the response it followed (ADR-032), and a
+   * fan-out lands as several. Wait for the count the case expects rather
+   * than for the first row, so an assertion cannot pass on a partial write.
+   */
+  async function eventuallyLoggedCount(
+    userId: string,
+    expected: number,
+  ): Promise<SubjectLogRow[]> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const rows = await subjectLogFor(userId);
+      if (rows.length >= expected) {
+        return rows;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return subjectLogFor(userId);
+  }
+
   // ────────────────────────────────────────────────────────────────────
   // BR-46 — the payload, on every event type, with no exceptions
   // ────────────────────────────────────────────────────────────────────
@@ -349,16 +420,25 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       await registerDevice(sharedAssistantId);
       await submitReport(student.membershipId, '2026-09-02');
 
-      // N-03, N-04, N-05, N-08 — the four event-driven ones.
+      // N-03, N-04, N-05, N-08 — the four event-driven ones. Every resource
+      // id is a real UUIDv7: ISS #135 stores it in `notification_log.
+      // subject_id`, which is a UUID column like `audit_entries.target_id`.
+      const acceptedRequestId = uuidv7();
+      const rejectedRequestId = uuidv7();
+      const submittedRequestId = uuidv7();
       await enrollmentListener.onJoinRequestAccepted(
-        new JoinRequestAcceptedEvent('jr-1', student.membershipId, applicant),
+        new JoinRequestAcceptedEvent(
+          acceptedRequestId,
+          student.membershipId,
+          applicant,
+        ),
       );
       await enrollmentListener.onJoinRequestRejected(
-        new JoinRequestRejectedEvent('jr-2', applicant),
+        new JoinRequestRejectedEvent(rejectedRequestId, applicant),
       );
       await enrollmentListener.onJoinRequestSubmitted(
         new JoinRequestSubmittedEvent(
-          'jr-3',
+          submittedRequestId,
           student.groupId,
           applicant,
           88.5,
@@ -412,9 +492,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
     it('dispatches and logs Sent with the transport reference', async () => {
       const applicant = await createUser('User', TUNIS);
       await registerDevice(applicant);
+      const membershipId = uuidv7();
 
       await enrollmentListener.onJoinRequestAccepted(
-        new JoinRequestAcceptedEvent('jr-1', 'membership-x', applicant),
+        new JoinRequestAcceptedEvent(uuidv7(), membershipId, applicant),
       );
 
       expect(await logFor(applicant)).toEqual([
@@ -424,9 +505,12 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
           transport_reference: 'expo-ticket',
         },
       ]);
-      expect(pushedFor('membership-x')).toEqual([
-        { eventType: 'N-03', resourceId: 'membership-x' },
+      expect(pushedFor(membershipId)).toEqual([
+        { eventType: 'N-03', resourceId: membershipId },
       ]);
+      // ISS #135: the row records the membership it was about, not only the
+      // applicant it went to.
+      expect(await subjectsFor(applicant)).toEqual([membershipId]);
     });
 
     it('cannot be muted at all — DB-CHK-09 rejects the preference row (BR-61)', async () => {
@@ -454,7 +538,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       }
 
       await enrollmentListener.onJoinRequestAccepted(
-        new JoinRequestAcceptedEvent('jr-1', 'membership-x', applicant),
+        new JoinRequestAcceptedEvent(uuidv7(), uuidv7(), applicant),
       );
 
       expect(await logFor(applicant)).toEqual([
@@ -471,9 +555,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
     it('dispatches, addressed at the JoinRequest', async () => {
       const applicant = await createUser('User', TUNIS);
       await registerDevice(applicant);
+      const joinRequestId = uuidv7();
 
       await enrollmentListener.onJoinRequestRejected(
-        new JoinRequestRejectedEvent('jr-42', applicant),
+        new JoinRequestRejectedEvent(joinRequestId, applicant),
       );
 
       expect(await logFor(applicant)).toEqual([
@@ -483,9 +568,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
           transport_reference: 'expo-ticket',
         },
       ]);
-      expect(pushedFor('jr-42')).toEqual([
-        { eventType: 'N-04', resourceId: 'jr-42' },
+      expect(pushedFor(joinRequestId)).toEqual([
+        { eventType: 'N-04', resourceId: joinRequestId },
       ]);
+      expect(await subjectsFor(applicant)).toEqual([joinRequestId]);
     });
   });
 
@@ -508,9 +594,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         ],
       );
 
+      const joinRequestId = uuidv7();
       await enrollmentListener.onJoinRequestSubmitted(
         new JoinRequestSubmittedEvent(
-          'jr-7',
+          joinRequestId,
           groupId,
           'applicant-x',
           91.25,
@@ -525,6 +612,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
           transport_reference: 'expo-ticket',
         },
       ]);
+      // ISS #135's per-subject row is what a future N-05 cadence guard would
+      // have to read: one Assistant serves many applicants (see the eight-row
+      // table on `NotificationLogEntry.subjectId`).
+      expect(await subjectsFor(assistant)).toEqual([joinRequestId]);
     });
 
     it('is suppressed when the Assistant has muted the category (FR-NOTIF-05)', async () => {
@@ -546,9 +637,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         ],
       );
 
+      const joinRequestId = uuidv7();
       await enrollmentListener.onJoinRequestSubmitted(
         new JoinRequestSubmittedEvent(
-          'jr-8',
+          joinRequestId,
           groupId,
           'applicant-x',
           91.25,
@@ -559,7 +651,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       expect(await logFor(assistant)).toEqual([
         { category: 'N-05', outcome: 'Suppressed', transport_reference: null },
       ]);
-      expect(pushedFor('jr-8')).toHaveLength(0);
+      expect(pushedFor(joinRequestId)).toHaveLength(0);
+      // A Suppressed row carries the subject too — SA §21 logs one row per
+      // decision, and the decision was about THIS request.
+      expect(await subjectsFor(assistant)).toEqual([joinRequestId]);
     });
   });
 
@@ -869,6 +964,10 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
           transport_reference: 'expo-ticket',
         },
       ]);
+      // ISS #135 left this path's guard per-RECIPIENT (the recipient is the
+      // subject here — DB-UQ-02 allows one `Active` membership per user), and
+      // the subject is recorded all the same.
+      expect(await subjectsFor(student.userId)).toEqual([student.membershipId]);
     });
 
     it('does not fire before BR-33 ten-day window opens', async () => {
@@ -997,6 +1096,66 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       expect(await logFor(teacherId)).toHaveLength(2);
     });
 
+    it("notifies ONCE PER STUDENT when two of a Teacher's students are at risk (#135)", async () => {
+      const teacherId = await teacherWithDevice();
+      const groupId = await groupFor(teacherId);
+      const first = await createStudent({ groupId });
+      const second = await createStudent({ groupId });
+      // Both last reported on the same day, so both episodes are open in the
+      // SAME window — the shape that used to collapse into one notification.
+      await submitReport(first.membershipId, '2026-09-02');
+      await submitReport(second.membershipId, '2026-09-02');
+
+      await atRisk.evaluate(evaluationDay);
+
+      const rows = await subjectLogFor(teacherId);
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.category === 'N-07')).toBe(true);
+      expect(rows.every((row) => row.outcome === 'Sent')).toBe(true);
+      expect([...rows.map((row) => row.subject_id)].sort()).toEqual(
+        [first.membershipId, second.membershipId].sort(),
+      );
+      expect(pushedFor(first.membershipId)).toEqual([
+        { eventType: 'N-07', resourceId: first.membershipId },
+      ]);
+      expect(pushedFor(second.membershipId)).toEqual([
+        { eventType: 'N-07', resourceId: second.membershipId },
+      ]);
+
+      // …and neither repeats on the next tick: the once-per-episode
+      // guarantee still holds, now PER STUDENT (SAS §22.3, SA.md:521).
+      await atRisk.evaluate(new Date('2026-09-08T01:00:00.000Z'));
+      await atRisk.evaluate(new Date('2026-09-09T01:00:00.000Z'));
+
+      expect(await subjectLogFor(teacherId)).toHaveLength(2);
+    });
+
+    it('opens a new episode for ONE student without re-notifying the other', async () => {
+      const teacherId = await teacherWithDevice();
+      const groupId = await groupFor(teacherId);
+      const steady = await createStudent({ groupId });
+      const relapsing = await createStudent({ groupId });
+      await submitReport(steady.membershipId, '2026-09-02');
+      await submitReport(relapsing.membershipId, '2026-09-02');
+
+      await atRisk.evaluate(evaluationDay);
+      expect(await subjectLogFor(teacherId)).toHaveLength(2);
+
+      // Only `relapsing` reports and then relapses; `steady` never reports
+      // again, so its episode — and its guard window — is unchanged.
+      await submitReport(relapsing.membershipId, '2026-09-08');
+      await atRisk.evaluate(new Date('2026-09-13T01:00:00.000Z'));
+
+      const rows = await subjectLogFor(teacherId);
+      expect(rows).toHaveLength(3);
+      expect(
+        rows.filter((row) => row.subject_id === relapsing.membershipId),
+      ).toHaveLength(2);
+      expect(
+        rows.filter((row) => row.subject_id === steady.membershipId),
+      ).toHaveLength(1);
+    });
+
     it('is suppressed when the Teacher has muted the category', async () => {
       const teacherId = await teacherWithDevice();
       await mute(teacherId, 'N-07');
@@ -1010,6 +1169,193 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
       expect(await logFor(teacherId)).toEqual([
         { category: 'N-07', outcome: 'Suppressed', transport_reference: null },
       ]);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────
+  // N-04 on DE-10 — DS-07's auto-rejection reaching its applicants (#133)
+  // ────────────────────────────────────────────────────────────────────
+
+  describe('N-04 on group archival → every auto-rejected Applicant', () => {
+    interface Applicant {
+      userId: string;
+      joinRequestId: string;
+    }
+
+    /**
+     * One `Pending` JoinRequest, inserted directly: this suite is about what
+     * ARCHIVAL does to it, and API-012's own validation is covered by the
+     * enrollment suites. The VO-08 columns carry fixture values inside every
+     * CHECK the DBT-03 table declares.
+     */
+    async function pendingRequest(
+      userId: string,
+      groupId: string,
+    ): Promise<string> {
+      const id = uuidv7();
+      await dataSource.query(
+        `INSERT INTO join_requests (
+           id, user_id, group_id, full_name, gender, age, phone_number,
+           occupation, city, memorized_hizb_count, tajweed_level,
+           studied_tajweed_theory, studied_qalun, fee_agreement,
+           program_goal, score, status
+         ) VALUES ($1, $2, $3, $4, 'Male', 24, '20000000', 'طالب', 'تونس',
+                   10, 'Intermediate', true, true, true, 'Memorization',
+                   55.00, 'Pending')`,
+        [id, userId, groupId, `مترشح ${id.slice(0, 6)}`],
+      );
+      return id;
+    }
+
+    async function applicantOf(groupId: string): Promise<Applicant> {
+      const userId = await createUser('User', TUNIS);
+      await registerDevice(userId);
+      return { userId, joinRequestId: await pendingRequest(userId, groupId) };
+    }
+
+    async function archive(groupId: string): Promise<void> {
+      const admin = await loginAsAdmin();
+      await request(app.getHttpServer())
+        .patch(`/api/v1/groups/${groupId}/lifecycle`)
+        .set('Authorization', `Bearer ${admin}`)
+        .send({ lifecycle_state: 'Archived' })
+        .expect(HttpStatus.OK);
+    }
+
+    async function requestRow(joinRequestId: string): Promise<{
+      status: string;
+      resolution_source: string | null;
+      reviewed_by: string | null;
+    }> {
+      const rows = await dataSource.query<
+        Array<{
+          status: string;
+          resolution_source: string | null;
+          reviewed_by: string | null;
+        }>
+      >(
+        `SELECT status, resolution_source, reviewed_by
+           FROM join_requests WHERE id = $1`,
+        [joinRequestId],
+      );
+      return rows[0];
+    }
+
+    it('tells every applicant of the archived group, and nobody else', async () => {
+      const archivedGroup = await createGroup();
+      const otherGroup = await createGroup();
+      const applicants = [
+        await applicantOf(archivedGroup),
+        await applicantOf(archivedGroup),
+        await applicantOf(archivedGroup),
+      ];
+      const bystander = await applicantOf(otherGroup);
+
+      await archive(archivedGroup);
+
+      // Each of the three learns their own application ended (SAS §22.2
+      // N-04: "Assistant rejects, or auto-rejection on archival (UC-13)").
+      for (const applicant of applicants) {
+        const rows = await eventuallyLoggedCount(applicant.userId, 1);
+        expect(rows).toEqual([
+          {
+            category: 'N-04',
+            outcome: 'Sent',
+            subject_id: applicant.joinRequestId,
+          },
+        ]);
+        expect(pushedFor(applicant.joinRequestId)).toEqual([
+          { eventType: 'N-04', resourceId: applicant.joinRequestId },
+        ]);
+        // DS-07 / EC-10 / FR-REQ-08, and DMS DS-07 on who decided it: the
+        // system did, so `resolution_source` says so and `reviewed_by`
+        // stays NULL — no user performed this rejection.
+        expect(await requestRow(applicant.joinRequestId)).toEqual({
+          status: 'Rejected',
+          resolution_source: 'system',
+          reviewed_by: null,
+        });
+      }
+
+      // The other group's queue is untouched, in the table and in the log.
+      expect(await requestRow(bystander.joinRequestId)).toEqual({
+        status: 'Pending',
+        resolution_source: null,
+        reviewed_by: null,
+      });
+      expect(await subjectLogFor(bystander.userId)).toEqual([]);
+      expect(pushedFor(bystander.joinRequestId)).toHaveLength(0);
+    });
+
+    it('does not double-notify when DE-10 is delivered twice', async () => {
+      const group = await createGroup();
+      const applicant = await applicantOf(group);
+
+      await archive(group);
+      await eventuallyLoggedCount(applicant.userId, 1);
+
+      // Re-deliver the very same event — the shape a retried or duplicated
+      // in-process emit would take. The guard is the `notification_log` row
+      // the first delivery wrote, read per (recipient, subject).
+      const rows = await dataSource.query<Array<{ archived_at: Date }>>(
+        `SELECT archived_at FROM groups WHERE id = $1`,
+        [group],
+      );
+      await groupListener.onGroupArchived(
+        new GroupArchivedEvent(group, rows[0].archived_at, [
+          applicant.joinRequestId,
+        ]),
+      );
+
+      expect(await subjectLogFor(applicant.userId)).toEqual([
+        {
+          category: 'N-04',
+          outcome: 'Sent',
+          subject_id: applicant.joinRequestId,
+        },
+      ]);
+      expect(pushedFor(applicant.joinRequestId)).toHaveLength(1);
+    });
+
+    it('archiving a group with no pending requests notifies nobody', async () => {
+      const group = await createGroup();
+      const before = await dataSource.query<Array<{ count: string }>>(
+        `SELECT count(*)::text AS count FROM notification_log`,
+      );
+
+      await archive(group);
+
+      const after = await dataSource.query<Array<{ count: string }>>(
+        `SELECT count(*)::text AS count FROM notification_log`,
+      );
+      expect(after[0].count).toBe(before[0].count);
+    });
+
+    it('answers 200 with the transport down — dispatch never blocks archival', async () => {
+      const group = await createGroup();
+      const applicant = await applicantOf(group);
+      sendThrows = true;
+
+      const admin = await loginAsAdmin();
+      const response = await request(app.getHttpServer())
+        .patch(`/api/v1/groups/${group}/lifecycle`)
+        .set('Authorization', `Bearer ${admin}`)
+        .send({ lifecycle_state: 'Archived' });
+
+      expect(response.status).toBe(HttpStatus.OK);
+      // BR-60 / ADR-032: the rejection stands and the failure is recorded,
+      // not thrown (FR-NOTIF-08).
+      const rows = await eventuallyLoggedCount(applicant.userId, 1);
+      expect(rows).toEqual([
+        {
+          category: 'N-04',
+          outcome: 'Failed',
+          subject_id: applicant.joinRequestId,
+        },
+      ]);
+      expect((await requestRow(applicant.joinRequestId)).status).toBe(
+        'Rejected',
+      );
     });
   });
 
@@ -1042,23 +1388,6 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         { eventType: 'N-08', resourceId: student.membershipId },
       ]);
     });
-
-    async function loginAsAdmin(): Promise<string> {
-      const password = 'Password123!';
-      const admins: Array<{ id: string; email: string }> =
-        await dataSource.query(
-          "SELECT id, email FROM users WHERE role = 'Admin' LIMIT 1",
-        );
-      const hasher = app.get<IPasswordHasher>(PASSWORD_HASHER);
-      await dataSource.query(
-        'UPDATE users SET password_hash = $1 WHERE id = $2',
-        [await hasher.hash(password), admins[0].id],
-      );
-      const login = await request(app.getHttpServer())
-        .post('/api/v1/auth/login')
-        .send({ email: admins[0].email, password });
-      return login.body.access_token as string;
-    }
   });
 
   describe('External-service failure never surfaces on the triggering request', () => {
@@ -1100,7 +1429,7 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
 
       await expect(
         enrollmentListener.onJoinRequestAccepted(
-          new JoinRequestAcceptedEvent('jr-9', 'membership-y', applicant),
+          new JoinRequestAcceptedEvent(uuidv7(), uuidv7(), applicant),
         ),
       ).resolves.toBeUndefined();
 
@@ -1108,22 +1437,5 @@ describe('F-NOT-05 — notification dispatch (SAS §22, SA §21) Integration', (
         { category: 'N-03', outcome: 'Failed', transport_reference: null },
       ]);
     });
-
-    async function loginAsAdmin(): Promise<string> {
-      const password = 'Password123!';
-      const admins: Array<{ id: string; email: string }> =
-        await dataSource.query(
-          "SELECT id, email FROM users WHERE role = 'Admin' LIMIT 1",
-        );
-      const hasher = app.get<IPasswordHasher>(PASSWORD_HASHER);
-      await dataSource.query(
-        'UPDATE users SET password_hash = $1 WHERE id = $2',
-        [await hasher.hash(password), admins[0].id],
-      );
-      const login = await request(app.getHttpServer())
-        .post('/api/v1/auth/login')
-        .send({ email: admins[0].email, password });
-      return login.body.access_token as string;
-    }
   });
 });

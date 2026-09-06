@@ -30,6 +30,7 @@ describe('MembershipNotificationListener — N-08', () => {
       findMembershipSuppressionContext: jest.fn(),
       findMembershipHolderUserId: jest.fn().mockResolvedValue('student-1'),
       findGroupAssistantUserId: jest.fn(),
+      findJoinRequestApplicants: jest.fn().mockResolvedValue([]),
     };
     listener = new MembershipNotificationListener(
       notifications as unknown as NotificationService,

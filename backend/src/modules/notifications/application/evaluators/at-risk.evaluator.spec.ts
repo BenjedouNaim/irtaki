@@ -35,6 +35,7 @@ describe('AtRiskEvaluator — N-07, once per episode (ISS-17)', () => {
     log = {
       record: jest.fn().mockResolvedValue(undefined),
       hasEntrySince: jest.fn().mockResolvedValue(false),
+      hasEntryForSubjectSince: jest.fn().mockResolvedValue(false),
     };
     notifications = {
       dispatch: jest.fn().mockResolvedValue({
@@ -72,21 +73,25 @@ describe('AtRiskEvaluator — N-07, once per episode (ISS-17)', () => {
     await evaluator.evaluate(new Date('2026-09-07T00:00:00.000Z'));
 
     expect(notifications.dispatch).not.toHaveBeenCalled();
-    expect(log.hasEntrySince).not.toHaveBeenCalled();
+    expect(log.hasEntryForSubjectSince).not.toHaveBeenCalled();
   });
 
   it('asks notification_log about the episode window before dispatching', async () => {
     await evaluator.evaluate(new Date('2026-09-07T00:00:00.000Z'));
 
-    expect(log.hasEntrySince).toHaveBeenCalledWith(
+    expect(log.hasEntryForSubjectSince).toHaveBeenCalledWith(
       'teacher-1',
       'N-07',
+      'membership-1',
       new Date('2026-09-04T00:00:00.000Z'),
     );
+    // ISS #135: never the unnarrowed probe — that is the one that conflates
+    // two students of the same Teacher.
+    expect(log.hasEntrySince).not.toHaveBeenCalled();
   });
 
   it('stays silent on the following days of the SAME episode', async () => {
-    log.hasEntrySince.mockResolvedValue(true);
+    log.hasEntryForSubjectSince.mockResolvedValue(true);
 
     const outcome = await evaluator.evaluate(
       new Date('2026-09-08T00:00:00.000Z'),
@@ -106,9 +111,10 @@ describe('AtRiskEvaluator — N-07, once per episode (ISS-17)', () => {
 
     // The window moved with the report, so the previous episode's row —
     // written on 2026-09-07 — cannot suppress this one.
-    expect(log.hasEntrySince).toHaveBeenCalledWith(
+    expect(log.hasEntryForSubjectSince).toHaveBeenCalledWith(
       'teacher-1',
       'N-07',
+      'membership-1',
       new Date('2026-09-10T00:00:00.000Z'),
     );
     expect(notifications.dispatch).toHaveBeenCalledTimes(1);
@@ -121,9 +127,10 @@ describe('AtRiskEvaluator — N-07, once per episode (ISS-17)', () => {
 
     await evaluator.evaluate(new Date('2026-09-07T00:00:00.000Z'));
 
-    expect(log.hasEntrySince).toHaveBeenCalledWith(
+    expect(log.hasEntryForSubjectSince).toHaveBeenCalledWith(
       'teacher-1',
       'N-07',
+      'membership-1',
       new Date('2026-09-03T00:00:00.000Z'),
     );
     expect(notifications.dispatch).toHaveBeenCalledTimes(1);
@@ -148,5 +155,60 @@ describe('AtRiskEvaluator — N-07, once per episode (ISS-17)', () => {
     ]);
     await evaluator.evaluate(new Date('2026-09-06T23:30:00.000Z'));
     expect(notifications.dispatch).not.toHaveBeenCalled();
+  });
+
+  // ────────────────────────────────────────────────────────────────────
+  // ISS #135 — the guard is per (recipient, subject), not per recipient
+  // ────────────────────────────────────────────────────────────────────
+
+  it('notifies once PER STUDENT when one Teacher has two at-risk students', async () => {
+    repository.findAtRiskCandidates.mockResolvedValue([
+      candidate({ membershipId: 'membership-a' }),
+      candidate({ membershipId: 'membership-b' }),
+    ]);
+
+    const outcome = await evaluator.evaluate(
+      new Date('2026-09-07T00:00:00.000Z'),
+    );
+
+    expect(notifications.dispatch).toHaveBeenCalledTimes(2);
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      { type: 'N-07', resourceId: 'membership-a' },
+      { userId: 'teacher-1' },
+      'N-07',
+      new Date('2026-09-07T00:00:00.000Z'),
+    );
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      { type: 'N-07', resourceId: 'membership-b' },
+      { userId: 'teacher-1' },
+      'N-07',
+      new Date('2026-09-07T00:00:00.000Z'),
+    );
+    expect(outcome).toEqual({ candidates: 2, triggered: 2, sent: 2 });
+  });
+
+  it("one student's episode row does not suppress the other student's", async () => {
+    repository.findAtRiskCandidates.mockResolvedValue([
+      candidate({ membershipId: 'membership-a' }),
+      candidate({ membershipId: 'membership-b' }),
+    ]);
+    // Only membership-a has already been notified about in this window.
+    log.hasEntryForSubjectSince.mockImplementation(
+      (_userId, _category, subjectId) =>
+        Promise.resolve(subjectId === 'membership-a'),
+    );
+
+    const outcome = await evaluator.evaluate(
+      new Date('2026-09-07T00:00:00.000Z'),
+    );
+
+    expect(notifications.dispatch).toHaveBeenCalledTimes(1);
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      { type: 'N-07', resourceId: 'membership-b' },
+      { userId: 'teacher-1' },
+      'N-07',
+      new Date('2026-09-07T00:00:00.000Z'),
+    );
+    expect(outcome).toEqual({ candidates: 2, triggered: 1, sent: 1 });
   });
 });

@@ -31,10 +31,12 @@ describe('NotificationService.dispatch (SA §21)', () => {
       }),
       findMembershipHolderUserId: jest.fn(),
       findGroupAssistantUserId: jest.fn(),
+      findJoinRequestApplicants: jest.fn().mockResolvedValue([]),
     };
     log = {
       record: jest.fn().mockResolvedValue(undefined),
       hasEntrySince: jest.fn().mockResolvedValue(false),
+      hasEntryForSubjectSince: jest.fn().mockResolvedValue(false),
     };
     sender = {
       send: jest
@@ -62,6 +64,9 @@ describe('NotificationService.dispatch (SA §21)', () => {
     expect(log.record).toHaveBeenCalledWith({
       userId: 'user-1',
       category: 'N-05',
+      // ISS #135: the row records WHAT it was about, not only WHO it went
+      // to — and it is the same identifier the payload carried.
+      subjectId: 'join-request-1',
       outcome: 'Sent',
       transportReference: 'ticket-1',
       dispatchedAt: now,
@@ -82,7 +87,11 @@ describe('NotificationService.dispatch (SA §21)', () => {
     expect(result.reason).toBe('CATEGORY_MUTED');
     expect(sender.send).not.toHaveBeenCalled();
     expect(log.record).toHaveBeenCalledWith(
-      expect.objectContaining({ outcome: 'Suppressed', category: 'N-01' }),
+      expect.objectContaining({
+        outcome: 'Suppressed',
+        category: 'N-01',
+        subjectId: 'membership-1',
+      }),
     );
   });
 
