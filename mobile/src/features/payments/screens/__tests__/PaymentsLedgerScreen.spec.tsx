@@ -4,6 +4,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  waitForElementToBeRemoved,
 } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as groupsApi from '@/shared/api/groups.client';
@@ -236,8 +237,16 @@ describe('PaymentsLedgerScreen (SCR-20, F-PAY-02, Figma 36:401 / 53:747)', () =>
         status: 'Unpaid',
       }),
     );
-    await waitFor(() =>
-      expect(screen.queryByTestId('payment-ledger-row-m-paid')).toBeNull(),
+
+    // `keepPreviousData` (useGroupPayments) deliberately keeps the unfiltered
+    // rows mounted until the filtered slice lands, so this row is present and
+    // then removed. `waitForElementToBeRemoved` is the API for that sequence:
+    // it asserts the element is there to begin with and then polls for its
+    // removal. A bare `waitFor(() => expect(queryBy…).toBeNull())` expresses
+    // the same intent but starves under a loaded parallel run, which is what
+    // made this spec the suite's one flake.
+    await waitForElementToBeRemoved(() =>
+      screen.queryByTestId('payment-ledger-row-m-paid'),
     );
     expect(
       screen.getByTestId('payments-ledger-filter-unpaid').props

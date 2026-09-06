@@ -1,5 +1,10 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StudentTabs } from '../StudentTabs';
 import * as dailyReportsApi from '@/shared/api/dailyReports.client';
@@ -367,7 +372,22 @@ describe('StudentTabs (SCR-08 Home + SCR-13 Progress + SCR-16 Payment, Figma 24:
 
     renderTabs();
 
-    fireEvent.press(await screen.findByTestId('view-report-button'));
+    // The CTA appears as soon as the DASHBOARD resolves `already_submitted`,
+    // but its target id comes from the separate API-029 read, so the card
+    // wires `onPress` only once `existing_report` is in hand and renders the
+    // Button `disabled` until then (ReportStatusCard: `disabled={!onPress}`).
+    // Pressing on `findByTestId` alone therefore raced the second request and
+    // pressed a disabled control under a loaded parallel run — the suite's
+    // remaining flake. Wait for the precondition the component itself
+    // enforces, which is also the behaviour SCR-15 depends on.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('view-report-button').props.accessibilityState
+          .disabled,
+      ).toBe(false),
+    );
+    fireEvent.press(screen.getByTestId('view-report-button'));
+
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/student/reports/[id]',
       params: { id: 'report-today' },
