@@ -26,4 +26,26 @@ export interface INotificationLogRepository {
     category: NotificationEventType,
     since: Date,
   ): Promise<boolean>;
+
+  /**
+   * ISS #135: the same guard, narrowed to the ONE subject the notification
+   * would be about (`notification_log.subject_id`).
+   *
+   * `hasEntrySince` above asks "has this recipient been told about anything
+   * of this category since `since`", which is exact only while a recipient
+   * can hold at most one live subject — true of N-06 (DB-UQ-02: one `Active`
+   * membership per user), false of N-07, whose recipient is the Teacher of a
+   * whole group. This overload asks "has this recipient been told about THIS
+   * subject", so each at-risk student keeps its own once-per-episode window.
+   *
+   * The outcome rule is `hasEntrySince`'s, unchanged: ANY outcome counts,
+   * because a `Suppressed` or `Failed` row is still a decision and BR-60
+   * makes a non-delivery no reason to retry tomorrow.
+   */
+  hasEntryForSubjectSince(
+    userId: string,
+    category: NotificationEventType,
+    subjectId: string,
+    since: Date,
+  ): Promise<boolean>;
 }

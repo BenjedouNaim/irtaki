@@ -30,6 +30,15 @@ import {
  */
 export interface NotificationEvent {
   type: NotificationEventType;
+  /**
+   * The one identifier BR-46 lets the payload carry — and, since ISS #135,
+   * also what goes into `notification_log.subject_id`. The two are the same
+   * value by construction: `resourceId` already names WHAT the notification
+   * is about at every one of the eight call sites (the table in
+   * `NotificationLogEntry.subjectId` classifies all eight), so the log
+   * records the subject the recipient was actually told about rather than a
+   * second, separately-derived one that could drift from it.
+   */
   resourceId: string;
   recheckMembershipId?: string;
 }
@@ -68,7 +77,9 @@ export interface DispatchResult {
  *    an invalid token, which is instead marked `invalidated_at` (SAS §22.5,
  *    UC-15 E2).
  * 5. **Log the outcome** to `notification_log` — `Sent`, `Failed` or
- *    `Suppressed`, always exactly one row (FR-NOTIF-08).
+ *    `Suppressed`, always exactly one row (FR-NOTIF-08), carrying the
+ *    event's `resourceId` as `subject_id` (ISS #135) so the SA §21 cadence
+ *    guard can dedup per (recipient, subject) and not per recipient alone.
  *
  * It never throws (BR-60, ADR-032, AGENTS §8 "notification degradation"):
  * every failure — transport, provider, even the log write — is caught and
@@ -108,7 +119,14 @@ export class NotificationService {
       // FR-NOTIF-08 still wants the outcome on record. The log write is
       // itself best-effort — it may be the thing that just failed.
       try {
-        await this.record(recipient.userId, category, 'Failed', null, now);
+        await this.record(
+          recipient.userId,
+          category,
+          event.resourceId,
+          'Failed',
+          null,
+          now,
+        );
       } catch {
         // Nothing left to do: the diagnosis is the ERROR line above.
       }
@@ -134,7 +152,13 @@ export class NotificationService {
       return { outcome: 'Failed', reason: null, transportReference: null };
     }
     if (preference.isMutable && preference.muted) {
-      return this.suppress(recipient.userId, category, 'CATEGORY_MUTED', now);
+      return this.suppress(
+        recipient.userId,
+        category,
+        event.resourceId,
+        'CATEGORY_MUTED',
+        now,
+      );
     }
 
     // 2. Re-check §22.3. The membership-context half applies to the events
@@ -148,19 +172,32 @@ export class NotificationService {
         return this.suppress(
           recipient.userId,
           category,
+          event.resourceId,
           'MEMBERSHIP_NOT_ACTIVE',
           now,
         );
       }
       const reason = evaluateMembershipSuppression(membership);
       if (reason !== null) {
-        return this.suppress(recipient.userId, category, reason, now);
+        return this.suppress(
+          recipient.userId,
+          category,
+          event.resourceId,
+          reason,
+          now,
+        );
       }
     }
 
     const tokens = await this.context.findLiveDeviceTokens(recipient.userId);
     if (tokens.length === 0) {
-      return this.suppress(recipient.userId, category, 'NO_DEVICE_TOKEN', now);
+      return this.suppress(
+        recipient.userId,
+        category,
+        event.resourceId,
+        'NO_DEVICE_TOKEN',
+        now,
+      );
     }
 
     // 3. Build the payload — BR-46's two fields, and nothing else.
@@ -185,6 +222,7 @@ export class NotificationService {
     await this.record(
       recipient.userId,
       category,
+      event.resourceId,
       outcome,
       transportReference,
       now,
@@ -228,10 +266,11 @@ export class NotificationService {
   private async suppress(
     userId: string,
     category: NotificationEventType,
+    subjectId: string,
     reason: SuppressionReason,
     now: Date,
   ): Promise<DispatchResult> {
-    await this.record(userId, category, 'Suppressed', null, now);
+    await this.record(userId, category, subjectId, 'Suppressed', null, now);
     this.logger.log(
       `Notification ${category} to user ${userId}: Suppressed (${reason})`,
     );
@@ -241,6 +280,7 @@ export class NotificationService {
   private async record(
     userId: string,
     category: NotificationEventType,
+    subjectId: string,
     outcome: NotificationOutcome,
     transportReference: string | null,
     now: Date,
@@ -248,6 +288,7 @@ export class NotificationService {
     await this.log.record({
       userId,
       category,
+      subjectId,
       outcome,
       transportReference,
       dispatchedAt: now,

@@ -71,21 +71,34 @@ const DEFAULT_ERROR_MESSAGES: Record<
 };
 
 /**
+ * The reason phrases NestJS puts in `message` (and `error`) when an
+ * `HttpException` subclass is constructed with no body of its own — e.g. a bare
+ * `new ForbiddenException()`, which serialises as
+ * `{ statusCode: 403, message: 'Forbidden', error: 'Forbidden' }`.
+ *
+ * These are English, and APIS §9.5 requires `message` to always be Arabic and
+ * user-facing. Recognising them is what lets the filter tell "the thrower
+ * supplied no message" apart from "the thrower supplied this message", since
+ * NestJS gives us no other signal.
+ */
+const NEST_DEFAULT_REASON_PHRASES = new Set([
+  'forbidden',
+  'unprocessable entity',
+  'bad request',
+  'not found',
+  'unauthorized',
+  'conflict',
+  'too many requests',
+  'internal server error',
+  'service unavailable',
+]);
+
+/**
  * Normalizes error strings to SCREAMING_SNAKE_CASE machine-readable codes.
  */
 function normalizeErrorCode(error: string, status: number): string {
   if (DEFAULT_ERROR_MESSAGES[status] && DEFAULT_ERROR_MESSAGES[status].error) {
-    const trimmed = error.trim().toLowerCase();
-    if (
-      trimmed === 'forbidden' ||
-      trimmed === 'unprocessable entity' ||
-      trimmed === 'bad request' ||
-      trimmed === 'not found' ||
-      trimmed === 'unauthorized' ||
-      trimmed === 'conflict' ||
-      trimmed === 'too many requests' ||
-      trimmed === 'internal server error'
-    ) {
+    if (NEST_DEFAULT_REASON_PHRASES.has(error.trim().toLowerCase())) {
       return DEFAULT_ERROR_MESSAGES[status].error;
     }
   }
@@ -94,6 +107,35 @@ function normalizeErrorCode(error: string, status: number): string {
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
 }
+
+/**
+ * True when `message` is only NestJS's English reason phrase for `status`,
+ * i.e. the thrower passed no user-facing message at all (ISS #137).
+ *
+ * Guarded on the phrase matching *this* status so a deliberate message that
+ * happens to collide with another status's phrase is still passed through.
+ */
+function isNestDefaultMessage(message: string, status: number): boolean {
+  const trimmed = message.trim().toLowerCase();
+  if (!NEST_DEFAULT_REASON_PHRASES.has(trimmed)) {
+    return false;
+  }
+  const statusPhrase = STATUS_REASON_PHRASE[status];
+  return statusPhrase !== undefined && statusPhrase === trimmed;
+}
+
+/** The reason phrase NestJS uses for each status the API actually returns. */
+const STATUS_REASON_PHRASE: Record<number, string> = {
+  [HttpStatus.BAD_REQUEST]: 'bad request',
+  [HttpStatus.UNAUTHORIZED]: 'unauthorized',
+  [HttpStatus.FORBIDDEN]: 'forbidden',
+  [HttpStatus.NOT_FOUND]: 'not found',
+  [HttpStatus.CONFLICT]: 'conflict',
+  [HttpStatus.UNPROCESSABLE_ENTITY]: 'unprocessable entity',
+  [HttpStatus.TOO_MANY_REQUESTS]: 'too many requests',
+  [HttpStatus.SERVICE_UNAVAILABLE]: 'service unavailable',
+  [HttpStatus.INTERNAL_SERVER_ERROR]: 'internal server error',
+};
 
 /**
  * Global Exception Filter (APIS §9.5, SA §24, TS §29).
@@ -148,7 +190,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
         if (
           typeof responseObj.message === 'string' &&
-          responseObj.message.trim().length > 0
+          responseObj.message.trim().length > 0 &&
+          // A bare `new ForbiddenException()` carries NestJS's English reason
+          // phrase, not a message the thrower chose. Taking it would put
+          // "Forbidden" in front of an Arabic-only UI (APIS §9.5, UF §31/§33),
+          // so the status's Arabic default stands instead. This is the
+          // backstop that makes the guards and the in-use-case refusals speak
+          // identically no matter which layer refused (ISS #137).
+          !isNestDefaultMessage(responseObj.message, status)
         ) {
           errorMessage = responseObj.message;
         } else if (Array.isArray(responseObj.message)) {

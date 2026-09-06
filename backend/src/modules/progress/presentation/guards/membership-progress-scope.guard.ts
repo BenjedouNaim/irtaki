@@ -37,7 +37,7 @@ export class MembershipProgressScopeGuard implements CanActivate {
       throw new NotFoundException({
         statusCode: 404,
         error: 'NOT_FOUND',
-        message: 'Membership not found',
+        message: 'المورد المطلوب غير موجود',
       });
     }
 
@@ -69,7 +69,7 @@ export class MembershipProgressScopeGuard implements CanActivate {
         throw new ForbiddenException({
           statusCode: 403,
           error: 'SCOPE_DENIED',
-          message: 'Access to this resource is denied',
+          message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
         });
       }
 
@@ -81,7 +81,7 @@ export class MembershipProgressScopeGuard implements CanActivate {
     throw new ForbiddenException({
       statusCode: 403,
       error: 'SCOPE_DENIED',
-      message: 'Access to this resource is denied',
+      message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
     });
   }
 }

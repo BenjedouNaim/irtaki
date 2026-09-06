@@ -57,20 +57,26 @@ const TIMEZONE = 'Africa/Tunis';
 
 /**
  * SA §14 / NFR-20 — every authorization failure answers with one masked
- * result. What is uniform across the whole surface today is the status and
- * the machine-readable code, so that is what every refused cell asserts.
+ * result: the same status, the same machine-readable code, and the same
+ * human-readable message, whichever layer refused.
  *
- * The human-readable `message` is *not* uniform and is deliberately not
- * asserted here: the route-specific ScopeGuards raise the Arabic
- * `'ليس لديك صلاحية للوصول إلى هذا المورد'`, while `RolesGuard` and the
- * use-case-level scope checks in Groups, Memberships and Enrollment raise a
- * bare `ForbiddenException`, which the global filter renders with the
- * English default `'Forbidden'`. That inconsistency is an error-envelope
- * defect rather than a §6.1 cell, and is reported as an open question.
+ * The `message` is asserted here as of ISS #137. It previously was not, and
+ * that omission is exactly what let the defect stand: the route-specific
+ * ScopeGuards raised the Arabic message below, while `RolesGuard` and the
+ * use-case-level scope checks in Groups, Memberships and Enrollment raised a
+ * bare `ForbiddenException`, which the global filter rendered with NestJS's
+ * English default `'Forbidden'`. So whether a refused caller saw Arabic or
+ * English depended on which layer refused — invisible from the outside, and
+ * in an Arabic-only product (UF §31/§33) a user-visible defect.
+ *
+ * The filter now substitutes the Arabic default whenever a thrower supplied
+ * no message of its own, so this assertion holds for every cell and no new
+ * bare throw can regress it.
  */
 const UNIFORM_403 = {
   statusCode: 403,
   error: 'SCOPE_DENIED',
+  message: 'ليس لديك صلاحية للوصول إلى هذا المورد',
 };
 
 type Variant = 'owner' | 'foreign';
@@ -877,10 +883,15 @@ describe('APIS §6.1 authorization matrix (F-TEST-02 / TS §36)', () => {
       cell: `${endpoint.api} × ${role} (${variant})`,
       status: res.status,
       error: (res.body as ErrorEnvelope).error,
+      message: (res.body as ErrorEnvelope).message,
     }).toEqual({
       cell: `${endpoint.api} × ${role} (${variant})`,
       status: HttpStatus.FORBIDDEN,
       error: UNIFORM_403.error,
+      // ISS #137: asserted on every refused cell, not just the status and
+      // code. This is the assertion that would have caught an English
+      // 'Forbidden' reaching an Arabic-only UI.
+      message: UNIFORM_403.message,
     });
     // NFR-20 / TS §36 "Error envelope leakage": the masked 403 carries the
     // envelope and nothing else — no stack, no SQL, no file path, and above

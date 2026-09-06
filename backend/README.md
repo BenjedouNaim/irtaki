@@ -57,6 +57,43 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+### Integration tests
+
+The integration suite (`*.integration.spec.ts`, run by `test:e2e`) needs a real
+PostgreSQL. TS §34 puts constraints, triggers and partial unique indexes in
+scope and pins the level to "a real (test) Postgres via Docker Compose" — a
+lighter substitute would not exercise them, so SQLite and mocks are ruled out.
+
+It also needs a database of its own. `DB_NAME` has no default and nothing is
+guessed for you (ISS #145), and the suite's teardown helpers empty whole tables
+— `notification_log` and `audit_entries` are deleted wholesale — so a run
+pointed at the development database `irtaki` destroys data that is not the
+suite's. The purge helpers refuse to run against that name, but the database to
+use is still yours to supply:
+
+```bash
+# create a database dedicated to the suite (postgres from docker-compose.yml)
+$ docker compose exec postgres psql -U irtaki -d postgres -c "CREATE DATABASE irtaki_test;"
+
+# migrate it, then seed it — most suites borrow the seeded Admin rather than
+# registering their own, because DB-UQ-08 admits one Admin system-wide
+$ NODE_ENV=test DB_NAME=irtaki_test npm run migration:run
+$ NODE_ENV=test DB_NAME=irtaki_test npm run seed
+
+# run the suite against it (a single spec: append its path)
+$ NODE_ENV=test DB_NAME=irtaki_test npm run test:e2e
+```
+
+`test/jest-e2e.json` raises `testTimeout` to 30s. Jest's 5s default is not
+enough here and the shortfall is real work, not a hang: passwords are hashed
+with argon2id at 64 MB / 3 iterations (`Argon2PasswordHasher`, and TS §4's
+choice of argon2id over bcrypt is deliberate), so every fixture user a spec
+registers costs a few hundred milliseconds, and a spec that seeds staff, a
+group and a roster registers several. At the 5s default those specs failed with
+"Exceeded timeout" on a loaded machine while passing on an idle one — a flaky
+gate rather than a real signal, which matters now that `backend-integration`
+runs this suite on every pull request.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

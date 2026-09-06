@@ -24,15 +24,29 @@ import type { EvaluationOutcome } from './evaluation-outcome';
  * timezone (T-01, SAS §18.1), whoever the recipient is.
  *
  * ISS-17: **once per episode, not daily while the condition persists.** The
- * guard is a read of `notification_log` before dispatch, exactly as SA §21
- * specifies ("no new table needed") — has this Teacher any N-07 row since
- * this membership's episode began? A report breaks the streak, moves the
- * anchor and opens a new window, so a relapse notifies again.
+ * cadence is specified twice and neither wording is per-recipient — SAS
+ * §22.3: "N-07 should be sent **once** per at-risk episode, not daily while
+ * the condition persists", and SA.md:521: "Cadence (ISS-17): N-06/N-07 fire
+ * once per cycle/episode — checked against existing `notification_log`
+ * entries before dispatch, no new table needed". An episode is a property of
+ * a STUDENT (DS-04 evaluates one membership's streak), so "once per episode"
+ * is once per student, and the guard is a read of `notification_log` before
+ * dispatch exactly as SA §21 prescribes — no new table, no stored flag. A
+ * report breaks the streak, moves the anchor and opens a new window, so a
+ * relapse notifies again.
  *
- * ⚠️ `notification_log` is keyed on the RECIPIENT (E-11 has no target
- * column), so two students of the same Teacher whose episodes overlap
- * produce one notification, not two — the documented mechanism cannot
- * distinguish them. Recorded rather than worked around, per AGENTS §14.
+ * ISS #135 narrows that read from (recipient, category) to (recipient,
+ * category, SUBJECT), the subject being the at-risk student's membership.
+ * Before `notification_log.subject_id` existed, E-11 recorded only who was
+ * told, so a Teacher with two at-risk students in one window was told about
+ * one of them and the guard swallowed the other — the dedup was correct
+ * given the data, and the data was the defect. The once-per-episode
+ * guarantee is unchanged in strength; it now holds PER STUDENT, which is
+ * what "per episode" meant all along.
+ *
+ * N-06 keeps the unnarrowed `hasEntrySince`: its recipient IS its subject
+ * (DB-UQ-02 allows one `Active` membership per user), so recipient-level
+ * dedup is already exact there and issue #135 requires it unchanged.
  */
 @Injectable()
 export class AtRiskEvaluator {
@@ -72,7 +86,12 @@ export class AtRiskEvaluator {
         candidate.startedAt,
       );
       if (
-        await this.log.hasEntrySince(candidate.teacherUserId, 'N-07', since)
+        await this.log.hasEntryForSubjectSince(
+          candidate.teacherUserId,
+          'N-07',
+          candidate.membershipId,
+          since,
+        )
       ) {
         continue;
       }

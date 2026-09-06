@@ -16,10 +16,13 @@ jobs:
     env:
       NODE_ENV: test
       # TypeORM connection is not exercised in unit tests; these values satisfy
-      # module instantiation in CI without a real Postgres container.
+      # module instantiation in CI without a real Postgres container. The name
+      # is deliberately not `irtaki` — nothing in this job connects, and a
+      # development database name here would be a trap for whoever later adds a
+      # step that does.
       DB_HOST: localhost
       DB_PORT: '5432'
-      DB_NAME: irtaki
+      DB_NAME: irtaki_ci_unit
       DB_USER: irtaki
       DB_PASS: irtaki
     steps:
@@ -65,3 +68,110 @@ jobs:
       - name: Unit tests
         if: steps.changes.outputs.backend == 'true'
         run: npm run test:unit
+
+      # `nest start` resolves entry points differently from the emitted output,
+      # so a production-path break is invisible to every other step here and to
+      # local development. CI never ran `npm run build`, which is how the
+      # Dockerfile and `start:prod` came to point at `dist/main.js` while the
+      # build emits `dist/src/main.js` — the container failed with
+      # MODULE_NOT_FOUND and nothing caught it. Building, then asserting the
+      # two paths production actually executes exist, is the gate.
+      - name: Build
+        if: steps.changes.outputs.backend == 'true'
+        run: npm run build
+
+      - name: Verify production entry points exist
+        if: steps.changes.outputs.backend == 'true'
+        run: |
+          test -f dist/src/main.js \
+            || { echo "::error::dist/src/main.js missing — start:prod and the Dockerfile CMD would fail"; exit 1; }
+          test -f dist/src/database/data-source.js \
+            || { echo "::error::dist/src/database/data-source.js missing — the Dockerfile migration step would fail"; exit 1; }
+          node -e "require('./dist/src/database/data-source')" \
+            || { echo "::error::data-source is not requirable from its built path"; exit 1; }
+
+  # The integration suite (~65 specs) needs a real Postgres: TS §11 rules out
+  # SQLite and mocks because the DB triggers, partial unique indexes and
+  # `ON DELETE RESTRICT` behaviour it verifies are Postgres-specific. Without
+  # this job nothing gates EPIC-11's suites and drift lands on `main` green
+  # (ISS #144).
+  #
+  # Separate job, not extra steps on `backend-ci`: it costs far more wall-clock
+  # than lint/type-check/unit, and keeping it separate lets the fast checks
+  # report without waiting on it.
+  backend-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        # Matches docker-compose.yml — the version the migrations are written
+        # against and the only one they are verified on.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: irtaki_test
+          POSTGRES_USER: irtaki
+          POSTGRES_PASSWORD: irtaki
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U irtaki -d irtaki_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      # Explicit, and deliberately NOT the development database name. The suite
+      # runs destructive teardown helpers, so the name it connects to must never
+      # be left to a default (ISS #145).
+      DB_NAME: irtaki_test
+      DB_USER: irtaki
+      DB_PASS: irtaki
+      JWT_ACCESS_SECRET: ci-jwt-access-secret-minimum-32-chars-key
+      JWT_REFRESH_PEPPER: ci-jwt-refresh-pepper-minimum-32-chars-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for paths-filter git-diff mode (no API call)
+
+      - name: Check for backend changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          token: '' # use git diff instead of GitHub API (avoids permission errors)
+          filters: |
+            backend:
+              - 'backend/**'
+
+      - name: Skip (no backend changes)
+        if: steps.changes.outputs.backend == 'false'
+        run: echo "No backend files changed — skipping integration suite."
+
+      - uses: actions/setup-node@v4
+        if: steps.changes.outputs.backend == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.changes.outputs.backend == 'true'
+        run: npm ci
+
+      # Migrations first, then seed: ~45 suites borrow the seeded Admin rather
+      # than registering their own, because DB-UQ-08 admits a single Admin
+      # system-wide. An unseeded database fails those suites at setup.
+      - name: Run migrations
+        if: steps.changes.outputs.backend == 'true'
+        run: npm run migration:run
+
+      - name: Seed reference and role data
+        if: steps.changes.outputs.backend == 'true'
+        run: npm run seed
+
+      - name: Integration tests
+        if: steps.changes.outputs.backend == 'true'
+        run: npm run test:e2e

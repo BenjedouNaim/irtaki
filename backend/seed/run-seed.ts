@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import * as argon2 from 'argon2';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { SURAHS_DATA } from './quran/surahs.data';
@@ -13,6 +14,13 @@ const dbPort = parseInt(process.env.DB_PORT ?? '5432', 10);
 const dbUser = process.env.DB_USER ?? 'irtaki';
 const dbPass = process.env.DB_PASS ?? 'irtaki';
 const dbName = process.env.DB_NAME ?? 'irtaki';
+
+/**
+ * The password every seeded account is created with. Overridable so a shared
+ * environment need not use the documented development default; the seed refuses
+ * to run in production regardless (see the guard in `seed()`).
+ */
+const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'password123';
 
 async function seed() {
   // Production guard
@@ -61,8 +69,16 @@ async function seed() {
 
     // 2. Seed Users (DBT-01)
     console.log('Seeding users (Admin, Teachers, Assistants)...');
-    // Pre-calculated argon2id hash for password: 'password123'
-    const defaultPasswordHash = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$RdescudvJCsgt3h5vd4x/g';
+    // Derived at seed time with the same argon2id parameters
+    // `Argon2PasswordHasher` uses, so the seeded accounts always verify against
+    // SEED_PASSWORD. A literal pasted here cannot be checked by any test and
+    // silently locks every seeded role out of a fresh database.
+    const defaultPasswordHash = await argon2.hash(SEED_PASSWORD, {
+      type: argon2.argon2id,
+      memoryCost: 65536, // 64 MB
+      timeCost: 3,
+      parallelism: 4,
+    });
 
     const users = [
       {

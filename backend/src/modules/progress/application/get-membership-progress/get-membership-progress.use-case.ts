@@ -36,7 +36,7 @@ export class GetMembershipProgressUseCase {
       throw new NotFoundException({
         statusCode: 404,
         error: 'NOT_FOUND',
-        message: 'Membership not found',
+        message: 'المورد المطلوب غير موجود',
       });
     }
 

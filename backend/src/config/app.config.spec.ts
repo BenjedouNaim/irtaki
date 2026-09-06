@@ -38,6 +38,10 @@ describe('AppConfig Environment Validation', () => {
       NODE_ENV: Environment.Production,
       PORT: '3000',
       DB_HOST: 'localhost',
+      // Supplied so this case reaches the production-specific block; a missing
+      // DB_NAME is rejected earlier, by the field validators, and is covered by
+      // its own tests below.
+      DB_NAME: 'irtaki',
       JWT_ACCESS_SECRET: 'dev-secret-key-must-be-changed-in-prod-min-32-chars',
       JWT_REFRESH_PEPPER: 'dev-pepper-key-must-be-changed-in-prod-min-32-chars',
     };
@@ -52,6 +56,7 @@ describe('AppConfig Environment Validation', () => {
       NODE_ENV: Environment.Production,
       PORT: '3000',
       DB_HOST: 'db',
+      DB_NAME: 'irtaki',
       JWT_ACCESS_SECRET: 'a-real-production-access-secret-32-chars-long',
       JWT_REFRESH_PEPPER: 'a-real-production-refresh-pepper-32-chars-long',
     };
@@ -93,10 +98,40 @@ describe('AppConfig Environment Validation', () => {
     });
 
     it('stays optional outside production (the ping is skipped with a WARN)', () => {
-      const result = validate({ NODE_ENV: Environment.Development });
+      const result = validate({
+        NODE_ENV: Environment.Development,
+        DB_NAME: 'irtaki',
+      });
       for (const key of HEALTHCHECKS_PING_URL_KEYS) {
         expect(result[key]).toBeUndefined();
       }
+    });
+  });
+
+  // ISS #145: DB_NAME used to default to 'irtaki', so an environment that never
+  // set it — notably `jest --config ./test/jest-e2e.json`, which loads no
+  // `.env` — connected to the development database and ran the integration
+  // suite's unscoped teardown DELETEs against it. The value must be supplied,
+  // in every environment, not just production.
+  describe('DB_NAME', () => {
+    it('refuses to validate when absent, rather than defaulting to a database name', () => {
+      expect(() => validate({ NODE_ENV: Environment.Development })).toThrow(
+        /DB_NAME/,
+      );
+    });
+
+    it('refuses an empty or whitespace-only value', () => {
+      expect(() =>
+        validate({ NODE_ENV: Environment.Development, DB_NAME: '   ' }),
+      ).toThrow(/DB_NAME/);
+    });
+
+    it('accepts an explicitly supplied name', () => {
+      const result = validate({
+        NODE_ENV: Environment.Development,
+        DB_NAME: 'irtaki_test',
+      });
+      expect(result.DB_NAME).toBe('irtaki_test');
     });
   });
 });

@@ -11,6 +11,15 @@ export interface LiveDeviceToken {
 }
 
 /**
+ * One auto-rejected JoinRequest reduced to what N-04 needs: the subject the
+ * notification is about and the Applicant it goes to (SAS §22.2).
+ */
+export interface JoinRequestApplicant {
+  joinRequestId: string;
+  userId: string;
+}
+
+/**
  * The reads `NotificationService` itself performs while walking SA §21's
  * sequence. They live in the Notifications module's OWN infrastructure —
  * the module subscribes to the other modules' events and is never called
@@ -54,4 +63,19 @@ export interface INotificationDispatchContextRepository {
 
   /** The `groups.assistant_id` of a group — N-05's recipient (DE-01). */
   findGroupAssistantUserId(groupId: string): Promise<string | null>;
+
+  /**
+   * The Applicants behind the JoinRequests DE-10 names as auto-rejected —
+   * N-04's recipients on DS-07's archival path (issue #133).
+   *
+   * `GroupArchivedEvent` carries the ids that FR-REQ-08's cascade rejected
+   * but not who they belong to, and SA §11 gives Notifications no inbound
+   * edge to the Enrollment module, so the user ids are resolved here, by
+   * this module's own read of `join_requests`, exactly as N-05's assistant
+   * and N-08's holder already are. An empty id list is answered without
+   * touching the database.
+   */
+  findJoinRequestApplicants(
+    joinRequestIds: readonly string[],
+  ): Promise<JoinRequestApplicant[]>;
 }

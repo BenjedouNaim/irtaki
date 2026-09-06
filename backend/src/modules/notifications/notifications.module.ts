@@ -23,6 +23,7 @@ import { NotificationService } from './application/dispatch/notification.service
 import { NOTIFICATION_EVALUATION_REPOSITORY } from './domain/notification-evaluation.repository.interface';
 import { NotificationEvaluationRepository } from './infrastructure/notification-evaluation.repository';
 import { EnrollmentNotificationListener } from './application/listeners/enrollment-notification.listener';
+import { GroupNotificationListener } from './application/listeners/group-notification.listener';
 import { MembershipNotificationListener } from './application/listeners/membership-notification.listener';
 import { DailyReminderEvaluator } from './application/evaluators/daily-reminder.evaluator';
 import { WeeklyReportAvailableEvaluator } from './application/evaluators/weekly-report-available.evaluator';
@@ -95,6 +96,10 @@ import { PaymentDueSoonEvaluationJob } from './infrastructure/jobs/payment-due-s
     // eight goes through NotificationService and nothing else.
     EnrollmentNotificationListener,
     MembershipNotificationListener,
+    // Issue #133: DE-04's second producer — DS-07's auto-rejection on
+    // archival — reaching N-04 over DE-10, the `Groups -.DE-10.->
+    // Notifications` edge SA §11 draws and nothing subscribed to.
+    GroupNotificationListener,
     {
       provide: NOTIFICATION_EVALUATION_REPOSITORY,
       useClass: NotificationEvaluationRepository,

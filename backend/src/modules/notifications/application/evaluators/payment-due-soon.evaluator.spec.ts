@@ -41,6 +41,7 @@ describe('PaymentDueSoonEvaluator — N-06, once per cycle (ISS-17)', () => {
     log = {
       record: jest.fn().mockResolvedValue(undefined),
       hasEntrySince: jest.fn().mockResolvedValue(false),
+      hasEntryForSubjectSince: jest.fn().mockResolvedValue(false),
     };
     notifications = {
       dispatch: jest.fn().mockResolvedValue({
@@ -100,6 +101,18 @@ describe('PaymentDueSoonEvaluator — N-06, once per cycle (ISS-17)', () => {
       'N-06',
       new Date('2026-09-01T00:00:00.000Z'),
     );
+  });
+
+  it('keeps the PER-RECIPIENT guard — ISS #135 narrowed N-07, not N-06', async () => {
+    // N-06's recipient IS its subject: DB-UQ-02 allows one `Active`
+    // membership per user, and BR-55 confines `Due Soon` to the current
+    // cycle, so recipient-level dedup is already exact here. Issue #135
+    // requires this behaviour unchanged, so the narrowed probe must not
+    // appear on this path at all.
+    await evaluator.evaluate(new Date('2026-11-25T00:00:00.000Z'));
+
+    expect(log.hasEntrySince).toHaveBeenCalledTimes(1);
+    expect(log.hasEntryForSubjectSince).not.toHaveBeenCalled();
   });
 
   it('fires ONCE, not daily, across the whole ten-day window', async () => {
