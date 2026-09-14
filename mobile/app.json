@@ -8,12 +8,14 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "tn.irtaki.mobile",
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true
       }
     },
     "android": {
+      "package": "tn.irtaki.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

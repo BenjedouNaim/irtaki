@@ -75,5 +75,12 @@
     "test": "jest --passWithNoTests",
     "test:unit": "jest --passWithNoTests"
   },
+  "expo": {
+    "autolinking": {
+      "exclude": [
+        "@expo/ui"
+      ]
+    }
+  },
   "private": true
 }
