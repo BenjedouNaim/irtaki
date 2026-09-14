@@ -52,7 +52,7 @@ describe('Role navigation', () => {
 
   itKnownBug(
     '@P1 NAV-02c the navigator sends an Assistant back Home instead of rendering student/teacher routes',
-    'SA.md DEC-B09: "no reports/performance routes exist at all (enforced by the navigator, not just the API)"; deep links render the screens with a 403 banner',
+    '#167 — SA.md DEC-B09: routes must not exist for the role; deep links render them with a 403 banner',
     async () => {
       const g = await group();
       await loginAs(g.assistant.email, g.assistant.password, 'Assistant');

@@ -102,7 +102,7 @@ describe('Daily report', () => {
 
   itKnownBug(
     '@P1 DR-01b Student Home switches to "report submitted" right after submitting',
-    'Home card reads GET /me/dashboard, which useSubmitDailyReport does not invalidate',
+    '#163 — Home card reads GET /me/dashboard, which useSubmitDailyReport does not invalidate',
     async () => {
       const s = await student(await group());
       await loginAs(s.session.email, s.session.password, 'Student');

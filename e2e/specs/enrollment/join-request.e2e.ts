@@ -43,7 +43,7 @@ describe('Enrollment — apply and decide', () => {
 
   itKnownBug(
     '@P1 ENR-01b the User Home shows the Pending request right after submitting',
-    'User Home keeps the "no request / browse groups" card until the app is relaunched',
+    '#164 — User Home keeps the "no request / browse groups" card until the app is relaunched',
     async () => {
       const g = await group({ gender: 'Female' });
       const u = await user('apply-refresh');
@@ -153,7 +153,7 @@ describe('Enrollment — apply and decide', () => {
 
   itKnownBug(
     '@P1 ENR-10b the queue drops the accepted request immediately',
-    'accepted row and Home pending tile stay stale until the tab is re-focused',
+    '#165 — accepted row and Home pending tile stay stale until the tab is re-focused',
     async () => {
       const g = await group({ gender: 'Female' });
       const a = await applicant(g);

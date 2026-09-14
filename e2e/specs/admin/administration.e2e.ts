@@ -160,7 +160,7 @@ describe('Administration', () => {
 
   itKnownBug(
     '@P1 ADM-07 the Admin roster keeps the removed student, which opens Recovery',
-    'SCR-30 expects removed rows, but GET /groups/{id}/memberships omits Terminated rows unless ?as_of= is sent, and the app never sends it',
+    '#166 — SCR-30 expects removed rows, but GET /groups/{id}/memberships omits Terminated rows unless ?as_of= is sent',
     async () => {
       const g = await group();
       const s = await student(g);
