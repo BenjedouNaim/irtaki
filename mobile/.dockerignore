@@ -1,0 +1,16 @@
+node_modules
+.expo
+dist
+coverage
+.git
+.env
+.env.*
+*.log
+*.tsbuildinfo
+android
+ios
+**/*.jks
+**/*.keystore
+**/*.p12
+**/google-services.json
+**/GoogleService-Info.plist

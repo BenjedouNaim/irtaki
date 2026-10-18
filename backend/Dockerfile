@@ -1,6 +1,5 @@
 # backend/Dockerfile
-# Multi-stage build for local development and CI integration tests.
-# NOT the production image -- production deploys are managed by Coolify (ADR-014, EPIC-12).
+# Multi-stage API image for local development and GHCR deployments.
 #
 # Stages:
 #   deps    -- install all dependencies (including devDependencies needed by build)

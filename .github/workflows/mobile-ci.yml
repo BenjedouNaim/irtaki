@@ -5,12 +5,19 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
-    paths: ['mobile/**']
-    tags: ['mobile-v*']
+    branches: [main, chore/web-ghcr-images]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ci.yml"
+      - ".github/workflows/publish-image.yml"
+    tags: ["mobile-v*"]
+permissions:
+  contents: read
 jobs:
   mobile-ci:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.mobile }}
     defaults:
       run:
         working-directory: mobile
@@ -19,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # needed for paths-filter git-diff mode (no API call)
+          fetch-depth: 0 # needed for paths-filter git-diff mode (no API call)
 
       # Detect whether any mobile/** files changed. On push triggers this is
       # not needed (paths filter above already gates the job), but on PRs it
@@ -28,10 +35,12 @@ jobs:
         id: changes
         uses: dorny/paths-filter@v3
         with:
-          token: ''  # use git diff instead of GitHub API (avoids permission errors)
+          token: "" # use git diff instead of GitHub API (avoids permission errors)
           filters: |
             mobile:
               - 'mobile/**'
+              - '.github/workflows/mobile-ci.yml'
+              - '.github/workflows/publish-image.yml'
 
       - name: Skip (no mobile changes)
         if: steps.changes.outputs.mobile == 'false'
@@ -68,3 +77,18 @@ jobs:
       #     token: ${{ secrets.EXPO_TOKEN }}
       # - name: EAS Build
       #   run: eas build --platform all --non-interactive
+
+  web-image:
+    needs: mobile-ci
+    if: >-
+      needs.mobile-ci.outputs.changed == 'true' &&
+      (github.event_name == 'pull_request' || github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/chore/web-ghcr-images')
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-image.yml
+    with:
+      context: mobile
+      image: web
+      api-base-url: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
