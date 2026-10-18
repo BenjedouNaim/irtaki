@@ -2,6 +2,13 @@ name: Container image
 
 on:
   workflow_call:
+    outputs:
+      image-name:
+        description: Published GHCR image name
+        value: ${{ jobs.image.outputs.image-name }}
+      image-digest:
+        description: Verified immutable image digest
+        value: ${{ jobs.image.outputs.image-digest }}
     inputs:
       context:
         description: Docker build context relative to the repository root
@@ -23,6 +30,9 @@ permissions:
 jobs:
   image:
     runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.image.outputs.name }}
+      image-digest: ${{ steps.publish.outputs.digest }}
     env:
       PUBLISH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images') }}
       TEST_IMAGE: ${{ github.ref == 'refs/heads/chore/web-ghcr-images' }}
@@ -34,6 +44,11 @@ jobs:
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate deployment automation before publishing
+        run: node --test .github/scripts/deploy-coolify.test.mjs
 
       - name: Set image name
         id: image

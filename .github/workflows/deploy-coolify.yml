@@ -1,0 +1,58 @@
+name: Deploy to Coolify
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        required: true
+        type: string
+      image-digest:
+        required: true
+        type: string
+      component:
+        required: true
+        type: string
+      application-uuid:
+        required: true
+        type: string
+      health-url:
+        required: true
+        type: string
+      workflow-file:
+        required: true
+        type: string
+    secrets:
+      COOLIFY_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.component }} to dev
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: coolify-${{ inputs.application-uuid }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy exact image and verify health
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APPLICATION_UUID: ${{ inputs.application-uuid }}
+          DEPLOY_HEALTH_URL: ${{ inputs.health-url }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+          DEPLOY_WORKFLOW_FILE: ${{ inputs.workflow-file }}
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/deploy-coolify.mjs

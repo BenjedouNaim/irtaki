@@ -10,6 +10,8 @@ on:
       - "mobile/**"
       - ".github/workflows/mobile-ci.yml"
       - ".github/workflows/publish-image.yml"
+      - ".github/workflows/deploy-coolify.yml"
+      - ".github/scripts/**"
     tags: ["mobile-v*"]
 permissions:
   contents: read
@@ -41,6 +43,8 @@ jobs:
               - 'mobile/**'
               - '.github/workflows/mobile-ci.yml'
               - '.github/workflows/publish-image.yml'
+              - '.github/workflows/deploy-coolify.yml'
+              - '.github/scripts/**'
 
       - name: Skip (no mobile changes)
         if: steps.changes.outputs.mobile == 'false'
@@ -92,3 +96,22 @@ jobs:
       context: mobile
       image: web
       api-base-url: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+
+  web-deploy:
+    needs: web-image
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images')
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy-coolify.yml
+    with:
+      component: web
+      application-uuid: ${{ vars.COOLIFY_WEB_APP_UUID }}
+      health-url: ${{ vars.COOLIFY_WEB_HEALTH_URL }}
+      image-name: ${{ needs.web-image.outputs.image-name }}
+      image-digest: ${{ needs.web-image.outputs.image-digest }}
+      workflow-file: mobile-ci.yml
+    secrets:
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}

@@ -10,6 +10,8 @@ on:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
       - ".github/workflows/publish-image.yml"
+      - ".github/workflows/deploy-coolify.yml"
+      - ".github/scripts/**"
 permissions:
   contents: read
 jobs:
@@ -50,6 +52,8 @@ jobs:
               - 'backend/**'
               - '.github/workflows/backend-ci.yml'
               - '.github/workflows/publish-image.yml'
+              - '.github/workflows/deploy-coolify.yml'
+              - '.github/scripts/**'
 
       - name: Skip (no backend changes)
         if: steps.changes.outputs.backend == 'false'
@@ -156,6 +160,8 @@ jobs:
               - 'backend/**'
               - '.github/workflows/backend-ci.yml'
               - '.github/workflows/publish-image.yml'
+              - '.github/workflows/deploy-coolify.yml'
+              - '.github/scripts/**'
 
       - name: Skip (no backend changes)
         if: steps.changes.outputs.backend == 'false'
@@ -197,3 +203,22 @@ jobs:
     with:
       context: backend
       image: backend
+
+  backend-deploy:
+    needs: backend-image
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images')
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy-coolify.yml
+    with:
+      component: backend
+      application-uuid: ${{ vars.COOLIFY_BACKEND_APP_UUID }}
+      health-url: ${{ vars.COOLIFY_BACKEND_HEALTH_URL }}
+      image-name: ${{ needs.backend-image.outputs.image-name }}
+      image-digest: ${{ needs.backend-image.outputs.image-digest }}
+      workflow-file: backend-ci.yml
+    secrets:
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
