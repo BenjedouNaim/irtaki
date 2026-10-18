@@ -27,7 +27,6 @@ function fixture(options = {}) {
     queued = false,
     activeChecks = 0;
   const app = {
-    id: 5,
     uuid: "web123",
     build_pack: "dockerimage",
     docker_registry_image_name: env.IMAGE_NAME,
@@ -281,16 +280,16 @@ test("fails without replaying a deployment POST when the API returns an error", 
   assert.equal(f.calls.filter((c) => c.method === "POST").length, 1);
 });
 
-test("rejects a deployment UUID belonging to another application", async () => {
+test("rejects a different deployment UUID returned by the status endpoint", async () => {
   const f = fixture({
     respond: ({ path }) =>
       path === "/api/v1/deployments/deploy123"
         ? json({
-            deployment_uuid: "deploy123",
+            deployment_uuid: "another-deployment",
             application_id: "999",
             status: "finished",
           })
         : undefined,
   });
-  await assert.rejects(f.run(), /different application/);
+  await assert.rejects(f.run(), /different deployment UUID/);
 });

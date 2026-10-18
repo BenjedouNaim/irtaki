@@ -228,14 +228,10 @@ export async function deploy(
   let lastStatus;
   while (true) {
     const state = await api(`/deployments/${deploymentId}`);
-    if (
-      state.deployment_uuid !== deploymentId ||
-      String(state.application_id) !== String(previous.id)
-    ) {
-      throw new Error(
-        "Coolify returned a deployment belonging to a different application",
-      );
-    }
+    // The queued UUID was bound to this application by /deploy's resource_uuid.
+    // Application GET deliberately hides its internal numeric id in Coolify 4.4.6.
+    if (state.deployment_uuid !== deploymentId)
+      throw new Error("Coolify returned a different deployment UUID");
     if (state.status !== lastStatus) {
       log(`Deployment status: ${state.status}`);
       lastStatus = state.status;
