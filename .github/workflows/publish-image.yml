@@ -34,8 +34,7 @@ jobs:
       image-name: ${{ steps.image.outputs.name }}
       image-digest: ${{ steps.publish.outputs.digest }}
     env:
-      PUBLISH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images') }}
-      TEST_IMAGE: ${{ github.ref == 'refs/heads/chore/web-ghcr-images' }}
+      PUBLISH_IMAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
       packages: write
@@ -63,11 +62,11 @@ jobs:
           API_BASE_URL: ${{ inputs.api-base-url }}
         run: |
           if [[ -z "$API_BASE_URL" ]]; then
-            if [[ "$PUBLISH_IMAGE" == "true" && "$TEST_IMAGE" != "true" ]]; then
+            if [[ "$PUBLISH_IMAGE" == "true" ]]; then
               echo "::error::Set the EXPO_PUBLIC_API_BASE_URL repository variable to the backend's public URL, including /api/v1."
               exit 1
             fi
-            # PRs and test-tagged images can validate CI before a domain is chosen.
+            # PRs can validate the image build before a domain is chosen.
             # Images published from main must always have a configured API URL.
             API_BASE_URL="https://api.example.invalid/api/v1"
           fi
@@ -85,7 +84,6 @@ jobs:
           tags: |
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=long,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,format=long,prefix=test-,enable=${{ github.ref == 'refs/heads/chore/web-ghcr-images' }}
             type=ref,event=pr
 
       - name: Set up Docker Buildx

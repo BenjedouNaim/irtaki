@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, chore/web-ghcr-images]
+    branches: [main]
     paths:
       - "mobile/**"
       - ".github/workflows/mobile-ci.yml"
@@ -86,8 +86,7 @@ jobs:
     needs: mobile-ci
     if: >-
       needs.mobile-ci.outputs.changed == 'true' &&
-      (github.event_name == 'pull_request' || github.ref == 'refs/heads/main' ||
-       github.ref == 'refs/heads/chore/web-ghcr-images')
+      (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
     permissions:
       contents: read
       packages: write
@@ -100,8 +99,7 @@ jobs:
   web-deploy:
     needs: web-image
     if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images')
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       actions: read

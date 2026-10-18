@@ -33,8 +33,7 @@ jobs:
   deploy:
     name: Deploy ${{ inputs.component }} to dev
     if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/chore/web-ghcr-images')
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:

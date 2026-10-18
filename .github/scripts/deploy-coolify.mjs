@@ -2,7 +2,7 @@ import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
-const BRANCHES = new Set(["main", "chore/web-ghcr-images"]);
+const BRANCHES = new Set(["main"]);
 const ACTIVE = new Set(["queued", "in_progress"]);
 const TERMINAL_FAILURE = new Set(["failed", "cancelled-by-user", "cancelled"]);
 
@@ -24,7 +24,7 @@ function httpsUrl(value, name) {
 
 export function configuration(env) {
   if (env.GITHUB_EVENT_NAME !== "push" || !BRANCHES.has(env.GITHUB_REF_NAME)) {
-    throw new Error("Only pushes to main or chore/web-ghcr-images may deploy");
+    throw new Error("Only pushes to main may deploy");
   }
   const base = httpsUrl(required(env, "COOLIFY_URL"), "COOLIFY_URL");
   if (base.pathname !== "/" || base.search)

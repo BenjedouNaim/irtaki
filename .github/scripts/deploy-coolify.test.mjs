@@ -4,7 +4,7 @@ import { configuration, deploy } from "./deploy-coolify.mjs";
 
 const env = {
   GITHUB_EVENT_NAME: "push",
-  GITHUB_REF_NAME: "chore/web-ghcr-images",
+  GITHUB_REF_NAME: "main",
   COOLIFY_URL: "https://coolify.example.com",
   COOLIFY_TOKEN: "private-coolify-token",
   GH_TOKEN: "private-github-token",
@@ -140,6 +140,7 @@ test("pins the verified digest, queues one deployment, then checks health withou
 for (const override of [
   { GITHUB_EVENT_NAME: "pull_request" },
   { GITHUB_EVENT_NAME: "workflow_dispatch" },
+  { GITHUB_REF_NAME: "chore/web-ghcr-images" },
   { GITHUB_REF_NAME: "untrusted-branch" },
   { COOLIFY_URL: "http://coolify.example.com" },
   { IMAGE_DIGEST: "latest" },
@@ -153,7 +154,7 @@ for (const override of [
   });
 }
 
-test("also accepts main pushes", () => {
+test("accepts main pushes", () => {
   assert.equal(
     configuration({ ...env, GITHUB_REF_NAME: "main" }).imageTag,
     `sha256-${"a".repeat(64)}`,
@@ -171,16 +172,33 @@ test("does not deploy to an application with a different image or build method",
   }
 });
 
-test("skips older runs across both allowed branches before changing application configuration", async () => {
-  for (const head_branch of ["main", "chore/web-ghcr-images"]) {
-    const f = fixture({
-      runs: [
-        { event: "push", head_branch, run_number: 101, status: "in_progress" },
-      ],
-    });
-    assert.equal((await f.run()).status, "superseded");
-    assert.equal(f.calls.length, 1);
-  }
+test("skips older main runs before changing application configuration", async () => {
+  const f = fixture({
+    runs: [
+      {
+        event: "push",
+        head_branch: "main",
+        run_number: 101,
+        status: "in_progress",
+      },
+    ],
+  });
+  assert.equal((await f.run()).status, "superseded");
+  assert.equal(f.calls.length, 1);
+});
+
+test("newer feature-branch runs cannot prevent a main deployment", async () => {
+  const f = fixture({
+    runs: [
+      {
+        event: "push",
+        head_branch: "chore/web-ghcr-images",
+        run_number: 101,
+        status: "in_progress",
+      },
+    ],
+  });
+  assert.equal((await f.run()).status, "healthy");
 });
 
 test("failed newer runs and PR runs do not prevent the latest working push from deploying", async () => {
