@@ -97,6 +97,51 @@ describe('AppConfig Environment Validation', () => {
       );
     });
 
+    it('allows production without ping URLs only when monitoring is explicitly disabled', () => {
+      const result = validate({
+        ...prodConfig,
+        HEALTHCHECKS_ENABLED: 'false',
+      });
+      expect(result.HEALTHCHECKS_ENABLED).toBe('false');
+      for (const key of HEALTHCHECKS_PING_URL_KEYS) {
+        expect(result[key]).toBeUndefined();
+      }
+    });
+
+    it.each(['JWT_ACCESS_SECRET', 'JWT_REFRESH_PEPPER'])(
+      'still requires %s when production monitoring is disabled',
+      (missing) => {
+        const config: Record<string, unknown> = {
+          ...prodConfig,
+          HEALTHCHECKS_ENABLED: 'false',
+        };
+        delete config[missing];
+        expect(() => validate(config)).toThrow(new RegExp(missing));
+      },
+    );
+
+    it.each(['true', undefined])(
+      'requires production ping URLs when HEALTHCHECKS_ENABLED is %s',
+      (enabled) => {
+        expect(() =>
+          validate({ ...prodConfig, HEALTHCHECKS_ENABLED: enabled }),
+        ).toThrow(/HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION/);
+      },
+    );
+
+    it.each(['0', 'FALSE', 'disabled', ''])(
+      'rejects ambiguous monitoring flag %s',
+      (enabled) => {
+        expect(() =>
+          validate({
+            ...prodConfig,
+            ...pingUrls,
+            HEALTHCHECKS_ENABLED: enabled,
+          }),
+        ).toThrow(/HEALTHCHECKS_ENABLED/);
+      },
+    );
+
     it('stays optional outside production (the ping is skipped with a WARN)', () => {
       const result = validate({
         NODE_ENV: Environment.Development,

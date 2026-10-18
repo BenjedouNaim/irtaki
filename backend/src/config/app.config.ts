@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -94,12 +95,14 @@ export class EnvironmentVariables {
   @IsOptional()
   CENTER_TIMEZONE: string = 'Africa/Tunis';
 
+  @IsIn(['true', 'false'])
+  @IsOptional()
+  HEALTHCHECKS_ENABLED: string = 'true';
+
   /**
-   * TS §32 `HEALTHCHECKS_PING_URL_*` — one per scheduled job, Required
-   * (TS §31 dead-man's-switch, SA §32 "scheduled job silently fails →
-   * Healthchecks.io"). Enforced in production below, like the other
-   * Required keys; in development/test an unset URL only disables that
-   * job's ping (logged once at WARN by HealthchecksPingService).
+   * One ping URL per scheduled job, required in production while monitoring
+   * is enabled. HEALTHCHECKS_ENABLED=false disables monitoring, not the jobs.
+   * Outside production, an unset URL skips that job's ping with a warning.
    */
   @IsString()
   @IsOptional()
@@ -143,8 +146,8 @@ export class EnvironmentVariables {
  * (`WeeklyReportFinalizationJob`, `CoverageReconciliationJob`,
  * `DailyReminderEvaluationJob`, `AtRiskEvaluationJob`,
  * `PaymentDueSoonEvaluationJob`) pings on success; a missed ping alerts".
- * Five jobs, five Required `HEALTHCHECKS_PING_URL_*` variables (TS §32) —
- * the list production boot is validated against below.
+ * Five jobs, five `HEALTHCHECKS_PING_URL_*` variables — the list production
+ * boot validates against when monitoring is enabled.
  */
 export const HEALTHCHECKS_PING_URL_KEYS = [
   'HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION',
@@ -201,15 +204,14 @@ export function validate(
     ) {
       missingProdKeys.push('JWT_REFRESH_PEPPER (production value required)');
     }
-    // TS §32: one Healthchecks.io ping URL per scheduled job is Required —
-    // without it that job's silent failure (SAS ISS-01) would go undetected
-    // (TS §31, SA §32). All five of SA §23's Required jobs, not just the
-    // first one to be built.
-    for (const key of HEALTHCHECKS_PING_URL_KEYS) {
-      if (!validatedConfig[key]) {
-        missingProdKeys.push(
-          `${key} (dead-man's-switch for the matching scheduled job, TS §31/§32)`,
-        );
+    // Require monitoring for every job unless this deployment explicitly opts out.
+    if (validatedConfig.HEALTHCHECKS_ENABLED !== 'false') {
+      for (const key of HEALTHCHECKS_PING_URL_KEYS) {
+        if (!validatedConfig[key]) {
+          missingProdKeys.push(
+            `${key} (dead-man's-switch for the matching scheduled job, TS §31/§32)`,
+          );
+        }
       }
     }
 

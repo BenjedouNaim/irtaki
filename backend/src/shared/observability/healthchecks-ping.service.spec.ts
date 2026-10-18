@@ -39,6 +39,17 @@ describe('HealthchecksPingService (ADR-033, TS §31)', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it('does not send pings or warn when monitoring is explicitly disabled, even with a URL', async () => {
+    env.HEALTHCHECKS_ENABLED = 'false';
+    env[variable] = 'https://hc-ping.com/abc';
+
+    await expect(
+      service.pingSuccess('WEEKLY_REPORT_FINALIZATION'),
+    ).resolves.toBe('unconfigured');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('resolves "unconfigured" without a request when the variable is unset, warning once only', async () => {
     await expect(
       service.pingSuccess('WEEKLY_REPORT_FINALIZATION'),
