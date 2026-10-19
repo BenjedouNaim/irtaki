@@ -17,6 +17,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { enforceRTL } from '@/shared/config/rtl';
+import { AppViewport } from '@/shared/components/AppViewport';
 
 import { refreshAccessToken } from '@/shared/api/client';
 import { useAuthStore } from '@/shared/auth';
@@ -73,14 +74,16 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-        >
-          <Stack screenOptions={{ headerShown: false }} />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <AppViewport>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider
+            value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+          >
+            <Stack screenOptions={{ headerShown: false }} />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </AppViewport>
   );
 }

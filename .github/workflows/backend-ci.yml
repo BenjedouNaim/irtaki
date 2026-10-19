@@ -6,10 +6,19 @@ on:
     branches: [main]
   push:
     branches: [main]
-    paths: ['backend/**']
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+      - ".github/workflows/publish-image.yml"
+      - ".github/workflows/deploy-coolify.yml"
+      - ".github/scripts/**"
+permissions:
+  contents: read
 jobs:
   backend-ci:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.backend }}
     defaults:
       run:
         working-directory: backend
@@ -21,7 +30,7 @@ jobs:
       # development database name here would be a trap for whoever later adds a
       # step that does.
       DB_HOST: localhost
-      DB_PORT: '5432'
+      DB_PORT: "5432"
       DB_NAME: irtaki_ci_unit
       DB_USER: irtaki
       DB_PASS: irtaki
@@ -37,10 +46,14 @@ jobs:
         id: changes
         uses: dorny/paths-filter@v3
         with:
-          token: '' # use git diff instead of GitHub API (avoids permission errors)
+          token: "" # use git diff instead of GitHub API (avoids permission errors)
           filters: |
             backend:
               - 'backend/**'
+              - '.github/workflows/backend-ci.yml'
+              - '.github/workflows/publish-image.yml'
+              - '.github/workflows/deploy-coolify.yml'
+              - '.github/scripts/**'
 
       - name: Skip (no backend changes)
         if: steps.changes.outputs.backend == 'false'
@@ -123,7 +136,7 @@ jobs:
     env:
       NODE_ENV: test
       DB_HOST: localhost
-      DB_PORT: '5432'
+      DB_PORT: "5432"
       # Explicit, and deliberately NOT the development database name. The suite
       # runs destructive teardown helpers, so the name it connects to must never
       # be left to a default (ISS #145).
@@ -141,10 +154,14 @@ jobs:
         id: changes
         uses: dorny/paths-filter@v3
         with:
-          token: '' # use git diff instead of GitHub API (avoids permission errors)
+          token: "" # use git diff instead of GitHub API (avoids permission errors)
           filters: |
             backend:
               - 'backend/**'
+              - '.github/workflows/backend-ci.yml'
+              - '.github/workflows/publish-image.yml'
+              - '.github/workflows/deploy-coolify.yml'
+              - '.github/scripts/**'
 
       - name: Skip (no backend changes)
         if: steps.changes.outputs.backend == 'false'
@@ -175,3 +192,32 @@ jobs:
       - name: Integration tests
         if: steps.changes.outputs.backend == 'true'
         run: npm run test:e2e
+
+  backend-image:
+    needs: [backend-ci, backend-integration]
+    if: needs.backend-ci.outputs.changed == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-image.yml
+    with:
+      context: backend
+      image: backend
+
+  backend-deploy:
+    needs: backend-image
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/deploy-coolify.yml
+    with:
+      component: backend
+      application-uuid: ${{ vars.COOLIFY_BACKEND_APP_UUID }}
+      health-url: ${{ vars.COOLIFY_BACKEND_HEALTH_URL }}
+      image-name: ${{ needs.backend-image.outputs.image-name }}
+      image-digest: ${{ needs.backend-image.outputs.image-digest }}
+      workflow-file: backend-ci.yml
+    secrets:
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}

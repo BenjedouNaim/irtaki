@@ -1,0 +1,151 @@
+name: Container image
+
+on:
+  workflow_call:
+    outputs:
+      image-name:
+        description: Published GHCR image name
+        value: ${{ jobs.image.outputs.image-name }}
+      image-digest:
+        description: Verified immutable image digest
+        value: ${{ jobs.image.outputs.image-digest }}
+    inputs:
+      context:
+        description: Docker build context relative to the repository root
+        required: true
+        type: string
+      image:
+        description: Image suffix (backend or web)
+        required: true
+        type: string
+      api-base-url:
+        description: Public backend URL including /api/v1 (web image only)
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.image.outputs.name }}
+      image-digest: ${{ steps.publish.outputs.digest }}
+    env:
+      PUBLISH_IMAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: image-${{ inputs.image }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate deployment automation before publishing
+        run: node --test .github/scripts/deploy-coolify.test.mjs
+
+      - name: Set image name
+        id: image
+        env:
+          IMAGE_SUFFIX: ${{ inputs.image }}
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-${IMAGE_SUFFIX}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure web API URL
+        if: inputs.image == 'web'
+        id: web-config
+        env:
+          API_BASE_URL: ${{ inputs.api-base-url }}
+        run: |
+          if [[ -z "$API_BASE_URL" ]]; then
+            if [[ "$PUBLISH_IMAGE" == "true" ]]; then
+              echo "::error::Set the EXPO_PUBLIC_API_BASE_URL repository variable to the backend's public URL, including /api/v1."
+              exit 1
+            fi
+            # PRs can validate the image build before a domain is chosen.
+            # Images published from main must always have a configured API URL.
+            API_BASE_URL="https://api.example.invalid/api/v1"
+          fi
+          if [[ "$API_BASE_URL" == *$'\n'* || "$API_BASE_URL" == *$'\r'* ]]; then
+            echo "::error::EXPO_PUBLIC_API_BASE_URL must be a single URL."
+            exit 1
+          fi
+          printf 'build-args=EXPO_PUBLIC_API_BASE_URL=%s\n' "$API_BASE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=pr
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image for verification
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ inputs.context }}
+          platforms: linux/amd64
+          load: true
+          tags: irtaki-${{ inputs.image }}:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ steps.web-config.outputs.build-args }}
+          cache-from: type=gha,scope=${{ inputs.image }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image }}
+
+      - name: Check backend runtime dependencies
+        if: inputs.image == 'backend'
+        run: >-
+          docker run --rm -e DB_NAME=irtaki_ci_image irtaki-backend:ci
+          node -e "require('./dist/src/database/data-source'); require('argon2');"
+
+      - name: Check web server configuration
+        if: inputs.image == 'web'
+        run: docker run --rm irtaki-web:ci nginx -t
+
+      - name: Log in to GHCR
+        if: env.PUBLISH_IMAGE == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image
+        if: env.PUBLISH_IMAGE == 'true'
+        id: publish
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ inputs.context }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ steps.web-config.outputs.build-args }}
+
+      - name: Verify published image from GHCR
+        if: env.PUBLISH_IMAGE == 'true'
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          IMAGE_SUFFIX: ${{ inputs.image }}
+        run: |
+          image="$IMAGE_NAME@$IMAGE_DIGEST"
+          docker pull "$image"
+          revision=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
+          test "$revision" = "$GITHUB_SHA"
+          if [[ "$IMAGE_SUFFIX" == "backend" ]]; then
+            docker run --rm -e DB_NAME=irtaki_ci_image "$image" \
+              node -e "require('./dist/src/database/data-source'); require('argon2');"
+          else
+            docker run --rm "$image" nginx -t
+          fi
+          printf 'Published and pulled successfully: `%s`\n' "$image" >> "$GITHUB_STEP_SUMMARY"

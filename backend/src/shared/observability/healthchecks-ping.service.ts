@@ -12,7 +12,7 @@ const PING_TIMEOUT_MS = 5_000;
  * job silently fails → Healthchecks.io"). Closes SAS ISS-01.
  *
  * One ping URL per job, read from `HEALTHCHECKS_PING_URL_<JOB>` (TS §32,
- * Required — production boot fails without it, see `config/app.config.ts`).
+ * Required while monitoring is enabled in production; see `config/app.config.ts`).
  * Best-effort at run time: an unset variable (development/test) or an
  * unreachable Healthchecks.io is logged at WARN (TS §30 "recoverable
  * anomaly") and never surfaces to the caller — the job's own outcome is
@@ -32,6 +32,10 @@ export class HealthchecksPingService {
    * → `HEALTHCHECKS_PING_URL_WEEKLY_REPORT_FINALIZATION`).
    */
   async pingSuccess(jobKey: string): Promise<HealthchecksPingResult> {
+    if (this.configService.get<string>('HEALTHCHECKS_ENABLED') === 'false') {
+      return 'unconfigured';
+    }
+
     const variable = `HEALTHCHECKS_PING_URL_${jobKey}`;
     const url = this.configService.get<string>(variable)?.trim();
 
