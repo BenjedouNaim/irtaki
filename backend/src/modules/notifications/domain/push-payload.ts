@@ -6,11 +6,10 @@ import type { NotificationEventType } from './notification-event';
  * string }` — no name/content/score/amount field exists on the type at all
  * (BR-46, enforced by TypeScript, not convention)."
  *
- * Push payloads render on locked screens and traverse a third party
- * (EXT-03); NFR-10 restricts exactly this data. There is therefore no title,
- * no body and no data field beyond these two — the app resolves its own
- * Arabic copy from `eventType` and fetches whatever it needs with
- * `resourceId`.
+ * The application data remains limited to these two fields. The approved
+ * native-FCM transition permits static generic Arabic title/body text in
+ * the transport envelope so the OS can display an alert while the app is
+ * closed. Personal data still never crosses the push transport.
  *
  * Framework-free (TS §9). Instances are frozen.
  */

@@ -5,6 +5,39 @@ import {
 } from './app.config';
 
 describe('AppConfig Environment Validation', () => {
+  it.each([
+    'PRIVATE_INVALID_JSON',
+    '{}',
+    '{"type":"service_account","private_key":"PRIVATE_KEY"}',
+  ])(
+    'rejects malformed FCM configuration without revealing its value',
+    (credentials) => {
+      let message = '';
+      try {
+        validate({
+          NODE_ENV: Environment.Development,
+          DB_NAME: 'irtaki',
+          FCM_SERVICE_ACCOUNT_JSON: credentials,
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('FCM_SERVICE_ACCOUNT_JSON');
+      expect(message).not.toContain('PRIVATE');
+    },
+  );
+
+  it('requires FCM credentials in production even if job monitoring is disabled', () => {
+    expect(() =>
+      validate({
+        NODE_ENV: Environment.Production,
+        DB_NAME: 'irtaki',
+        JWT_ACCESS_SECRET: 'production-access-secret-32-chars-long',
+        JWT_REFRESH_PEPPER: 'production-refresh-pepper-32-chars-long',
+        HEALTHCHECKS_ENABLED: 'false',
+      }),
+    ).toThrow(/FCM_SERVICE_ACCOUNT_JSON/);
+  });
   it('validates a valid development environment configuration', () => {
     const validConfig = {
       NODE_ENV: Environment.Development,
@@ -54,6 +87,12 @@ describe('AppConfig Environment Validation', () => {
   describe('HEALTHCHECKS_PING_URL_* — one per scheduled job (TS §31/§32 Required)', () => {
     const prodConfig = {
       NODE_ENV: Environment.Production,
+      FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({
+        type: 'service_account',
+        project_id: 'test',
+        client_email: 'push@test.invalid',
+        private_key: 'test-key',
+      }),
       PORT: '3000',
       DB_HOST: 'db',
       DB_NAME: 'irtaki',

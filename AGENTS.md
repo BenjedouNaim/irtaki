@@ -6,6 +6,23 @@ If you (the agent) find this file inaccurate after a change you made, correct it
 
 ---
 
+## Approved notification transport transition (2026-11-01)
+
+The user approved replacing Expo Push Service/EAS with direct Firebase Cloud
+Messaging for Android and iOS. Firebase manages the APNs connection; the backend
+has one FCM sender. All eight events, recipients, schedules, preferences and
+suppression rules remain unchanged. The user also explicitly approved static
+generic Arabic notification title/body text for OS display while the app is
+closed. Application data remains exactly `{eventType, resourceId}`; no personal
+data, report contents, scores or payment amounts may be sent.
+
+`backend/README.md` and `mobile/README.md` document setup. Update only the
+`.env.example` templates; deployment credentials are supplied by the user.
+Baseline Expo transport/build statements and the strict data-only-envelope
+wording in `docs/SA.md`, `docs/TS.md`, and `docs/SAS.md` are superseded by this
+approval. Specification reconciliation is a separate flagged documentation task;
+do not edit those specifications as a side effect of this implementation.
+
 ## 1. What Irtaki Is
 
 A mobile app for managing **one** Quran memorization center in Tunisia — enrollment, group management, daily/weekly reporting, performance tracking, offline payment tracking. Single-tenant by design (no multi-center support — see §13). Data must legally stay in Tunisia; this is why hosting is self-hosted Tunisian VPS, not a foreign cloud (see §8).
@@ -45,7 +62,7 @@ All in `docs/`, in dependency order — each was built on top of the ones before
 | Backend | NestJS + TypeORM + PostgreSQL |
 | Auth | In-house JWT, **argon2id** password hashing — not bcrypt |
 | Email | Mailgun |
-| Push | FCM via Expo |
+| Push | Direct FCM (Android/iOS); Firebase manages APNs |
 | Hosting | Self-hosted Tunisian VPS pair, **Coolify** as deployment platform (data-residency requirement — not swappable for a foreign PaaS) |
 | Backups | MinIO on a second VPS |
 | API style | REST/JSON, URI-versioned, 54 endpoints / 13 resource groups |

@@ -65,6 +65,10 @@ jobs:
         if: steps.changes.outputs.mobile == 'true'
         run: npm run lint
 
+      - name: Validate native Firebase configuration
+        if: steps.changes.outputs.mobile == 'true'
+        run: npm run check:native-config
+
       - name: Type-check
         if: steps.changes.outputs.mobile == 'true'
         run: npm run type-check
@@ -72,15 +76,6 @@ jobs:
       - name: Unit tests
         if: steps.changes.outputs.mobile == 'true'
         run: npm run test:unit
-
-      # EAS Build and Submit placeholders — configure when Expo token exists
-      # - name: Setup Expo
-      #   uses: expo/expo-github-action@v8
-      #   with:
-      #     eas-version: latest
-      #     token: ${{ secrets.EXPO_TOKEN }}
-      # - name: EAS Build
-      #   run: eas build --platform all --non-interactive
 
   web-image:
     needs: mobile-ci

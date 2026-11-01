@@ -1,3 +1,65 @@
+# Irtaki backend — native FCM notifications
+
+The notification transport uses Firebase Admin SDK directly for Android and iOS.
+There is no Expo Push Service endpoint, EAS account, Expo project, or Expo access
+token in the delivery path. Firebase connects to APNs for iOS.
+
+## Deployment environment
+
+Update the deployment environment using `backend/.env.example`; do not deploy
+its development database/JWT defaults as production secrets. Existing database,
+authentication, timezone, and monitoring settings still apply.
+
+Set `FCM_SERVICE_ACCOUNT_JSON` to the **complete JSON content** of the Firebase
+service-account key, not its path and not `google-services.json`. In Coolify's
+runtime environment editor, paste raw JSON without surrounding dotenv quotes.
+For a dotenv file, use a single-line, single-quoted JSON value, preserving the
+literal `\n` escapes inside `private_key`. Never use `EXPO_PUBLIC_*` for this key.
+
+Enable Firebase Cloud Messaging API v1 in the same Google Cloud/Firebase project.
+The service account needs permission to send FCM messages (Firebase Cloud
+Messaging API Admin is the dedicated role). For iOS, upload an Apple APNs
+authentication key in Firebase Project settings → Cloud Messaging → iOS app
+configuration. The backend uses the same service-account configuration for both
+platforms; no separate backend APNs sender or Apple key is needed.
+
+Production boot requires FCM credentials. An empty value is allowed in local
+development/test; dispatch is then recorded as `Failed`, rather than pretending
+it was delivered. Malformed service-account configuration fails validation without
+printing the credential. Restart the backend after changing deployment secrets.
+No local `.env` files or real Firebase credentials are supplied by this change.
+
+## Notification contract
+
+The eight existing N-01…N-08 events, schedules, recipients, preferences, and
+suppression rules are unchanged. Application data remains exactly
+`{eventType, resourceId}`. The user approved a generic Arabic title/body in the
+FCM notification envelope on 2026-11-01, allowing the OS to display alerts while
+the app is closed. It never includes a name, report, score, metric, or amount.
+The app uses fixed generic text for foreground/local alerts too.
+
+`Sent` in `notification_log` means **FCM accepted the message**, not confirmed
+device delivery/display. Transient transport failures receive one application
+retry; invalid/unregistered tokens are invalidated. Credential, APNs setup,
+payload, and rate-limit failures do not invalidate healthy device tokens or
+receive an immediate retry. Provider error codes are logged without raw provider
+messages or tokens. Firebase SDK transport requests may perform their own retries;
+the adapter bounds each application's wait to ten seconds without cancelling an
+already accepted Firebase request, so duplicate delivery remains possible.
+Notification failure never blocks the business action that triggered it.
+
+Existing Expo tokens are retired when encountered; updated native apps register
+FCM tokens through the existing `POST /devices` endpoint. There are no new API
+endpoints, database migrations, or notification categories.
+
+The native app setup and physical-device verification checklist are in
+[`mobile/README.md`](../mobile/README.md). Baseline transport/EAS statements and
+the strict two-field envelope wording in `docs/SA.md`, `docs/TS.md`, and
+`docs/SAS.md` are superseded by the explicitly approved transition above.
+Reconciliation of those specifications remains a separate documentation task.
+
+---
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
