@@ -17,7 +17,7 @@ export class MailgunMailer implements IMailer {
     email: string,
     resetToken: string,
   ): Promise<void> {
-    const resetUrl = `mobile://(auth)/forgot-password-confirm?token=${encodeURIComponent(resetToken)}`;
+    const resetUrl = `irtaki://(auth)/forgot-password-confirm?token=${encodeURIComponent(resetToken)}`;
 
     if (!this.apiKey || !this.domain) {
       this.logger.log(
