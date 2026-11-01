@@ -217,7 +217,8 @@ export class NotificationService {
       }
     }
 
-    // 5. Log the outcome (FR-NOTIF-08).
+    // 5. Log the outcome (FR-NOTIF-08). Sent means accepted by FCM,
+    // not confirmed display/delivery on a device.
     const outcome: NotificationOutcome = anySent ? 'Sent' : 'Failed';
     await this.record(
       recipient.userId,
@@ -258,6 +259,12 @@ export class NotificationService {
         `Push token for device ${device.id} rejected as invalid, marking invalidated_at (E-09)`,
       );
       await this.context.invalidateDeviceToken(device.id);
+    }
+
+    if (result.status === 'permanent-failure') {
+      this.logger.warn(
+        `Push configuration or message rejected for device ${device.id}: ${result.detail ?? 'unknown error'}`,
+      );
     }
 
     return result;

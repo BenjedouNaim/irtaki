@@ -172,6 +172,32 @@ export function validate(
     skipMissingProperties: false,
   });
 
+  const pushCredentials = validatedConfig.FCM_SERVICE_ACCOUNT_JSON?.trim();
+  if (pushCredentials) {
+    try {
+      const account: unknown = JSON.parse(pushCredentials);
+      if (
+        typeof account !== 'object' ||
+        account === null ||
+        !('type' in account) ||
+        account.type !== 'service_account' ||
+        !['project_id', 'client_email', 'private_key'].every(
+          (key) =>
+            key in account &&
+            typeof (account as Record<string, unknown>)[key] === 'string' &&
+            (account as Record<string, string>)[key].trim().length > 0,
+        )
+      ) {
+        throw new Error('invalid service account');
+      }
+    } catch {
+      // Never attach the parser error or source value: this contains a private key.
+      throw new Error(
+        '[ConfigModule] FCM_SERVICE_ACCOUNT_JSON must be a service-account JSON with project_id, client_email and private_key',
+      );
+    }
+  }
+
   if (errors.length > 0) {
     const errorMessages = errors.map((err) => {
       const constraints = err.constraints
@@ -187,6 +213,11 @@ export function validate(
   // In production, enforce that critical secrets and parameters are explicitly supplied
   if (validatedConfig.NODE_ENV === Environment.Production) {
     const missingProdKeys: string[] = [];
+    if (!pushCredentials) {
+      missingProdKeys.push(
+        'FCM_SERVICE_ACCOUNT_JSON (direct FCM credentials required)',
+      );
+    }
     if (!validatedConfig.DATABASE_URL && !validatedConfig.DB_HOST) {
       missingProdKeys.push('DATABASE_URL or DB_HOST');
     }

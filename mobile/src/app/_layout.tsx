@@ -18,6 +18,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { enforceRTL } from '@/shared/config/rtl';
 import { AppViewport } from '@/shared/components/AppViewport';
+import { PushNotifications } from '@/features/notifications/components/PushNotifications';
 
 import { refreshAccessToken } from '@/shared/api/client';
 import { useAuthStore } from '@/shared/auth';
@@ -77,6 +78,7 @@ export default function RootLayout() {
     <AppViewport>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
+          <PushNotifications />
           <ThemeProvider
             value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
           >

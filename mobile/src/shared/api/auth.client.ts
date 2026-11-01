@@ -1,5 +1,6 @@
 import { request } from './client';
 import { Role } from '../auth/types';
+import { unregisterPushDevice } from '@/features/notifications/services/push-session';
 
 export interface RegisterRequest {
   email: string;
@@ -73,6 +74,7 @@ export async function refreshSession(
 }
 
 export async function logoutUser(refreshToken: string): Promise<void> {
+  await unregisterPushDevice();
   return request<void>('/auth/logout', {
     method: 'POST',
     body: {

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -59,10 +59,15 @@ const DEFAULT_BOTTOM_INSET = 22;
  *
  * Progress (Figma 30:553) and Payment (Figma 30:701) are unchanged.
  */
-export function StudentTabs() {
+export function StudentTabs({
+  notificationTab,
+}: { notificationTab?: string } = {}) {
   const router = useRouter();
   const insets = useContext(SafeAreaInsetsContext);
   const [tab, setTab] = useState<StudentTab>('home');
+  useEffect(() => {
+    setTab(notificationTab === 'payment' ? 'payment' : 'home');
+  }, [notificationTab]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { data, isLoading, isError, error, refetch } =
     useDashboard<StudentDashboardDto>();

@@ -18,7 +18,7 @@ import { NOTIFICATION_DISPATCH_CONTEXT_REPOSITORY } from './domain/notification-
 import { PUSH_SENDER } from './domain/push-sender.interface';
 import { NotificationLogRepository } from './infrastructure/notification-log.repository';
 import { NotificationDispatchContextRepository } from './infrastructure/notification-dispatch-context.repository';
-import { ExpoPushSender } from './infrastructure/expo-push.sender';
+import { FcmPushSender } from './infrastructure/fcm-push.sender';
 import { NotificationService } from './application/dispatch/notification.service';
 import { NOTIFICATION_EVALUATION_REPOSITORY } from './domain/notification-evaluation.repository.interface';
 import { NotificationEvaluationRepository } from './infrastructure/notification-evaluation.repository';
@@ -88,7 +88,7 @@ import { PaymentDueSoonEvaluationJob } from './infrastructure/jobs/payment-due-s
     },
     {
       provide: PUSH_SENDER,
-      useClass: ExpoPushSender,
+      useClass: FcmPushSender,
     },
     NotificationService,
     // F-NOT-05: the four event listeners (N-03/N-04/N-05/N-08) and the four

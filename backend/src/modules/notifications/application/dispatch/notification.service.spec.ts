@@ -163,6 +163,23 @@ describe('NotificationService.dispatch (SA §21)', () => {
     expect(sender.send).not.toHaveBeenCalled();
   });
 
+  it('does not retry or invalidate healthy devices on a permanent provider/configuration failure', async () => {
+    sender.send.mockResolvedValue({
+      status: 'permanent-failure',
+      transportReference: null,
+      detail: 'messaging/invalid-apns-credentials',
+    });
+    const result = await service.dispatch(
+      { type: 'N-05', resourceId: 'join-request-1' },
+      recipient,
+      'N-05',
+      now,
+    );
+    expect(result.outcome).toBe('Failed');
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(context.invalidateDeviceToken).not.toHaveBeenCalled();
+  });
+
   it('retries a transient failure exactly once (SAS §22.5)', async () => {
     sender.send
       .mockResolvedValueOnce({
