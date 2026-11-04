@@ -24,7 +24,8 @@
     "test:integration": "jest --config ./test/jest-e2e.json --runInBand",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
-    "seed": "ts-node seed/run-seed.ts"
+    "seed": "ts-node seed/run-seed.ts",
+    "job:run": "ts-node src/cli/run-job.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

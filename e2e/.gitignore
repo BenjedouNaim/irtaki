@@ -1,0 +1,6 @@
+logs/
+.inspect-session.json
+node_modules/
+*.png
+page-source.xml
+scripts/.scratch-*
