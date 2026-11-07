@@ -39,6 +39,16 @@ try {
   assert.equal(config.ios.bundleIdentifier, applicationId);
   assert.equal(config.ios.entitlements['aps-environment'], 'development');
   assert.ok(config.plugins.includes('@react-native-firebase/app'));
+  // Both libraries declare this metadata. Different values fail Android's manifest merge.
+  const firebaseConfig = require('../firebase.json')['react-native'];
+  const manifest = config._internal.modResults.android.manifest;
+  const defaultChannel = manifest.manifest.application[0]['meta-data'].find(
+    (entry) => entry.$['android:name'] === 'com.google.firebase.messaging.default_notification_channel_id',
+  );
+  assert.ok(defaultChannel, 'Expo must declare the default notification channel');
+  assert.equal(firebaseConfig.messaging_android_notification_channel_id, 'irtaki');
+  assert.equal(defaultChannel.$['android:value'], firebaseConfig.messaging_android_notification_channel_id,
+    'Expo and React Native Firebase must declare the same Android notification channel');
   console.log('Android/iOS Firebase config plugins and APNs entitlement verified with temporary fixtures.');
 } finally {
   rmSync(fixtureRoot, { recursive: true, force: true });

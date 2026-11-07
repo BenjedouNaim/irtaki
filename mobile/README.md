@@ -6,6 +6,14 @@ Expo remain the app framework; **Expo Push Service and EAS are not required**.
 channels, and foreground notification display; it does not send through Expo.
 The web build does not load Firebase native modules or register push devices.
 
+## Privacy policy
+
+`public/privacy.html` is a standalone Arabic HTML page with an embedded icon.
+Expo copies it into the web export, and the existing Nginx container serves it
+directly at `https://irtaki.chrigui.dev/privacy`, without requiring sign-in.
+The account-deletion instructions are at `/privacy#delete-account`.
+Redeploy the web container after changing the page or Nginx configuration.
+
 ## Firebase setup
 
 1. Add Firebase to your existing Google Cloud project if needed.
@@ -42,8 +50,9 @@ mobile apps are different from the private service-account key.
 
 Use Node 22 and `npm ci` in `mobile/`. React Native Firebase is pinned to 23.5.0
 for compatibility with this repository's Expo SDK 54 / Node 22 setup.
+Expo UI is pinned to exactly `0.2.0-beta.9` for SDK 54 native compatibility.
 
-Android requires Android Studio, its SDK/JDK setup, and a supported device/emulator
+Android requires the Android SDK/JDK tools and a supported device/emulator
 with Google Play services. iOS requires macOS, Xcode, CocoaPods, and appropriate
 Apple signing. For final notification verification, use physical devices.
 
@@ -63,6 +72,40 @@ The production API must be reachable by the device. `localhost` on a phone means
 the phone itself; use your backend's HTTPS URL (or LAN address for local testing).
 Generate a release build and configure app-store signing using the native
 Android/Xcode tools; debug builds are not distribution artifacts.
+
+### Signed Android bundle from the terminal
+
+Run in `mobile/` after `npm ci` and the Firebase/environment setup above:
+
+```sh
+npm run release:android
+```
+
+The command loads the production environment, regenerates Android with Expo
+prebuild, and builds an AAB signed by Gradle using your existing upload key.
+Android Studio does not need to be open. It selects an installed nvm Node 22
+and macOS JDK 21 when available; otherwise use Node 22 and set `JAVA_HOME` to
+JDK 21 or 17. Install the Android SDK and set `ANDROID_HOME` for a custom location.
+
+The final verified upload file is `dist/android/irtaki-<version>-<versionCode>.aab`.
+It verifies the signature and selected upload certificate before replacing an
+existing output, and rejects debug certificates. Back up your keystore outside Git.
+For each subsequent Play upload, increase `expo.android.versionCode` in `app.json`;
+the command does not increment it automatically.
+
+Set these in your ignored local `.env` (CI can supply private environment secrets):
+
+- `ANDROID_UPLOAD_KEYSTORE`: defaults to `~/Documents/irtaki-upload.jks`.
+- `ANDROID_UPLOAD_KEY_ALIAS`: defaults to `irtaki-upload`.
+- `ANDROID_UPLOAD_STORE_PASSWORD`: required; quote it and escape dollar signs as
+  `\$` because Expo expands environment variables.
+- `ANDROID_UPLOAD_KEY_PASSWORD`: leave blank if it matches the keystore password.
+
+The command never prompts. Missing signing settings fail before prebuild.
+Keep passwords private and never use an `EXPO_PUBLIC_` prefix for them.
+
+Signing configuration lives outside the generated native directory so it survives
+prebuild. Passwords are excluded from Expo prebuild and command arguments.
 
 ## Registration and notification behavior
 
